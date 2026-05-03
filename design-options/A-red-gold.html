@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>方案A · 深红金典雅</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+body { font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif; background: #fdf8f3; max-width: 430px; margin: 0 auto; min-height: 100vh; }
+
+/* ── TOP BAR ── */
+.topbar { background: linear-gradient(135deg, #1a0505 0%, #6b1414 100%); padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; }
+.logo-row { display: flex; align-items: center; gap: 10px; }
+.logo-circle { width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.brand-name { color: white; font-weight: 800; font-size: 15px; }
+.brand-sub { color: #f4a460; font-size: 10px; letter-spacing: 0.5px; margin-top: 1px; }
+.call-btn { background: rgba(212,168,83,0.2); border: 1px solid rgba(212,168,83,0.4); color: #f4d03f; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+
+/* ── HERO ── */
+.hero { background: linear-gradient(170deg, #1a0505 0%, #6b1414 45%, #a93226 100%); padding: 28px 20px 36px; position: relative; overflow: hidden; }
+.hero::after { content: ''; position: absolute; top: -60px; right: -60px; width: 200px; height: 200px; border-radius: 50%; background: rgba(212,168,83,0.08); }
+.hero-tag { display: inline-flex; align-items: center; gap: 6px; background: rgba(212,168,83,0.18); border: 1px solid rgba(212,168,83,0.3); color: #f4d03f; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-bottom: 14px; }
+.hero h1 { color: white; font-size: 26px; font-weight: 900; line-height: 1.25; margin-bottom: 8px; }
+.hero h1 span { color: #f4d03f; }
+.hero p { color: rgba(255,255,255,0.65); font-size: 13px; line-height: 1.6; margin-bottom: 22px; }
+.btn-row { display: flex; gap: 10px; }
+.btn-primary { flex: 1; background: linear-gradient(135deg, #c8972a, #f4d03f); color: #1a0505; font-weight: 800; padding: 14px; border-radius: 14px; border: none; font-size: 14px; }
+.btn-outline { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 14px 18px; border-radius: 14px; font-size: 13px; font-weight: 600; }
+
+/* ── TRUST ── */
+.trust { background: white; padding: 16px 20px; display: grid; grid-template-columns: repeat(4,1fr); border-bottom: 1px solid #f0e6d3; }
+.trust-item { text-align: center; }
+.trust-val { font-size: 15px; font-weight: 800; color: #6b1414; }
+.trust-lbl { font-size: 10px; color: #999; margin-top: 2px; }
+
+/* ── SERVICES ── */
+.sec { padding: 20px 16px; }
+.sec-title { font-size: 11px; font-weight: 700; color: #b08040; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 14px; }
+
+/* Featured moving card */
+.move-card { background: linear-gradient(135deg, #1a0505, #6b1414); border-radius: 20px; padding: 20px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 8px 24px rgba(107,20,20,0.3); }
+.move-left h3 { color: white; font-size: 20px; font-weight: 900; margin-bottom: 4px; }
+.move-left p { color: rgba(255,255,255,0.6); font-size: 12px; }
+.move-badge { background: rgba(212,168,83,0.2); color: #f4d03f; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 8px; margin-bottom: 8px; display: inline-block; }
+.move-price { color: #f4d03f; font-size: 22px; font-weight: 900; text-align: right; }
+.move-price span { font-size: 12px; color: rgba(255,255,255,0.5); font-weight: 400; }
+.move-icon { font-size: 40px; }
+
+/* Other services */
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.svc-card { background: white; border-radius: 18px; padding: 18px 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); border: 1px solid #f5e6d3; }
+.svc-icon { font-size: 28px; margin-bottom: 10px; }
+.svc-name { font-size: 14px; font-weight: 700; color: #1a1a1a; margin-bottom: 3px; }
+.svc-desc { font-size: 11px; color: #aaa; line-height: 1.4; }
+.svc-link { font-size: 11px; color: #c0392b; font-weight: 600; margin-top: 8px; }
+
+/* ── WHY US ── */
+.why { background: white; margin: 0 0 80px; }
+.why-item { display: flex; align-items: center; gap: 14px; padding: 14px 20px; border-bottom: 1px solid #fdf5ec; }
+.why-icon { font-size: 22px; flex-shrink: 0; }
+.why-title { font-size: 14px; font-weight: 700; color: #1a1a1a; }
+.why-desc { font-size: 12px; color: #aaa; margin-top: 2px; }
+
+/* ── BOTTOM CTA ── */
+.bottom-cta { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #f0e6d3; padding: 12px 16px 24px; display: flex; gap: 10px; max-width: 430px; margin: 0 auto; }
+.cta-call { flex: 1; background: #fdf5ec; color: #6b1414; font-weight: 700; padding: 14px; border-radius: 14px; border: none; font-size: 14px; }
+.cta-book { flex: 1.5; background: linear-gradient(135deg, #6b1414, #c0392b); color: white; font-weight: 800; padding: 14px; border-radius: 14px; border: none; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo-row">
+    <div class="logo-circle">🏠</div>
+    <div>
+      <div class="brand-name">迁喜搬家</div>
+      <div class="brand-sub">MOVE WITH EASE · SYDNEY</div>
+    </div>
+  </div>
+  <button class="call-btn">📞 致电</button>
+</div>
+
+<div class="hero">
+  <div class="hero-tag">⭐ 悉尼华人搬家首选</div>
+  <h1>专业搬运<br><span>安心无忧</span></h1>
+  <p>华人团队 · 中英双语 · 全程保险<br>搬家 · IKEA · 寄存 · 清洁</p>
+  <div class="btn-row">
+    <button class="btn-primary">立即预约搬家 →</button>
+    <button class="btn-outline">📞</button>
+  </div>
+</div>
+
+<div class="trust">
+  <div class="trust-item"><div class="trust-val">98%</div><div class="trust-lbl">好评率</div></div>
+  <div class="trust-item"><div class="trust-val">2000+</div><div class="trust-lbl">订单</div></div>
+  <div class="trust-item"><div class="trust-val">悉尼</div><div class="trust-lbl">全区</div></div>
+  <div class="trust-item"><div class="trust-val">投保</div><div class="trust-lbl">保障</div></div>
+</div>
+
+<div class="sec">
+  <div class="sec-title">✦ 我们的服务</div>
+
+  <div class="move-card">
+    <div class="move-left">
+      <div class="move-badge">最热门</div>
+      <h3>搬家搬运</h3>
+      <p>面包车 / 小卡车 / 大卡车</p>
+    </div>
+    <div style="text-align:right">
+      <div class="move-icon">🚛</div>
+      <div class="move-price">$60<span>/起</span></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="svc-card">
+      <div class="svc-icon">🛋️</div>
+      <div class="svc-name">IKEA 安装</div>
+      <div class="svc-desc">代购提货 · 专业安装</div>
+      <div class="svc-link">了解更多 ›</div>
+    </div>
+    <div class="svc-card">
+      <div class="svc-icon">📦</div>
+      <div class="svc-name">物品寄存</div>
+      <div class="svc-desc">按周计费 · 灵活取用</div>
+      <div class="svc-link">了解更多 ›</div>
+    </div>
+    <div class="svc-card">
+      <div class="svc-icon">✨</div>
+      <div class="svc-name">清洁服务</div>
+      <div class="svc-desc">交房验房 · 细致入微</div>
+      <div class="svc-link">了解更多 ›</div>
+    </div>
+    <div class="svc-card">
+      <div class="svc-icon">♻️</div>
+      <div class="svc-name">二手物品</div>
+      <div class="svc-desc">优质二手 · 合理定价</div>
+      <div class="svc-link">了解更多 ›</div>
+    </div>
+  </div>
+</div>
+
+<div class="why">
+  <div class="why-item"><span class="why-icon">🏆</span><div><div class="why-title">专业团队</div><div class="why-desc">多年经验，物品零损坏承诺</div></div></div>
+  <div class="why-item"><span class="why-icon">💬</span><div><div class="why-title">中英双语</div><div class="why-desc">华人团队，沟通无障碍</div></div></div>
+  <div class="why-item"><span class="why-icon">📅</span><div><div class="why-title">7天随约</div><div class="why-desc">急搬也能安排，时间灵活</div></div></div>
+  <div class="why-item"><span class="why-icon">🔒</span><div><div class="why-title">全程保险</div><div class="why-desc">正规运营投保，安心无忧</div></div></div>
+</div>
+
+<div class="bottom-cta">
+  <button class="cta-call">📞 电话咨询</button>
+  <button class="cta-book">立即预约 →</button>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>方案F · 暖橙活力</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+body { font-family: -apple-system, 'PingFang SC', sans-serif; background: #fffbf5; max-width: 430px; margin: 0 auto; min-height: 100vh; }
+
+.topbar { background: white; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #fff0e0; }
+.logo-row { display: flex; align-items: center; gap: 10px; }
+.logo-box { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #ea580c, #f97316); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.brand-name { font-size: 15px; font-weight: 800; color: #c2410c; }
+.brand-sub { font-size: 10px; color: #fdba74; margin-top: 1px; }
+.call-btn { background: #fff7ed; border: 1.5px solid #f97316; color: #ea580c; padding: 7px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+
+.hero { background: linear-gradient(155deg, #c2410c 0%, #ea580c 45%, #f97316 100%); padding: 28px 20px 40px; position: relative; overflow: hidden; }
+.hero::after { content: ''; position: absolute; bottom: -60px; right: -40px; width: 200px; height: 200px; border-radius: 50%; background: rgba(255,255,255,0.07); }
+.hero::before { content: ''; position: absolute; top: -20px; left: 30%; width: 140px; height: 140px; border-radius: 50%; background: rgba(255,255,255,0.04); }
+.hero-tag { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.18); color: white; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-bottom: 14px; }
+.hero h1 { color: white; font-size: 28px; font-weight: 900; line-height: 1.2; margin-bottom: 10px; }
+.hero h1 span { color: #fed7aa; }
+.hero p { color: rgba(255,255,255,0.78); font-size: 13px; line-height: 1.6; margin-bottom: 24px; }
+.btn-row { display: flex; gap: 10px; }
+.btn-primary { flex: 1; background: white; color: #c2410c; font-weight: 800; padding: 15px; border-radius: 14px; border: none; font-size: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+.btn-call { background: rgba(255,255,255,0.18); border: 1.5px solid rgba(255,255,255,0.3); color: white; padding: 15px 18px; border-radius: 14px; font-size: 13px; font-weight: 600; }
+
+.trust { background: white; display: grid; grid-template-columns: repeat(4,1fr); padding: 14px 16px; border-bottom: 1px solid #fff0e0; }
+.trust-item { text-align: center; }
+.trust-val { font-size: 15px; font-weight: 800; color: #c2410c; }
+.trust-lbl { font-size: 10px; color: #9ca3af; margin-top: 2px; }
+
+.sec { padding: 22px 16px; }
+.sec-label { font-size: 11px; font-weight: 700; color: #ea580c; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 14px; }
+
+.move-card { background: linear-gradient(135deg, #c2410c, #f97316); border-radius: 20px; padding: 20px; margin-bottom: 12px; box-shadow: 0 8px 24px rgba(234,88,12,0.28); }
+.move-card-inner { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.move-tag { background: rgba(255,255,255,0.2); color: white; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 8px; display: inline-block; margin-bottom: 6px; }
+.move-card h3 { color: white; font-size: 20px; font-weight: 900; }
+.move-card p { color: rgba(255,255,255,0.65); font-size: 12px; margin-top: 2px; }
+.move-emoji { font-size: 44px; }
+.move-price-box { text-align: right; }
+.move-price { color: #fed7aa; font-size: 26px; font-weight: 900; }
+.move-price span { font-size: 12px; color: rgba(255,255,255,0.45); font-weight: 400; }
+.move-btn { background: white; color: #c2410c; font-weight: 800; padding: 13px; border-radius: 12px; border: none; width: 100%; font-size: 14px; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.svc-card { background: white; border-radius: 18px; padding: 18px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); border: 1.5px solid #fff0e0; }
+.svc-icon { font-size: 28px; margin-bottom: 10px; }
+.svc-name { font-size: 14px; font-weight: 700; color: #1d1d1f; }
+.svc-desc { font-size: 11px; color: #9ca3af; margin-top: 3px; line-height: 1.4; }
+.svc-link { font-size: 11px; color: #ea580c; font-weight: 600; margin-top: 10px; }
+
+.why { background: white; border-top: 1px solid #fff0e0; margin-bottom: 100px; }
+.why-item { display: flex; align-items: center; gap: 14px; padding: 15px 20px; border-bottom: 1px solid #fffbf5; }
+.why-icon { font-size: 22px; flex-shrink: 0; }
+.why-title { font-size: 14px; font-weight: 700; color: #1c1917; }
+.why-desc { font-size: 12px; color: #9ca3af; margin-top: 2px; }
+
+.bottom-cta { position: fixed; bottom: 0; left: 0; right: 0; max-width: 430px; margin: 0 auto; background: white; border-top: 1px solid #fff0e0; padding: 12px 16px 28px; display: flex; gap: 10px; }
+.cta-call { flex: 1; background: #fff7ed; color: #c2410c; font-weight: 700; padding: 14px; border-radius: 14px; border: 1.5px solid #f97316; font-size: 14px; }
+.cta-book { flex: 1.5; background: linear-gradient(135deg, #c2410c, #f97316); color: white; font-weight: 800; padding: 14px; border-radius: 14px; border: none; font-size: 14px; box-shadow: 0 4px 14px rgba(234,88,12,0.3); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo-row">
+    <div class="logo-box">🏠</div>
+    <div><div class="brand-name">迁喜搬家</div><div class="brand-sub">Move With Ease · Sydney</div></div>
+  </div>
+  <button class="call-btn">📞 致电</button>
+</div>
+
+<div class="hero">
+  <div class="hero-tag">🔥 悉尼华人搬家首选</div>
+  <h1>搬家省心<br><span>专业靠谱</span></h1>
+  <p>华人团队 · 中英双语 · 7天服务<br>悉尼全区覆盖 · 全程保险保障</p>
+  <div class="btn-row">
+    <button class="btn-primary">立即在线预约 →</button>
+    <button class="btn-call">📞</button>
+  </div>
+</div>
+
+<div class="trust">
+  <div class="trust-item"><div class="trust-val">98%</div><div class="trust-lbl">好评率</div></div>
+  <div class="trust-item"><div class="trust-val">2000+</div><div class="trust-lbl">订单</div></div>
+  <div class="trust-item"><div class="trust-val">悉尼</div><div class="trust-lbl">全区</div></div>
+  <div class="trust-item"><div class="trust-val">投保</div><div class="trust-lbl">保障</div></div>
+</div>
+
+<div class="sec">
+  <div class="sec-label">✦ 我们的服务</div>
+  <div class="move-card">
+    <div class="move-card-inner">
+      <div>
+        <span class="move-tag">⭐ 最热门</span>
+        <h3>搬家搬运</h3>
+        <p>面包车 / 小卡车 / 大卡车</p>
+      </div>
+      <div class="move-price-box">
+        <div class="move-emoji">🚛</div>
+        <div class="move-price">$60<span>/h起</span></div>
+      </div>
+    </div>
+    <button class="move-btn">立即预约搬家 →</button>
+  </div>
+  <div class="grid2">
+    <div class="svc-card"><div class="svc-icon">🛋️</div><div class="svc-name">IKEA 安装</div><div class="svc-desc">代购提货 · 安装</div><div class="svc-link">预约 ›</div></div>
+    <div class="svc-card"><div class="svc-icon">📦</div><div class="svc-name">物品寄存</div><div class="svc-desc">按周计费</div><div class="svc-link">预约 ›</div></div>
+    <div class="svc-card"><div class="svc-icon">✨</div><div class="svc-name">清洁服务</div><div class="svc-desc">交房验房</div><div class="svc-link">预约 ›</div></div>
+    <div class="svc-card"><div class="svc-icon">♻️</div><div class="svc-name">二手物品</div><div class="svc-desc">优质二手</div><div class="svc-link">浏览 ›</div></div>
+  </div>
+</div>
+
+<div class="why">
+  <div class="why-item"><span class="why-icon">🏆</span><div><div class="why-title">专业团队</div><div class="why-desc">经验丰富，物品零损坏</div></div></div>
+  <div class="why-item"><span class="why-icon">💬</span><div><div class="why-title">中英双语</div><div class="why-desc">华人团队，沟通无障碍</div></div></div>
+  <div class="why-item"><span class="why-icon">📅</span><div><div class="why-title">7天随约</div><div class="why-desc">急搬也能安排，灵活</div></div></div>
+  <div class="why-item"><span class="why-icon">🔒</span><div><div class="why-title">全程保险</div><div class="why-desc">正规运营，安心无忧</div></div></div>
+</div>
+
+<div class="bottom-cta">
+  <button class="cta-call">📞 致电</button>
+  <button class="cta-book">立即预约 →</button>
+</div>
+</body>
+</html>

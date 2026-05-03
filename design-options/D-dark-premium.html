@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>方案D · 暗夜高端黑</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+body { font-family: -apple-system, 'PingFang SC', sans-serif; background: #0a0a0a; max-width: 430px; margin: 0 auto; min-height: 100vh; color: white; }
+
+.topbar { background: #111111; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #222; }
+.brand { font-size: 16px; font-weight: 900; color: white; letter-spacing: -0.5px; }
+.brand em { color: #ff6b35; font-style: normal; }
+.call-btn { background: #1e1e1e; border: 1px solid #333; color: #ff6b35; padding: 7px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+
+.hero { background: #111; padding: 32px 20px 36px; border-bottom: 1px solid #1e1e1e; position: relative; overflow: hidden; }
+.hero::after { content: ''; position: absolute; top: 0; right: 0; width: 120px; height: 120px; background: radial-gradient(circle, rgba(255,107,53,0.12) 0%, transparent 70%); }
+.hero-tag { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,107,53,0.12); border: 1px solid rgba(255,107,53,0.25); color: #ff6b35; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-bottom: 16px; }
+.hero h1 { font-size: 30px; font-weight: 900; line-height: 1.2; margin-bottom: 10px; letter-spacing: -1px; }
+.hero h1 span { color: #ff6b35; }
+.hero p { color: #666; font-size: 13px; line-height: 1.7; margin-bottom: 26px; }
+.btn-row { display: flex; gap: 10px; }
+.btn-primary { flex: 1; background: #ff6b35; color: white; font-weight: 800; padding: 16px; border-radius: 14px; border: none; font-size: 14px; box-shadow: 0 4px 20px rgba(255,107,53,0.35); }
+.btn-call { background: #1e1e1e; border: 1px solid #333; color: white; padding: 16px 18px; border-radius: 14px; font-size: 13px; font-weight: 600; }
+
+.trust { background: #111; display: grid; grid-template-columns: repeat(4,1fr); padding: 14px 16px; border-bottom: 1px solid #1e1e1e; }
+.trust-item { text-align: center; }
+.trust-val { font-size: 15px; font-weight: 800; color: #ff6b35; }
+.trust-lbl { font-size: 10px; color: #555; margin-top: 2px; }
+
+.sec { padding: 22px 16px; }
+.sec-label { font-size: 11px; font-weight: 700; color: #444; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 14px; }
+
+.move-card { background: #151515; border: 1px solid #222; border-radius: 20px; padding: 20px; margin-bottom: 12px; position: relative; overflow: hidden; }
+.move-card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255,107,53,0.05) 0%, transparent 60%); }
+.move-top { display: flex; justify-content: space-between; margin-bottom: 8px; }
+.move-badge { background: rgba(255,107,53,0.15); color: #ff6b35; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 8px; }
+.move-emoji { font-size: 32px; }
+.move-card h3 { font-size: 22px; font-weight: 900; margin-bottom: 4px; }
+.move-price { color: #ff6b35; font-size: 26px; font-weight: 900; text-align: right; }
+.move-price span { font-size: 12px; color: #555; font-weight: 400; }
+.move-card p { color: #555; font-size: 12px; margin-bottom: 16px; }
+.move-btn { background: #ff6b35; color: white; font-weight: 700; padding: 13px; border-radius: 12px; border: none; width: 100%; font-size: 14px; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.svc-card { background: #151515; border: 1px solid #1e1e1e; border-radius: 18px; padding: 18px; }
+.svc-icon { font-size: 28px; margin-bottom: 10px; }
+.svc-name { font-size: 14px; font-weight: 700; color: white; }
+.svc-desc { font-size: 11px; color: #555; margin-top: 3px; line-height: 1.4; }
+.svc-link { font-size: 11px; color: #ff6b35; font-weight: 600; margin-top: 10px; }
+
+.why-sec { padding: 0 0 100px; }
+.why-item { display: flex; align-items: center; gap: 14px; padding: 15px 20px; border-bottom: 1px solid #151515; }
+.why-icon { font-size: 22px; }
+.why-title { font-size: 14px; font-weight: 700; color: white; }
+.why-desc { font-size: 12px; color: #555; margin-top: 2px; }
+
+.bottom-cta { position: fixed; bottom: 0; left: 0; right: 0; max-width: 430px; margin: 0 auto; background: #111; border-top: 1px solid #222; padding: 12px 16px 28px; display: flex; gap: 10px; }
+.cta-call { flex: 1; background: #1e1e1e; border: 1px solid #333; color: white; font-weight: 700; padding: 14px; border-radius: 14px; font-size: 14px; }
+.cta-book { flex: 1.5; background: #ff6b35; color: white; font-weight: 800; padding: 14px; border-radius: 14px; border: none; font-size: 14px; box-shadow: 0 4px 16px rgba(255,107,53,0.3); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">迁喜搬家 <em>·</em> MWE</div>
+  <button class="call-btn">📞 联系</button>
+</div>
+
+<div class="hero">
+  <div class="hero-tag">🚛 悉尼专业搬运团队</div>
+  <h1>搬家交给<br><span>专业的我们</span></h1>
+  <p>华人团队 · 中英双语 · 全程投保<br>悉尼全区 · 7天服务 · 按时到达</p>
+  <div class="btn-row">
+    <button class="btn-primary">立即预约 →</button>
+    <button class="btn-call">📞 致电</button>
+  </div>
+</div>
+
+<div class="trust">
+  <div class="trust-item"><div class="trust-val">98%</div><div class="trust-lbl">好评</div></div>
+  <div class="trust-item"><div class="trust-val">2000+</div><div class="trust-lbl">订单</div></div>
+  <div class="trust-item"><div class="trust-val">全区</div><div class="trust-lbl">覆盖</div></div>
+  <div class="trust-item"><div class="trust-val">投保</div><div class="trust-lbl">保障</div></div>
+</div>
+
+<div class="sec">
+  <div class="sec-label">── 服务项目</div>
+  <div class="move-card">
+    <div class="move-top">
+      <span class="move-badge">⭐ 最热门</span>
+      <span class="move-emoji">🚛</span>
+    </div>
+    <h3>搬家搬运</h3>
+    <p>面包车 / 小卡车 / 大卡车可选</p>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;">
+      <button class="move-btn" style="width:auto;padding:12px 24px">立即预约 →</button>
+      <div class="move-price">$60<span>/h起</span></div>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="svc-card"><div class="svc-icon">🛋️</div><div class="svc-name">IKEA 安装</div><div class="svc-desc">代购 · 安装</div><div class="svc-link">预约 ›</div></div>
+    <div class="svc-card"><div class="svc-icon">📦</div><div class="svc-name">物品寄存</div><div class="svc-desc">按周计费</div><div class="svc-link">预约 ›</div></div>
+    <div class="svc-card"><div class="svc-icon">✨</div><div class="svc-name">清洁服务</div><div class="svc-desc">交房验房</div><div class="svc-link">预约 ›</div></div>
+    <div class="svc-card"><div class="svc-icon">♻️</div><div class="svc-name">二手物品</div><div class="svc-desc">优质二手</div><div class="svc-link">浏览 ›</div></div>
+  </div>
+</div>
+
+<div class="why-sec">
+  <div class="why-item"><span class="why-icon">🏆</span><div><div class="why-title">专业团队</div><div class="why-desc">多年经验，零损坏承诺</div></div></div>
+  <div class="why-item"><span class="why-icon">💬</span><div><div class="why-title">中英双语</div><div class="why-desc">华人团队，沟通零障碍</div></div></div>
+  <div class="why-item"><span class="why-icon">📅</span><div><div class="why-title">7天随约</div><div class="why-desc">急搬当天可安排</div></div></div>
+  <div class="why-item"><span class="why-icon">🔒</span><div><div class="why-title">全程保险</div><div class="why-desc">正规投保，损坏赔付</div></div></div>
+</div>
+
+<div class="bottom-cta">
+  <button class="cta-call">📞 致电</button>
+  <button class="cta-book">立即预约搬家</button>
+</div>
+</body>
+</html>
