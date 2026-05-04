@@ -17,10 +17,15 @@ export async function autocompleteAddress(input) {
       }),
     })
     const data = await res.json()
+    if (data.error) {
+      console.error('[Places API]', data.error.status, data.error.message)
+      return []
+    }
     return data.suggestions
       ?.map(s => s.placePrediction?.text?.text)
       .filter(Boolean) || []
-  } catch {
+  } catch (e) {
+    console.error('[Places API] fetch error', e)
     return []
   }
 }
@@ -44,10 +49,15 @@ export async function getDistanceKm(origin, destination) {
       }),
     })
     const data = await res.json()
+    if (data.error) {
+      console.error('[Routes API]', data.error.status, data.error.message)
+      return null
+    }
     const meters = data.routes?.[0]?.distanceMeters
     if (!meters) return null
     return Math.round(meters / 100) / 10
-  } catch {
+  } catch (e) {
+    console.error('[Routes API] fetch error', e)
     return null
   }
 }
