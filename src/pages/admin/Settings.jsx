@@ -40,7 +40,7 @@ export default function Settings() {
 
   function handleSaveEdit() {
     if (!editingStaff) return
-    const updates = { role: editingStaff.role, username: editingStaff.username }
+    const updates = { name: editingStaff.name, role: editingStaff.role, username: editingStaff.username }
     if (editingStaff.password) updates.password = editingStaff.password
     updateStaffMember(editingStaff.id, updates)
     setEditingStaff(null)
@@ -136,6 +136,11 @@ export default function Settings() {
                   <button onClick={() => setEditingStaff(null)} className="text-gray-400 text-xl">×</button>
                 </div>
                 <div className="px-5 py-4 space-y-3">
+                  <Field label="显示姓名">
+                    <input value={editingStaff.name}
+                      onChange={e => setEditingStaff(f => ({ ...f, name: e.target.value }))}
+                      className={inputCls} />
+                  </Field>
                   <Field label="登录账号">
                     <input value={editingStaff.username}
                       onChange={e => setEditingStaff(f => ({ ...f, username: e.target.value }))}
