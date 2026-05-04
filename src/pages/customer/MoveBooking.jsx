@@ -32,7 +32,7 @@ const VEHICLES = [
     loadRef: '约可装 30 箱纸箱 / 1 个床垫 / 少量小型家具',
     note: '物品较多（2 房以上）建议选小卡车',
     configs: [
-      { key: '面包车', label: '司机 1 人', people: 1, rate: 60, minHours: 1 },
+      { key: '面包车', label: '司机 1 人', people: 1, rate: 60, minHours: 1, returnFee: 50 },
     ],
   },
   {
@@ -48,8 +48,8 @@ const VEHICLES = [
     loadRef: '约可装 1–2 房间全部家具及物品',
     note: null,
     configs: [
-      { key: '小卡车',   label: '2 人团队', people: 2, rate: 110, minHours: 2 },
-      { key: '小卡三人', label: '3 人团队', people: 3, rate: 160, minHours: 2 },
+      { key: '小卡车',   label: '2 人团队', people: 2, rate: 110, minHours: 2, returnFee: 110 },
+      { key: '小卡三人', label: '3 人团队', people: 3, rate: 160, minHours: 2, returnFee: 160 },
     ],
   },
   {
@@ -64,8 +64,8 @@ const VEHICLES = [
     loadRef: '约可装 3–5 房间全部物品',
     note: null,
     configs: [
-      { key: '大卡车',   label: '2 人团队', people: 2, rate: 120, minHours: 2 },
-      { key: '大卡三人', label: '3 人团队', people: 3, rate: 165, minHours: 2 },
+      { key: '大卡车',   label: '2 人团队', people: 2, rate: 120, minHours: 2, returnFee: 120 },
+      { key: '大卡三人', label: '3 人团队', people: 3, rate: 165, minHours: 2, returnFee: 165 },
     ],
   },
 ]
@@ -489,9 +489,26 @@ export default function MoveBooking() {
                   </div>
                 </div>
               )}
+              {/* Return trip fee */}
+              {(() => {
+                const fee = vehicle.configs[configIdx]?.returnFee
+                return fee ? (
+                  <div className="rounded-xl px-3 py-2.5 mb-3 flex items-start justify-between gap-3"
+                    style={{ background: '#FFF8F7', border: '1px solid #EAD5D1' }}>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-600">出车回程费</p>
+                      <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                        一次性收费，会依据距离远近上调或下调，具体以客服报价为准
+                      </p>
+                    </div>
+                    <p className="text-base font-black flex-shrink-0" style={{ color: '#B3475C' }}>
+                      ${fee}<span className="text-xs font-normal text-gray-400">起</span>
+                    </p>
+                  </div>
+                ) : null
+              })()}
               <div className="text-xs text-gray-400 space-y-1">
                 <p>· 计费从到达客户家与客服见面时开始，到物品搬运完毕检查车辆结束</p>
-                <p>· 返程费用一次性收费，会依据距离远近上调或下调费用，具体请以客服报价为准</p>
                 <p>· 最终报价以客服确认为准</p>
               </div>
             </div>
