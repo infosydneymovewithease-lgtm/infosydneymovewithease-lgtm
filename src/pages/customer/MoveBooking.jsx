@@ -24,9 +24,7 @@ const VEHICLES = [
     id: 'van', name: '面包车', nameEn: 'Toyota Hiace',
     tagline: '小件搬运首选，灵活便捷',
     volume: '6.2', weight: null, dims: '2.55 × 1.54 × 1.32 m',
-    img: '/images/van.jpg',
-    imgScale: 1.05,
-    imgBg: 'linear-gradient(160deg, #b8a2d4 0%, #cdb8e2 45%, #e8d8f4 100%)',
+    img: '/images/van-full.jpg',
     scenarios: ['单身公寓搬出', '合租房间搬运', '学生搬家', '少量家具', '行李搬运', '小件配送'],
     advantages: ['价格最低', '灵活好停车', '地库友好', '市区高效'],
     loadRef: '约可装 30 箱纸箱 / 1 个床垫 / 少量小型家具',
@@ -40,8 +38,6 @@ const VEHICLES = [
     tagline: '1–2 房搬家最受欢迎，性价比最高',
     volume: '20', weight: '4.5', dims: '4.4 × 2.25 × 2.2 m',
     img: '/images/small-truck.jpg',
-    imgScale: 0.95,
-    imgBg: 'linear-gradient(160deg, #7080b8 0%, #90a0cc 45%, #bcc8e8 100%)',
     tag: '最受欢迎',
     scenarios: ['1–2 房公寓整体搬家', '家具家电较多', '中型搬迁', '跨区搬家'],
     advantages: ['空间充足', '专业搬运团队', '高效完成', '可应对复杂楼层'],
@@ -57,8 +53,6 @@ const VEHICLES = [
     tagline: '3 房以上 / House，一次搬完',
     volume: '30', weight: '8', dims: '6.0 × 2.2 × 2.35 m',
     img: '/images/large-truck.jpg',
-    imgScale: 0.88,
-    imgBg: 'linear-gradient(160deg, #c87090 0%, #d898a8 45%, #f0c8d0 100%)',
     scenarios: ['3 房以上 / House', '整屋搬迁', '大型家具家电', '别墅搬家'],
     advantages: ['超大容积', '专业大件搬运', '一次装完', '效率最高'],
     loadRef: '约可装 3–5 房间全部物品',
@@ -352,14 +346,12 @@ export default function MoveBooking() {
             {VEHICLES.map(v => (
               <div key={v.id} className="bg-white rounded-3xl shadow-sm overflow-hidden"
                 style={{ border: `1px solid ${BORDER}` }}>
-                <div className="relative overflow-hidden" style={{ height: '200px', background: v.imgBg }}>
+                <div className="relative overflow-hidden" style={{ height: '200px', background: '#f0f0f0' }}>
                   <img src={v.img} alt={v.name}
                     style={{
-                      position: 'absolute', bottom: 0, left: '50%',
-                      transform: `translateX(-50%) scale(${v.imgScale})`,
-                      transformOrigin: 'center bottom',
+                      position: 'absolute', inset: 0,
                       width: '100%', height: '100%',
-                      objectFit: 'contain', objectPosition: 'center bottom',
+                      objectFit: 'cover', objectPosition: 'center',
                     }}
                   />
                   {v.tag && (
@@ -401,14 +393,12 @@ export default function MoveBooking() {
         {step === 1 && vehicle && (
           <div className="space-y-4">
             {/* Photo banner */}
-            <div className="rounded-3xl overflow-hidden relative" style={{ height: '200px', background: vehicle.imgBg }}>
+            <div className="rounded-3xl overflow-hidden relative" style={{ height: '200px', background: '#f0f0f0' }}>
               <img src={vehicle.img} alt={vehicle.name}
                 style={{
-                  position: 'absolute', bottom: 0, left: '50%',
-                  transform: `translateX(-50%) scale(${vehicle.imgScale})`,
-                  transformOrigin: 'center bottom',
+                  position: 'absolute', inset: 0,
                   width: '100%', height: '100%',
-                  objectFit: 'contain', objectPosition: 'center bottom',
+                  objectFit: 'cover', objectPosition: 'center',
                 }}
               />
               <div className="absolute bottom-0 left-0 right-0 p-4"
