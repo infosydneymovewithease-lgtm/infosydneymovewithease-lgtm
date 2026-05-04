@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { Phone, ChevronRight } from 'lucide-react'
 
 const SERVICES = [
-  { id: 'ikea',    name: 'IKEA 提货安装', desc: '代购 · 安装 · 一站式', emoji: '🛋️', path: '/book/ikea'        },
-  { id: 'storage', name: '物品寄存',      desc: '按周计费 · 灵活取用',   emoji: '📦', path: '/book/storage'    },
-  { id: 'clean',   name: '清洁服务',      desc: '交房验房 · 细致入微',   emoji: '✨', path: '/book/clean'      },
-  { id: 'second',  name: '旧家具回收',    desc: '回收寄售 · 搬家同步处理', emoji: '♻️', path: '/book/secondhand' },
+  { id: 'ikea',    name: 'IKEA 提货安装', desc: '代购 · 安装 · 一站式',    emoji: '🛋️', path: '/book/ikea'        },
+  { id: 'storage', name: '物品寄存',      desc: '按周计费 · 灵活取用',     emoji: '📦', path: '/book/storage'     },
+  { id: 'clean',   name: '清洁服务',      desc: '交房验房 · 细致入微',     emoji: '✨', path: '/book/clean',      hidden: true },
+  { id: 'second',  name: '旧家具回收',    desc: '回收寄售 · 搬家同步处理', emoji: '♻️', path: '/book/secondhand',  hidden: true },
 ]
 
 const TRUST = [
@@ -83,7 +83,7 @@ export default function CustomerHome() {
             悉尼华人搬家首选
           </p>
           <h1 className="text-2xl font-bold leading-tight mb-3" style={{ color: T1 }}>
-            搬家 · 寄存 · 清洁<br />
+            搬家 · 寄存 · IKEA<br />
             <span className="font-normal text-lg" style={{ color: T3 }}>华人团队全程服务</span>
           </h1>
           <p className="text-sm font-medium mb-6" style={{ color: T3 }}>
@@ -187,7 +187,7 @@ export default function CustomerHome() {
 
         {/* Other services */}
         <div className="grid grid-cols-2 gap-3">
-          {SERVICES.map(s => (
+          {SERVICES.filter(s => !s.hidden).map(s => (
             <button key={s.id} onClick={() => navigate(s.path)}
               className="bg-white rounded-2xl p-4 text-left active:scale-95 transition-transform"
               style={{ border: `1px solid ${BLUE_BORDER}` }}>
