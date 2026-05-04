@@ -573,7 +573,7 @@ export default function MoveBooking() {
                     {vehicle.name} · {config?.label}
                   </p>
                   <p className="text-gray-500 text-xs mt-0.5">
-                    ${config?.rate}/h · 最少 {config?.minHours}h · 含出行费 · 客服确认后为准
+                    ${config?.rate}/h · {config?.minHours}h起 · 30公里内${config?.returnFee}返程费 · 客服确认后为准
                   </p>
                 </div>
                 <button onClick={() => setStep(1)} className="text-xs text-gray-400 underline">
