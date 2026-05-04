@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useApp } from '../../context/AppContext'
-import { UserPlus, Save, ToggleLeft, ToggleRight } from 'lucide-react'
+import { UserPlus, Save, ToggleLeft, ToggleRight, Pencil } from 'lucide-react'
 import { VEHICLES } from '../../data/vehicles'
 
 const ROLE_LABEL = { admin: '管理员', cs: '客服', worker: '师傅' }
@@ -10,6 +10,7 @@ export default function Settings() {
   const { staff, addStaffMember, updateStaffMember, appSettings, updateAppSettings } = useApp()
   const [tab, setTab] = useState('staff')
   const [showAddStaff, setShowAddStaff] = useState(false)
+  const [editingStaff, setEditingStaff] = useState(null)
   const [companyForm, setCompanyForm] = useState(appSettings)
   const [companySaved, setCompanySaved] = useState(false)
 
@@ -31,6 +32,18 @@ export default function Settings() {
     })
     setNewStaff({ name: '', username: '', password: '', role: 'worker', isDriver: false })
     setShowAddStaff(false)
+  }
+
+  function openEdit(s) {
+    setEditingStaff({ id: s.id, name: s.name, username: s.username, password: '', role: s.role })
+  }
+
+  function handleSaveEdit() {
+    if (!editingStaff) return
+    const updates = { role: editingStaff.role, username: editingStaff.username }
+    if (editingStaff.password) updates.password = editingStaff.password
+    updateStaffMember(editingStaff.id, updates)
+    setEditingStaff(null)
   }
 
   function handleSaveCompany() {
@@ -96,10 +109,16 @@ export default function Settings() {
                           </div>
                           <p className="text-xs text-gray-400 mt-0.5">账号：{s.username}</p>
                         </div>
-                        <button onClick={() => updateStaffMember(s.id, { active: !active })}
-                          className="flex-shrink-0 text-gray-300 hover:text-gray-500 transition-colors">
-                          {active ? <ToggleRight size={24} className="text-green-500" /> : <ToggleLeft size={24} />}
-                        </button>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button onClick={() => openEdit(s)}
+                            className="p-1.5 rounded-lg text-gray-300 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+                            <Pencil size={15} />
+                          </button>
+                          <button onClick={() => updateStaffMember(s.id, { active: !active })}
+                            className="text-gray-300 hover:text-gray-500 transition-colors">
+                            {active ? <ToggleRight size={24} className="text-green-500" /> : <ToggleLeft size={24} />}
+                          </button>
+                        </div>
                       </div>
                     )
                   })}
@@ -107,6 +126,56 @@ export default function Settings() {
               </div>
             )
           })}
+
+          {/* Edit staff modal */}
+          {editingStaff && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
+              <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                  <h3 className="font-bold text-gray-900">编辑账号 · {editingStaff.name}</h3>
+                  <button onClick={() => setEditingStaff(null)} className="text-gray-400 text-xl">×</button>
+                </div>
+                <div className="px-5 py-4 space-y-3">
+                  <Field label="登录账号">
+                    <input value={editingStaff.username}
+                      onChange={e => setEditingStaff(f => ({ ...f, username: e.target.value }))}
+                      className={inputCls} />
+                  </Field>
+                  <Field label="新密码（留空则不修改）">
+                    <input type="password" value={editingStaff.password}
+                      onChange={e => setEditingStaff(f => ({ ...f, password: e.target.value }))}
+                      placeholder="输入新密码"
+                      className={inputCls} />
+                  </Field>
+                  <Field label="角色权限">
+                    <div className="grid grid-cols-3 gap-2">
+                      {['worker','cs','admin'].map(r => (
+                        <button key={r} type="button"
+                          onClick={() => setEditingStaff(f => ({ ...f, role: r }))}
+                          className={`py-2 rounded-xl border-2 text-xs font-semibold transition-colors ${
+                            editingStaff.role === r
+                              ? 'border-red-300 bg-red-50 text-red-700'
+                              : 'border-gray-200 text-gray-500'
+                          }`}>
+                          {ROLE_LABEL[r]}
+                        </button>
+                      ))}
+                    </div>
+                  </Field>
+                  <div className="pt-1 text-xs text-gray-400 bg-gray-50 rounded-xl px-3 py-2 space-y-0.5">
+                    <p><span className="font-semibold text-red-700">管理员</span> — 可看全部菜单，含工资/客户主档/系统设置</p>
+                    <p><span className="font-semibold text-blue-600">客服</span> — 订单管理、派单、账单，隐藏敏感功能</p>
+                    <p><span className="font-semibold text-green-600">师傅</span> — 仅工人端口</p>
+                  </div>
+                  <button onClick={handleSaveEdit}
+                    className="w-full py-3 rounded-xl text-white font-semibold mt-2"
+                    style={{ background: 'linear-gradient(135deg, #6b1414, #c0392b)' }}>
+                    保存修改
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Add staff modal */}
           {showAddStaff && (

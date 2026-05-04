@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { VEHICLES } from '../../data/vehicles'
 import {
@@ -79,10 +79,7 @@ function getCustomerLevel(orders, phone) {
 export default function AdminOrderDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const location = useLocation()
   const { orders, workers, dispatchOrder, updateOrderStatus, updateOrder } = useApp()
-  // Only allow dispatch when navigating from a specific tab (not "全部")
-  const allowDispatch = location.state?.allowDispatch !== false
 
   const order = orders.find(o => o.id === id)
   const [showDispatch, setShowDispatch] = useState(false)
@@ -93,7 +90,6 @@ export default function AdminOrderDetail() {
   const [showEditQuote, setShowEditQuote] = useState(false)
   const [quoteInput,   setQuoteInput]   = useState(String(order?.quote || ''))
   const [quoteNoteInput, setQuoteNoteInput] = useState(order?.quoteNote || '')
-
   const [checks,  setChecks]  = useState(() => order?.confirmChecks || {})
   const [csNote,  setCsNote]  = useState(() => order?.csNote || '')
 
@@ -107,7 +103,7 @@ export default function AdminOrderDetail() {
   const v = VEHICLES[order.vehicle]
   const assignedTeam = order.assignedWorkers?.length ? order.assignedWorkers : (order.assignedTo ? [order.assignedTo] : [])
   const custLevel = getCustomerLevel(orders, order.customerPhone)
-  const canDispatch = !['已完成','已取消','待确认'].includes(order.status)
+  const canDispatch = !['已完成','已取消'].includes(order.status)
   const materialsCost = order.materialsCost || 0
 
   function toggleWorkerSelect(wid) {
@@ -143,6 +139,10 @@ export default function AdminOrderDetail() {
   }
 
   const isPending = order.status === '待确认'
+  // Show confirmation checklist for pending customer orders OR unconfirmed CS-created orders
+  const showConfirmFlow = isPending || (
+    !order.assignedTo && ['已报价', '已收定金'].includes(order.status)
+  )
 
   function toggleCheck(key) {
     const updated = { ...checks, [key]: !checks[key] }
@@ -185,7 +185,7 @@ export default function AdminOrderDetail() {
       </div>
 
       {/* Alerts */}
-      {!order.assignedTo && canDispatch && allowDispatch && (
+      {!order.assignedTo && canDispatch && (
         <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-3">
           <AlertTriangle size={16} className="text-red-500 flex-shrink-0" />
           <span className="text-red-700 text-sm flex-1">此订单尚未派单</span>
@@ -579,8 +579,8 @@ export default function AdminOrderDetail() {
         )}
       </Card>
 
-      {/* ── Pending-order confirmation modules ── */}
-      {isPending && (
+      {/* ── Confirmation modules — shown for 待确认 and unconfirmed CS orders ── */}
+      {showConfirmFlow && (
         <>
           {/* 1. 联系确认 */}
           <Card title="联系确认">
@@ -697,29 +697,31 @@ export default function AdminOrderDetail() {
             />
           </Card>
 
-          {/* 确认订单按钮 */}
-          <div>
-            <button
-              onClick={handleConfirmOrder}
-              disabled={!canConfirmOrder}
-              className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all ${
-                canConfirmOrder
-                  ? 'text-white shadow-sm active:scale-95'
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              }`}
-              style={canConfirmOrder ? { background: 'linear-gradient(135deg, #059669, #10b981)' } : {}}
-            >
-              确认订单
-            </button>
-            {!canConfirmOrder && (
-              <p className="text-center text-xs text-gray-400 mt-1.5">
-                还需完成：
-                {!(checks.called || checks.wechat || checks.replied) && <span className="text-orange-500"> 联系客户</span>}
-                {!checks.timeOk && <span className="text-orange-500"> · 时间确认</span>}
-                {!checks.addressOk && <span className="text-orange-500"> · 地址确认</span>}
-              </p>
-            )}
-          </div>
+          {/* 确认订单按钮 — only for 待确认 orders */}
+          {isPending && (
+            <div>
+              <button
+                onClick={handleConfirmOrder}
+                disabled={!canConfirmOrder}
+                className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all ${
+                  canConfirmOrder
+                    ? 'text-white shadow-sm active:scale-95'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                }`}
+                style={canConfirmOrder ? { background: 'linear-gradient(135deg, #059669, #10b981)' } : {}}
+              >
+                确认订单
+              </button>
+              {!canConfirmOrder && (
+                <p className="text-center text-xs text-gray-400 mt-1.5">
+                  还需完成：
+                  {!(checks.called || checks.wechat || checks.replied) && <span className="text-orange-500"> 联系客户</span>}
+                  {!checks.timeOk && <span className="text-orange-500"> · 时间确认</span>}
+                  {!checks.addressOk && <span className="text-orange-500"> · 地址确认</span>}
+                </p>
+              )}
+            </div>
+          )}
         </>
       )}
 
@@ -745,7 +747,7 @@ export default function AdminOrderDetail() {
                 派单于 {new Date(order.dispatchedAt).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </p>
             )}
-            {canDispatch && allowDispatch && (
+            {canDispatch && (
               <button onClick={() => { setSelectedWorkers(assignedTeam); setShowDispatch(true) }}
                 className="text-sm text-gray-500 hover:text-gray-700 underline">
                 修改派单
@@ -755,9 +757,7 @@ export default function AdminOrderDetail() {
         ) : (
           <div className="text-center py-2">
             <p className="text-gray-400 text-sm mb-3">尚未分配师傅</p>
-            {isPending ? (
-              <p className="text-xs text-orange-500">请先完成确认流程后再派单</p>
-            ) : canDispatch && allowDispatch && (
+            {canDispatch && (
               <button
                 onClick={() => { setSelectedWorkers([]); setShowDispatch(true) }}
                 className="text-white px-6 py-2.5 rounded-xl font-semibold text-sm"
