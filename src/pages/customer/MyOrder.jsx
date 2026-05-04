@@ -70,7 +70,7 @@ export default function MyOrder() {
             <ArrowLeft size={20} />
           </button>
           <span className="font-bold text-gray-900 flex-1">查看我的预约</span>
-          <a href="tel:0450461917" className="flex items-center gap-1 text-sm font-medium"
+          <a href="tel:0426033899" className="flex items-center gap-1 text-sm font-medium"
             style={{ color: MID }}>
             <Phone size={14} /> 联系客服
           </a>
@@ -120,7 +120,7 @@ export default function MyOrder() {
             <p className="text-xs text-gray-400 mb-4">
               请确认订单号与手机号是否正确，或联系客服查询
             </p>
-            <a href="tel:0450461917"
+            <a href="tel:0426033899"
               className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-xl text-white"
               style={{ background: GRAD }}>
               <Phone size={14} /> 电话联系客服
@@ -291,7 +291,7 @@ export default function MyOrder() {
                     <p>银行：Commonwealth Bank (CBA)</p>
                     <p>户名：Move With Ease</p>
                     <p>BSB：062-000 &nbsp;|&nbsp; 账号：1234 5678</p>
-                    <p>PayID：0450 461 917</p>
+                    <p>PayID：0426 033 899</p>
                   </div>
                   <p className="text-orange-500 mt-1.5">转账备注请填写姓名及订单号</p>
                 </div>
@@ -301,10 +301,10 @@ export default function MyOrder() {
             {/* Contact */}
             <div className="rounded-2xl p-4" style={{ background: BG, border: `1px solid ${BORDER}` }}>
               <p className="text-xs text-gray-500 text-center mb-3">如需修改或取消预约，请联系客服</p>
-              <a href="tel:0450461917"
+              <a href="tel:0426033899"
                 className="w-full flex items-center justify-center gap-2 text-white font-bold py-3.5 rounded-2xl block text-center"
                 style={{ background: GRAD }}>
-                <Phone size={16} /> 0450 461 917
+                <Phone size={16} /> 0426 033 899
               </a>
             </div>
           </div>

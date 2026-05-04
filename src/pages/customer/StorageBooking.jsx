@@ -171,7 +171,7 @@ export default function StorageBooking() {
             </div>
           </div>
 
-          <a href="tel:0450461917"
+          <a href="tel:0426033899"
             className="w-full flex items-center justify-center gap-2 text-white font-bold py-3.5 rounded-2xl mb-3 block text-center"
             style={{ background: GRAD }}>
             <Phone size={16} /> 联系客服
@@ -201,7 +201,7 @@ export default function StorageBooking() {
             <ArrowLeft size={20} />
           </button>
           <span className="font-bold text-gray-900 flex-1">物品寄存预约</span>
-          <a href="tel:0450461917" className="flex items-center gap-1.5 text-sm font-medium"
+          <a href="tel:0426033899" className="flex items-center gap-1.5 text-sm font-medium"
             style={{ color: MID }}>
             <Phone size={15} /> 咨询
           </a>
@@ -518,7 +518,7 @@ export default function StorageBooking() {
               <div className="flex justify-between"><span className="text-orange-500">户名</span><span className="font-medium">Move With Ease</span></div>
               <div className="flex justify-between"><span className="text-orange-500">BSB</span><span className="font-medium">062-000</span></div>
               <div className="flex justify-between"><span className="text-orange-500">账号</span><span className="font-medium">1234 5678</span></div>
-              <div className="flex justify-between"><span className="text-orange-500">PayID</span><span className="font-medium">0450 461 917</span></div>
+              <div className="flex justify-between"><span className="text-orange-500">PayID</span><span className="font-medium">0426 033 899</span></div>
             </div>
             <p className="text-orange-500 mt-2">转账备注请填写您的姓名</p>
           </div>

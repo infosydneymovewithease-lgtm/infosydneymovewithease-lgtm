@@ -59,7 +59,7 @@ export default function GuidePage() {
       <div className="bg-white sticky top-0 z-10" style={{ borderBottom: `1px solid ${BORDER}` }}>
         <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
           <span className="font-bold text-gray-900 text-base">搬家攻略</span>
-          <a href="tel:0450461917" className="flex items-center gap-1 text-sm font-medium"
+          <a href="tel:0426033899" className="flex items-center gap-1 text-sm font-medium"
             style={{ color: MID }}>
             <Phone size={14} /> 咨询客服
           </a>
@@ -120,10 +120,10 @@ export default function GuidePage() {
           style={{ border: `1px solid ${BORDER}` }}>
           <p className="text-sm font-semibold text-gray-800 mb-1">还有疑问？直接联系客服</p>
           <p className="text-xs text-gray-400 mb-4">7天服务，营业时间即时接听</p>
-          <a href="tel:0450461917"
+          <a href="tel:0426033899"
             className="w-full flex items-center justify-center gap-2 text-white font-bold py-3.5 rounded-2xl"
             style={{ background: GRAD }}>
-            <Phone size={16} /> 0450 461 917
+            <Phone size={16} /> 0426 033 899
           </a>
         </div>
 

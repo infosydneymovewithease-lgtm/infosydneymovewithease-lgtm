@@ -68,10 +68,10 @@ export default function CustomerHome() {
               <p className="text-xs" style={{ color: 'rgba(255,255,255,0.7)' }}>Move With Ease · Sydney</p>
             </div>
           </div>
-          <a href="tel:0450461917"
+          <a href="tel:0426033899"
             className="flex items-center gap-1.5 text-white text-xs px-3 py-1.5 rounded-full"
             style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)' }}>
-            <Phone size={11} /> 0450 461 917
+            <Phone size={11} /> 0426 033 899
           </a>
         </div>
       </div>
@@ -95,7 +95,7 @@ export default function CustomerHome() {
               style={{ background: `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE_MAIN})` }}>
               免费获取报价
             </button>
-            <a href="tel:0450461917"
+            <a href="tel:0426033899"
               className="flex items-center justify-center gap-1.5 font-medium px-4 py-3.5 rounded-xl text-sm"
               style={{ background: '#EDEDED', color: T2, border: '1px solid #DEDEDE' }}>
               <Phone size={14} /> 电话咨询

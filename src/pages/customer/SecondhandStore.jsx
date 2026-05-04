@@ -88,7 +88,7 @@ export default function SecondhandStore() {
             style={{ border: `1px solid ${BLUE_BORDER}` }}>
             <p className="text-sm font-semibold" style={{ color: T1 }}>没找到想要的？</p>
             <p className="text-xs mt-1 mb-3" style={{ color: T3 }}>提交您的需求，我们帮您寻找合适的二手好物</p>
-            <a href="tel:0450461917"
+            <a href="tel:0426033899"
               className="inline-flex items-center gap-1.5 text-white text-sm font-semibold px-4 py-2 rounded-xl"
               style={{ background: BLUE_DARK }}>
               <Phone size={14} /> 联系我们
@@ -122,10 +122,10 @@ export default function SecondhandStore() {
               <p className="text-sm font-bold text-2xl" style={{ color: BLUE_MID }}>
                 ${contactItem.price}
               </p>
-              <a href="tel:0450461917"
+              <a href="tel:0426033899"
                 className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-white font-semibold"
                 style={{ background: BLUE_DARK }}>
-                <Phone size={16} /> 致电 0450 461 917
+                <Phone size={16} /> 致电 0426 033 899
               </a>
               {contactItem.location && (
                 <div className="flex items-start gap-2 text-sm text-gray-500">

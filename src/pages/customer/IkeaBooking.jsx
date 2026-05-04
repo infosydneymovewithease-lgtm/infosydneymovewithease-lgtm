@@ -186,7 +186,7 @@ export default function IkeaBooking() {
             </div>
           </div>
 
-          <a href="tel:0450461917"
+          <a href="tel:0426033899"
             className="w-full flex items-center justify-center gap-2 text-white font-bold py-3.5 rounded-2xl mb-3 block text-center"
             style={{ background: GRAD }}>
             <Phone size={16} /> 联系客服
@@ -216,7 +216,7 @@ export default function IkeaBooking() {
             <ArrowLeft size={20} />
           </button>
           <span className="font-bold text-gray-900 flex-1">IKEA 提货安装</span>
-          <a href="tel:0450461917" className="flex items-center gap-1.5 text-sm font-medium"
+          <a href="tel:0426033899" className="flex items-center gap-1.5 text-sm font-medium"
             style={{ color: MID }}>
             <Phone size={15} /> 咨询
           </a>
@@ -481,7 +481,7 @@ export default function IkeaBooking() {
               <p>银行：Commonwealth Bank (CBA)</p>
               <p>户名：Move With Ease</p>
               <p>BSB：062-000 &nbsp;|&nbsp; 账号：1234 5678</p>
-              <p>PayID：0450 461 917</p>
+              <p>PayID：0426 033 899</p>
             </div>
             <p className="text-orange-500 mt-1.5">转账备注请填写姓名及订单号</p>
           </div>

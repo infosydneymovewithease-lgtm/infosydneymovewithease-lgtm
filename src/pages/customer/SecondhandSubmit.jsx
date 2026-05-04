@@ -147,7 +147,7 @@ export default function SecondhandSubmit() {
             ))}
           </div>
 
-          <a href="tel:0450461917"
+          <a href="tel:0426033899"
             className="w-full flex items-center justify-center gap-2 text-white font-bold py-3.5 rounded-2xl mb-3 block text-center"
             style={{ background: GRAD }}>
             <Phone size={16} /> 联系客服
@@ -171,7 +171,7 @@ export default function SecondhandSubmit() {
             <ArrowLeft size={20} />
           </button>
           <span className="font-bold text-gray-900 flex-1">旧家具回收 / 二手寄售</span>
-          <a href="tel:0450461917" className="flex items-center gap-1.5 text-sm font-medium" style={{ color: MID }}>
+          <a href="tel:0426033899" className="flex items-center gap-1.5 text-sm font-medium" style={{ color: MID }}>
             <Phone size={15} /> 咨询
           </a>
         </div>

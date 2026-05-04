@@ -76,7 +76,7 @@ export default function CleanBooking() {
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">预约成功！</h2>
           <p className="text-gray-500 text-sm mb-6">订单号 {orderId}，我们将1小时内联系您报价确认</p>
-          <a href="tel:0450461917"
+          <a href="tel:0426033899"
             className="w-full flex items-center justify-center gap-2 text-white font-bold py-3.5 rounded-2xl mb-3 block text-center"
             style={{ background: BLUE_GRAD }}>
             <Phone size={16} /> 联系客服
@@ -93,7 +93,7 @@ export default function CleanBooking() {
         <div className="max-w-lg mx-auto px-4 h-14 flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-gray-500"><ArrowLeft size={20} /></button>
           <span className="font-bold text-gray-900 flex-1">清洁服务预约</span>
-          <a href="tel:0450461917" className="flex items-center gap-1.5 text-sm font-medium" style={{ color: BLUE_MID }}>
+          <a href="tel:0426033899" className="flex items-center gap-1.5 text-sm font-medium" style={{ color: BLUE_MID }}>
             <Phone size={15} /> 咨询
           </a>
         </div>

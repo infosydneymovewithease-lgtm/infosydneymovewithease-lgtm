@@ -60,7 +60,7 @@ export default function ProfilePage() {
           <div className="px-4 py-3" style={{ borderBottom: `1px solid ${BORDER}` }}>
             <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: T3 }}>联系我们</p>
           </div>
-          <a href="tel:0450461917"
+          <a href="tel:0426033899"
             className="flex items-center justify-between px-4 py-4 active:bg-gray-50"
             style={{ borderBottom: `1px solid ${BORDER}` }}>
             <div className="flex items-center gap-3">
@@ -70,7 +70,7 @@ export default function ProfilePage() {
               </div>
               <div>
                 <p className="font-semibold text-sm text-gray-800">电话咨询</p>
-                <p className="text-xs text-gray-400">0450 461 917</p>
+                <p className="text-xs text-gray-400">0426 033 899</p>
               </div>
             </div>
             <ChevronRight size={16} className="text-gray-300" />

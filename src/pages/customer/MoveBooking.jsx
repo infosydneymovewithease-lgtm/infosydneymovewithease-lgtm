@@ -274,7 +274,7 @@ export default function MoveBooking() {
             </div>
           </div>
 
-          <a href="tel:0450461917"
+          <a href="tel:0426033899"
             className="w-full flex items-center justify-center gap-2 text-white font-bold py-3.5 rounded-2xl mb-3 block text-center"
             style={{ background: GRAD }}>
             <Phone size={16} /> 电话确认
@@ -304,7 +304,7 @@ export default function MoveBooking() {
           <ArrowLeft size={20} />
         </button>
         <span className="font-bold text-gray-900 flex-1">搬家预约</span>
-        <a href="tel:0450461917" className="flex items-center gap-1 text-sm font-medium"
+        <a href="tel:0426033899" className="flex items-center gap-1 text-sm font-medium"
           style={{ color: MID }}>
           <Phone size={14} /> 电话咨询
         </a>
@@ -820,7 +820,7 @@ export default function MoveBooking() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-orange-500">PayID</span>
-                    <span className="font-medium">0450 461 917</span>
+                    <span className="font-medium">0426 033 899</span>
                   </div>
                 </div>
                 <p className="text-orange-500 mt-2">转账备注请填写您的姓名及订单号</p>
