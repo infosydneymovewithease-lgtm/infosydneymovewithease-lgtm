@@ -130,12 +130,20 @@ export default function NewOrder() {
     if (!form.depositStatus) return
     if (form.depositStatus === 'unpaid') return  // blocked
 
+    const autoQuoteNote = v ? [
+      `$${v.hourlyRate}×${v.minHours}h + $${v.returnFee}(返程费) = $${baseQuote}`,
+      remote.total > 0 ? `+ 远途 $${remote.total}` : null,
+      materialsCost > 0 ? `+ 物资 $${materialsCost}` : null,
+      discountedQuote !== baseQuote + remote.total + materialsCost ? `折后 $${discountedQuote}起` : `= $${discountedQuote}起`,
+    ].filter(Boolean).join(' ') : ''
+
     const order = createOrder({
       ...form,
       distanceKm: km || null,
       remoteSurcharge: remote.total || null,
       materialsCost,
       quote: discountedQuote,
+      quoteNote: form.quoteNote || autoQuoteNote,
       fragileEstimatedFee: parseFloat(form.fragileEstimatedFee) || 0,
       depositPaid: form.depositStatus === 'paid',
       status: form.depositStatus === 'paid' ? '已收定金' : '待确认',
