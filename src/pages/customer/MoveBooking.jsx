@@ -508,7 +508,7 @@ export default function MoveBooking() {
                 ) : null
               })()}
               <div className="text-xs text-gray-400 space-y-1">
-                <p>· 计费从到达客户家与客服见面时开始，到物品搬运完毕检查车辆结束</p>
+                <p>· 师傅到达并联系客户确认后开始计时，搬到新地址并全部卸完为止</p>
                 <p>· 最终报价以客服确认为准</p>
               </div>
             </div>
