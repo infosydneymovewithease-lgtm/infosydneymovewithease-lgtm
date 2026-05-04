@@ -199,7 +199,7 @@ export default function MoveBooking() {
       status: '待确认',
       quote: totalEstimate,
       quoteNote: [
-        `$${config.rate}×${config.minHours}h + $${config.rate}(出行费) = $${baseEstimate}`,
+        `$${config.rate}×${config.minHours}h + $${config.rate}(返程费) = $${baseEstimate}`,
         remoteEstimate > 0 ? `+ 远途 $${remoteEstimate}` : null,
         stairsFee      > 0 ? `+ 楼梯 $${stairsFee}`     : null,
         materialsEstimate > 0 ? `+ 物资 $${materialsEstimate}` : null,
@@ -245,7 +245,7 @@ export default function MoveBooking() {
             <div className="flex justify-between items-start">
               <span className="text-gray-500 flex-shrink-0">收费参考</span>
               <span className="font-medium text-right text-xs leading-relaxed">
-                ${config?.rate}×{config?.minHours}h + ${config?.rate}(出行费)<br/>
+                ${config?.rate}×{config?.minHours}h + ${config?.rate}(返程费)<br/>
                 <span className="text-gray-800 font-bold">= ${config ? config.rate * config.minHours + config.rate : 0} 起</span>
               </span>
             </div>
@@ -894,7 +894,7 @@ export default function MoveBooking() {
                 </div>
                 <div className="text-right text-xs text-gray-400 leading-relaxed">
                   {config && (
-                    <p className="text-gray-500">${config.rate}×{config.minHours}h + ${config.rate}出行</p>
+                    <p className="text-gray-500">${config.rate}×{config.minHours}h + ${config.rate}返程费</p>
                   )}
                   <p>= 基础 ${baseEstimate}</p>
                   {stairsFee > 0 && <p style={{ color: MID }}>+ 楼梯 ${stairsFee}</p>}
