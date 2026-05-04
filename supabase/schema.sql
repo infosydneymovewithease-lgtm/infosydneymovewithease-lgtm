@@ -63,7 +63,12 @@ CREATE TABLE IF NOT EXISTS orders (
   "hasVideo"           boolean DEFAULT false,
   "paymentStatus"      text,
   "collectedBy"        text,
-  "completedAt"        text
+  "completedAt"        text,
+  materials            jsonb,
+  "materialsCost"      numeric DEFAULT 0,
+  "fragileItems"       jsonb DEFAULT '[]',
+  "fragileDescription" text,
+  "fragileEstimatedFee" numeric DEFAULT 0
 );
 
 -- ── Storage Orders ───────────────────────────────────────────────────────────

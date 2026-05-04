@@ -1,6 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
-import { VEHICLES } from '../data/vehicles'
 import {
   ArrowLeft, Phone, MapPin, Package, MessageSquare,
   DollarSign, Calendar, Truck, CheckCircle, PlayCircle
@@ -43,19 +42,6 @@ export default function OrderDetail() {
   const rm = order.requestedMaterials
   const hasRequestedMaterials = rm && (rm.boxes > 0 || rm.wrapItems > 0 || rm.mattressCovers > 0 || rm.packingItems > 0)
 
-  // Generate fee breakdown note if not stored
-  const v = VEHICLES[order.vehicle]
-  const displayQuoteNote = order.quoteNote || (v && order.quote ? (() => {
-    const base = v.hourlyRate * v.minHours + v.returnFee
-    const remote = order.remoteSurcharge || 0
-    const mats = order.materialsCost || 0
-    return [
-      `$${v.hourlyRate}×${v.minHours}h + $${v.returnFee}(返程费) = $${base}`,
-      remote > 0 ? `+ 远途 $${remote}` : null,
-      mats > 0 ? `+ 物资 $${mats}` : null,
-      `= $${order.quote}起`,
-    ].filter(Boolean).join(' ')
-  })() : null)
 
   const checks = order.confirmChecks || {}
   const riskFlags = [
@@ -285,8 +271,8 @@ export default function OrderDetail() {
               >
                 <span className="text-green-600 font-bold text-lg">${order.quote}</span>
               </InfoRow>
-              {displayQuoteNote && (
-                <p className="text-xs text-gray-400 mt-0.5 pl-7">{displayQuoteNote}</p>
+              {order.quoteNote && (
+                <p className="text-xs text-gray-400 mt-0.5 pl-7">{order.quoteNote}</p>
               )}
               {order.deposit > 0 && (
                 <InfoRow

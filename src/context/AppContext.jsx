@@ -19,6 +19,8 @@ const ORDER_COLUMNS = new Set([
   'dispatchedAt','confirmedAt','confirmChecks','csNote','createdBy','createdByName',
   'ikeaOrderNo','storeLocation','rubbishDisposal','riskItems','photos','hasVideo',
   'paymentStatus','collectedBy','completedAt',
+  'materials','materialsCost',
+  'fragileItems','fragileDescription','fragileEstimatedFee',
 ])
 
 const STORAGE_COLUMNS = new Set([
