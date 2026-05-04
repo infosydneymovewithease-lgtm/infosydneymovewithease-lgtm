@@ -491,7 +491,8 @@ export default function MoveBooking() {
               )}
               <div className="text-xs text-gray-400 space-y-1">
                 <p>· 计费从到达客户家与客服见面时开始，到物品搬运完毕检查车辆结束</p>
-                <p>· 最终报价以客服确认为准，无隐藏费用</p>
+                <p>· 返程费用一次性收费，会依据距离远近上调或下调费用，具体请以客服报价为准</p>
+                <p>· 最终报价以客服确认为准</p>
               </div>
             </div>
 
