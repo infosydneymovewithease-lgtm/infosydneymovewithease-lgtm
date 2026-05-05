@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft, Phone, CheckCircle, ChevronRight, Upload, X } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
+import { supabase } from '../../lib/supabase'
 import dayjs from 'dayjs'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
 import { getDistanceKm } from '../../utils/googleMaps'
@@ -161,9 +162,23 @@ export default function MoveBooking() {
     setStep(1)
   }
 
-  function handleFileUpload(e) {
+  async function handleFileUpload(e) {
     const file = e.target.files[0]
     if (!file) return
+    const ext  = (file.name.split('.').pop() || 'jpg').toLowerCase()
+    const path = `${dayjs().format('YYYYMMDD')}_${Date.now()}.${ext}`
+    const { data: stored, error } = await supabase.storage
+      .from('deposit-screenshots')
+      .upload(path, file, { contentType: file.type, upsert: false })
+    if (!error) {
+      const { data: { publicUrl } } = supabase.storage
+        .from('deposit-screenshots').getPublicUrl(stored.path)
+      setDepositFile({ name: file.name, url: publicUrl })
+      setErrors(err => ({ ...err, depositFile: false }))
+      return
+    }
+    // Fallback: base64 (e.g. bucket not yet created)
+    console.warn('[upload] storage failed, using base64:', error.message)
     const reader = new FileReader()
     reader.onload = ev => {
       setDepositFile({ name: file.name, data: ev.target.result })

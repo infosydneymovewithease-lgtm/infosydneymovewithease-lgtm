@@ -296,9 +296,9 @@ export default function StorageDetail() {
           )}
           {order.depositScreenshot && (
             <div className="pt-1">
-              {typeof order.depositScreenshot === 'object' && order.depositScreenshot.data ? (
+              {typeof order.depositScreenshot === 'object' && (order.depositScreenshot.url || order.depositScreenshot.data) ? (
                 <img
-                  src={order.depositScreenshot.data}
+                  src={order.depositScreenshot.url || order.depositScreenshot.data}
                   alt="定金截图"
                   className="w-full max-w-xs rounded-xl border border-gray-200"
                 />

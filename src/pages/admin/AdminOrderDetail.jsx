@@ -555,9 +555,9 @@ export default function AdminOrderDetail() {
         {order.depositScreenshot && (
           <div className="mt-2">
             <p className="text-xs text-gray-400 mb-1.5 px-1">定金转账截图</p>
-            {typeof order.depositScreenshot === 'object' && order.depositScreenshot.data ? (
+            {typeof order.depositScreenshot === 'object' && (order.depositScreenshot.url || order.depositScreenshot.data) ? (
               <img
-                src={order.depositScreenshot.data}
+                src={order.depositScreenshot.url || order.depositScreenshot.data}
                 alt="定金截图"
                 className="w-full max-w-xs rounded-xl border border-gray-200"
               />
