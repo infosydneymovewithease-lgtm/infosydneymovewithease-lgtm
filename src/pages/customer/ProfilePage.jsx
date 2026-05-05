@@ -1,11 +1,11 @@
 import { useNavigate } from 'react-router-dom'
 import { Phone, ChevronRight, Shield, Clock, Star, MessageCircle } from 'lucide-react'
 
-const MID    = '#C95E70'
-const DARK   = '#96394E'
-const BG     = '#FFF8F7'
-const BORDER = '#EAD5D1'
-const GRAD   = 'linear-gradient(135deg, #96394E, #C95E70)'
+const MID    = '#8B2635'
+const DARK   = '#6b1420'
+const BG     = '#F7F7F7'
+const BORDER = '#EFEFEF'
+const GRAD   = 'linear-gradient(135deg, #6b1420, #8B2635)'
 const T2     = '#3F4854'
 const T3     = '#6B7280'
 

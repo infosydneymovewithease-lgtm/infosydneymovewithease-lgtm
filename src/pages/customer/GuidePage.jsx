@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { Phone, ChevronDown } from 'lucide-react'
 
-const MID    = '#C95E70'
-const BG     = '#FFF8F7'
-const BORDER = '#EAD5D1'
-const GRAD   = 'linear-gradient(135deg, #C94F6D, #E97873)'
+const MID    = '#8B2635'
+const BG     = '#F7F7F7'
+const BORDER = '#EFEFEF'
+const GRAD   = 'linear-gradient(135deg, #8B2635, #C0392B)'
 const T3     = '#6B7280'
 
 const TIPS = [

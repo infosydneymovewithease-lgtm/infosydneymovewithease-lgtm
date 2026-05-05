@@ -3,10 +3,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Phone, Search, CheckCircle, Clock, AlertCircle } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 
-const GRAD   = 'linear-gradient(135deg, #C94F6D, #E97873)'
-const BG     = '#FFF3F0'
-const MID    = '#C94F6D'
-const BORDER = '#F3C9C3'
+const GRAD   = 'linear-gradient(135deg, #8B2635, #C0392B)'
+const BG     = '#F7F7F7'
+const MID    = '#8B2635'
+const BORDER = '#EFEFEF'
 
 const STATUS_STYLE = {
   '待确认':   { bg: '#FEF9C3', color: '#854D0E', icon: Clock },

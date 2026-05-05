@@ -4,9 +4,9 @@ import { Phone, ChevronRight } from 'lucide-react'
 
 const BRAND   = '#8B2635'
 const BRAND_L = '#C0392B'
-const T1      = '#111827'
-const T2      = '#374151'
-const T3      = '#6B7280'
+const T1      = '#1A1A1A'
+const T2      = '#555555'
+const T3      = '#999999'
 const WECHAT  = 'qianxibanjia888'
 
 const SLIDES = [
@@ -67,11 +67,12 @@ export default function CustomerHome() {
               objectPosition: 'center center',
               opacity: fading ? 0 : 1,
               transition: 'opacity 0.4s ease',
+              filter: 'brightness(1.04) contrast(1.04)',
             }}
           />
-          {/* 渐变遮罩 */}
+          {/* 渐变遮罩：不用纯黑 */}
           <div className="absolute inset-0"
-            style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.4) 45%, rgba(0,0,0,0.05) 100%)' }} />
+            style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.52) 0%, rgba(0,0,0,0.22) 45%, rgba(0,0,0,0.08) 100%)' }} />
 
           {/* 文字 + 按钮 */}
           <div className="absolute bottom-0 left-0 right-0 px-5 pb-6">
@@ -87,20 +88,27 @@ export default function CustomerHome() {
               style={{ fontSize: '1.75rem', lineHeight: 1.15, textShadow: '0 2px 12px rgba(0,0,0,0.4)' }}>
               悉尼华人<br />搬家服务
             </h1>
-            <div className="flex gap-2.5 items-center">
+            <div className="flex flex-col gap-2">
               <button onClick={() => navigate('/book/move')}
-                className="px-4 py-2.5 rounded-xl text-white font-bold text-sm"
+                className="px-5 py-2.5 rounded-xl text-white font-bold text-sm self-start"
                 style={{
                   background: `linear-gradient(135deg, ${BRAND}, ${BRAND_L})`,
                   boxShadow: '0 4px 14px rgba(139,38,53,0.5)',
                 }}>
                 查看车型报价 ›
               </button>
-              <a href="tel:0426033899"
-                className="px-4 py-2.5 rounded-xl font-semibold text-sm text-white flex items-center gap-1.5"
-                style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)' }}>
-                <Phone size={13} /> 电话咨询
-              </a>
+              <div className="flex gap-2">
+                <a href="tel:0426033899"
+                  className="px-3.5 py-2 rounded-xl font-semibold text-xs text-white flex items-center gap-1"
+                  style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)' }}>
+                  <Phone size={11} /> 电话咨询
+                </a>
+                <a href={`https://weixin.qq.com/r/${WECHAT}`}
+                  className="px-3.5 py-2 rounded-xl font-semibold text-xs text-white flex items-center gap-1"
+                  style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)' }}>
+                  💬 微信：{WECHAT}
+                </a>
+              </div>
             </div>
           </div>
 
@@ -124,9 +132,9 @@ export default function CustomerHome() {
       </div>
 
       {/* ── Trust strip ── */}
-      <div className="max-w-lg mx-auto px-4 pt-3 pb-1">
-        <div className="bg-white rounded-2xl grid grid-cols-4 py-4 px-2"
-          style={{ border: '1px solid #EFEFEF' }}>
+      <div className="max-w-lg mx-auto px-4 pt-4 pb-1">
+        <div className="bg-white rounded-2xl grid grid-cols-4 py-5 px-2"
+          style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
           {[
             { icon: '👥', value: '2000+', label: '搬家订单' },
             { icon: '🛡️', value: '本地',  label: '华人团队' },
@@ -134,7 +142,7 @@ export default function CustomerHome() {
             { icon: '📅', value: '7天',   label: '可预约'   },
           ].map((t, i) => (
             <div key={t.label} className="text-center"
-              style={i > 0 ? { borderLeft: '1px solid #EFEFEF' } : {}}>
+              style={i > 0 ? { borderLeft: '1px solid #F0F0F0' } : {}}>
               <p className="text-base leading-none mb-1">{t.icon}</p>
               <p className="text-sm font-extrabold" style={{ color: BRAND }}>{t.value}</p>
               <p className="text-xs mt-0.5" style={{ color: T3 }}>{t.label}</p>
@@ -144,9 +152,9 @@ export default function CustomerHome() {
       </div>
 
       {/* ── WeChat notice ── */}
-      <div className="max-w-lg mx-auto px-4 pt-3">
-        <div className="bg-white rounded-2xl flex items-center gap-3 px-4 py-3"
-          style={{ border: '1px solid #EFEFEF', borderLeft: '3px solid #F59E0B' }}>
+      <div className="max-w-lg mx-auto px-4 pt-4">
+        <div className="bg-white rounded-2xl flex items-center gap-3 px-4 py-3.5"
+          style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderLeft: '3px solid #F59E0B' }}>
           <span className="text-lg flex-shrink-0">📸</span>
           <p className="flex-1 text-xs leading-snug" style={{ color: T2 }}>
             <span className="font-semibold">不确定费用？</span>&nbsp;发一张照片，1分钟帮你确认报价
@@ -160,11 +168,11 @@ export default function CustomerHome() {
       </div>
 
       {/* ── Vehicle Pricing ── */}
-      <div className="max-w-lg mx-auto px-4 pt-6 pb-3">
+      <div className="max-w-lg mx-auto px-4 pt-5 pb-3">
         <div className="rounded-2xl overflow-hidden"
           style={{
             background: 'linear-gradient(150deg, #6b1420 0%, #8B2635 45%, #C0392B 100%)',
-            boxShadow: '0 8px 32px rgba(139,38,53,0.2)',
+            boxShadow: '0 8px 24px rgba(139,38,53,0.22)',
           }}>
           <div className="px-6 pt-6 pb-4">
             <h2 className="text-white font-extrabold text-xl tracking-tight">悉尼搬家报价</h2>
@@ -175,18 +183,21 @@ export default function CustomerHome() {
           <div className="mx-5 mb-5 rounded-xl overflow-hidden"
             style={{ background: 'rgba(0,0,0,0.18)' }}>
             {[
-              { name: '面包车', price: '$60'  },
-              { name: '小卡车', price: '$110' },
-              { name: '大卡车', price: '$120' },
+              { name: '面包车', price: '$60',  id: 'van'   },
+              { name: '小卡车', price: '$110', id: 'small' },
+              { name: '大卡车', price: '$120', id: 'large' },
             ].map((v, i) => (
-              <div key={v.name} className="flex items-center px-5 py-4"
+              <button key={v.name}
+                onClick={() => navigate('/book/move', { state: { vehicleId: v.id } })}
+                className="w-full flex items-center px-5 py-4 active:bg-white/10 transition-colors"
                 style={i > 0 ? { borderTop: '1px solid rgba(255,255,255,0.08)' } : {}}>
-                <p className="flex-1 text-white font-semibold">{v.name}</p>
-                <p>
+                <p className="flex-1 text-left text-white font-semibold">{v.name}</p>
+                <p className="mr-2">
                   <span className="text-white font-extrabold text-xl">{v.price}</span>
                   <span className="text-xs ml-1" style={{ color: 'rgba(255,255,255,0.45)' }}>/h起</span>
                 </p>
-              </div>
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '1.1rem' }}>›</span>
+              </button>
             ))}
           </div>
           <div className="grid grid-cols-2 gap-3 px-5 pb-6">
@@ -205,7 +216,7 @@ export default function CustomerHome() {
       </div>
 
       {/* ── Other services ── */}
-      <div className="max-w-lg mx-auto px-4 pt-6 pb-3">
+      <div className="max-w-lg mx-auto px-4 pt-6 pb-2">
         <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: T3 }}>其他服务</p>
         <div className="grid grid-cols-2 gap-3">
           {[
@@ -214,7 +225,7 @@ export default function CustomerHome() {
           ].map(s => (
             <button key={s.name} onClick={() => navigate(s.path)}
               className="bg-white rounded-2xl p-5 text-left"
-              style={{ border: '1px solid #EFEFEF' }}>
+              style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
               <span className="text-3xl block mb-3">{s.emoji}</span>
               <p className="font-bold text-sm" style={{ color: T1 }}>{s.name}</p>
               <p className="text-xs mt-1 leading-snug" style={{ color: T3 }}>{s.desc}</p>
@@ -227,9 +238,9 @@ export default function CustomerHome() {
       </div>
 
       {/* ── Extra fees ── */}
-      <div className="max-w-lg mx-auto px-4 pt-6 pb-3">
+      <div className="max-w-lg mx-auto px-4 pt-5 pb-2">
         <div className="bg-white rounded-2xl overflow-hidden"
-          style={{ border: '1px solid #EFEFEF', borderLeft: '3px solid #F59E0B' }}>
+          style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderLeft: '3px solid #F59E0B' }}>
           <div className="px-5 pt-5 pb-5">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-base">⚠️</span>
@@ -253,14 +264,13 @@ export default function CustomerHome() {
               </ul>
               <div className="flex-shrink-0 text-center" style={{ width: 72 }}>
                 <img src="/wechat-qr.jpg" alt="微信二维码"
-                  className="w-[72px] h-[72px] rounded-xl object-cover"
-                  style={{ border: '1px solid #EFEFEF' }} />
+                  className="w-[72px] h-[72px] rounded-xl object-cover" />
                 <p className="text-xs font-bold mt-1.5" style={{ color: T2 }}>扫码微信</p>
                 <p className="text-xs" style={{ color: T3 }}>1分钟确认</p>
               </div>
             </div>
 
-            <div className="mt-4 pt-3" style={{ borderTop: '1px solid #F0F0F0' }}>
+            <div className="mt-4 pt-3" style={{ borderTop: '1px solid #F5F5F5' }}>
               <p className="text-xs" style={{ color: T3 }}>
                 微信号：<span className="font-semibold" style={{ color: BRAND }}>{WECHAT}</span>
                 &nbsp;·&nbsp;发图片或视频，提前确认费用
@@ -271,8 +281,9 @@ export default function CustomerHome() {
       </div>
 
       {/* ── Why us ── */}
-      <div className="max-w-lg mx-auto px-4 pt-6 pb-10">
-        <div className="bg-white rounded-2xl overflow-hidden" style={{ border: '1px solid #EFEFEF' }}>
+      <div className="max-w-lg mx-auto px-4 pt-5 pb-10">
+        <div className="bg-white rounded-2xl overflow-hidden"
+          style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
           {[
             { icon: '🏆', title: '专业团队', desc: '经验丰富，服务用心' },
             { icon: '💰', title: '价格透明', desc: '先报价再搬运，无隐藏收费' },

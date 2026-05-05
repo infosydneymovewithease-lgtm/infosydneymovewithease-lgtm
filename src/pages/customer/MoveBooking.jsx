@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft, Phone, CheckCircle, ChevronRight, Upload, X } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import dayjs from 'dayjs'
@@ -7,10 +7,10 @@ import AddressAutocomplete from '../../components/AddressAutocomplete'
 import { getDistanceKm } from '../../utils/googleMaps'
 import { calcRemoteSurcharge } from '../../utils/remoteFee'
 
-const GRAD   = 'linear-gradient(135deg, #C94F6D, #E97873)'
-const BG     = '#FFF3F0'
-const MID    = '#C94F6D'
-const BORDER = '#F3C9C3'
+const GRAD   = 'linear-gradient(135deg, #A52535, #C0392B)'
+const BG     = '#F7F7F7'
+const MID    = '#A52535'
+const BORDER = '#EFEFEF'
 
 // First slot is always exact 08:00; subsequent slots are arrival windows
 const TIME_SLOTS = {
@@ -23,11 +23,11 @@ const VEHICLES = [
   {
     id: 'van', name: '面包车', nameEn: 'Toyota Hiace',
     tagline: '小件搬运首选，灵活便捷',
-    volume: '6.2', weight: null, dims: '2.55 × 1.54 × 1.32 m',
+    volume: '6.2', weight: '900公斤', dims: '2.55 × 1.54 × 1.32 m',
     img: '/images/van-full.jpg',
     scenarios: ['单身公寓搬出', '合租房间搬运', '学生搬家', '少量家具', '行李搬运', '小件配送'],
     advantages: ['价格最低', '灵活好停车', '地库友好', '市区高效'],
-    loadRef: '约可装 30 箱纸箱 / 1 个床垫 / 少量小型家具',
+    loadRef: '约可装 35 标准纸箱左右 / 1 个床垫 + 少量纸箱 / 少量小型家具等',
     note: '物品较多（2 房以上）建议选小卡车',
     configs: [
       { key: '面包车', label: '司机 1 人', people: 1, rate: 60, minHours: 1, returnFee: 50 },
@@ -36,7 +36,7 @@ const VEHICLES = [
   {
     id: 'small', name: '小卡车', nameEn: 'Isuzu 4.5T',
     tagline: '1–2 房搬家最受欢迎，性价比最高',
-    volume: '20', weight: '4.5', dims: '4.4 × 2.25 × 2.2 m',
+    volume: '20', weight: '4.5T', dims: '4.4 × 2.25 × 2.2 m',
     img: '/images/small-truck.jpg',
     tag: '最受欢迎',
     scenarios: ['1–2 房公寓整体搬家', '家具家电较多', '中型搬迁', '跨区搬家'],
@@ -51,7 +51,7 @@ const VEHICLES = [
   {
     id: 'large', name: '大卡车', nameEn: 'Hino 8T',
     tagline: '3 房以上 / House，一次搬完',
-    volume: '30', weight: '8', dims: '6.0 × 2.2 × 2.35 m',
+    volume: '30', weight: '8T', dims: '6.0 × 2.2 × 2.35 m',
     img: '/images/large-truck.jpg',
     scenarios: ['3 房以上 / House', '整屋搬迁', '大型家具家电', '别墅搬家'],
     advantages: ['超大容积', '专业大件搬运', '一次装完', '效率最高'],
@@ -73,11 +73,13 @@ const STAIRS_OPTIONS = [
 
 export default function MoveBooking() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { createOrder } = useApp()
   const fileInputRef = useRef(null)
 
-  const [step, setStep]           = useState(0)
-  const [vehicleId, setVehicleId] = useState(null)
+  const initId = location.state?.vehicleId ?? null
+  const [step, setStep]           = useState(initId ? 1 : 0)
+  const [vehicleId, setVehicleId] = useState(initId)
   const [configIdx, setConfigIdx] = useState(0)
   const [depositFile, setDepositFile] = useState(null)
   const [submitted, setSubmitted] = useState(false)
@@ -88,6 +90,7 @@ export default function MoveBooking() {
   const [mattressCovers,  setMattressCovers]  = useState(0)
   const [packingItems,    setPackingItems]    = useState(0)
   const [extrasOpen, setExtrasOpen]           = useState(false)
+  const [showWechat, setShowWechat]           = useState(false)
 
   const [form, setForm] = useState({
     name: '', phone: '', wechat: '',
@@ -212,7 +215,7 @@ export default function MoveBooking() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background: BG }}>
         <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-sm text-center"
-          style={{ border: `1px solid ${BORDER}` }}>
+          style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
           <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4"
             style={{ background: BG }}>
             <CheckCircle size={40} style={{ color: MID }} />
@@ -256,7 +259,8 @@ export default function MoveBooking() {
             定金截图已收到，客服将在 1 小时内致电确认并锁定档期。
           </div>
 
-          <div className="rounded-2xl p-4 text-left mb-4" style={{ background: BG }}>
+          <div className="rounded-2xl p-4 text-left mb-4 bg-white"
+            style={{ borderLeft: '3px solid #F59E0B', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
             <p className="font-bold text-sm mb-2.5" style={{ color: MID }}>📋 温馨提示</p>
             <div className="space-y-1.5 text-sm text-gray-600">
               {['请提前预留停车位', '公寓请提前预约电梯', '提前打包易碎 / 贵重物品', '楼梯、重物、长距离搬运请提前告知'].map(tip => (
@@ -339,49 +343,96 @@ export default function MoveBooking() {
         {/* ── STEP 0: Vehicle selection ── */}
         {step === 0 && (
           <div className="space-y-4">
-            <div className="mb-1">
-              <h2 className="text-lg font-bold text-gray-900">选择搬运车型</h2>
-              <p className="text-gray-400 text-sm">根据物品量选合适的车辆</p>
+
+            {/* 引导卡 */}
+            <div className="bg-white rounded-2xl px-5 py-4"
+              style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', borderLeft: `4px solid ${MID}` }}>
+              <p className="font-extrabold text-gray-900 text-base mb-1">选择搬运车型</p>
+              <p className="text-xs text-gray-400 leading-relaxed">根据物品量选择合适车辆，点击查看详情及报价</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3">
+                {[
+                  { icon: '📦', tip: '箱子为主 → 面包车' },
+                  { icon: '🛋️', tip: '1–2 房 → 小卡车' },
+                  { icon: '🏠', tip: '3 房以上 → 大卡车' },
+                ].map(t => (
+                  <div key={t.tip} className="flex items-center gap-1.5 text-xs text-gray-500">
+                    <span>{t.icon}</span><span>{t.tip}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 pt-3" style={{ borderTop: '1px solid #F0F0F0' }}>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-700">不确定选车？不用纠结 👍</p>
+                    <p className="text-xs text-gray-400 mt-0.5">添加客服微信，免费帮您确认车型 + 预估价格</p>
+                  </div>
+                  <button
+                    onClick={() => setShowWechat(v => !v)}
+                    className="flex-shrink-0 flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg text-white"
+                    style={{ background: MID }}>
+                    💬 添加微信
+                  </button>
+                </div>
+                {showWechat && (
+                  <div className="mt-3 rounded-xl p-4 flex items-center gap-4"
+                    style={{ background: '#F7F7F7' }}>
+                    <img src="/wechat-qr.jpg" alt="微信二维码"
+                      className="w-20 h-20 rounded-xl object-cover flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-gray-400 mb-1">扫码或搜索微信号添加客服</p>
+                      <p className="font-bold text-sm text-gray-900">qianxibanjia888</p>
+                      <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">发送物品照片，免费确认车型及预估费用</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Vehicle cards */}
             {VEHICLES.map(v => (
-              <div key={v.id} className="bg-white rounded-3xl shadow-sm overflow-hidden"
-                style={{ border: `1px solid ${BORDER}` }}>
-                <div className="relative overflow-hidden" style={{ height: '200px', background: '#f0f0f0' }}>
+              <div key={v.id} className="bg-white rounded-2xl overflow-hidden"
+                style={{ boxShadow: '0 2px 16px rgba(0,0,0,0.08)', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                {/* Image */}
+                <div className="relative overflow-hidden" style={{ height: 190 }}>
                   <img src={v.img} alt={v.name}
-                    style={{
-                      position: 'absolute', inset: 0,
-                      width: '100%', height: '100%',
-                      objectFit: 'cover', objectPosition: 'center',
-                    }}
-                  />
+                    className="absolute inset-0 w-full h-full object-cover" />
+                  <div className="absolute inset-0"
+                    style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.38) 0%, transparent 55%)' }} />
                   {v.tag && (
-                    <div className="absolute top-3 left-3 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm"
+                    <div className="absolute top-3 left-3 text-white text-xs font-bold px-2.5 py-1 rounded-full"
                       style={{ background: MID }}>
                       ⭐ {v.tag}
                     </div>
                   )}
-                  <div className="absolute bottom-3 right-3 rounded-2xl px-3 py-2 text-right shadow-md"
-                    style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(8px)' }}>
-                    <p className="font-black text-gray-900 text-lg leading-none">
+                  {/* Price badge */}
+                  <div className="absolute bottom-3 right-3 rounded-xl px-3 py-2 text-right"
+                    style={{ background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)' }}>
+                    <p className="font-black text-lg leading-none" style={{ color: MID }}>
                       ${v.configs[0].rate}
-                      <span className="text-xs text-gray-400 font-normal">/h起</span>
+                      <span className="text-xs font-normal text-gray-400">/h起</span>
                     </p>
                     <p className="text-gray-400 text-xs mt-0.5">最少 {v.configs[0].minHours}h</p>
                   </div>
+                  {/* Name overlay */}
+                  <div className="absolute bottom-3 left-4">
+                    <p className="text-white font-extrabold text-lg leading-tight">{v.name}</p>
+                    <p className="text-white/70 text-xs">{v.nameEn}</p>
+                  </div>
                 </div>
 
-                <div className="px-4 pb-4 pt-3">
-                  <h3 className="text-lg font-bold text-gray-900">{v.name}</h3>
-                  <p className="text-xs text-gray-400 mt-0.5 mb-3">{v.nameEn} · {v.tagline}</p>
-                  <div className="flex flex-wrap gap-1.5 mb-3">
+                {/* Body */}
+                <div className="px-4 pt-3 pb-4">
+                  <p className="text-xs text-gray-500 mb-3">{v.tagline}</p>
+                  <div className="flex flex-wrap gap-1.5 mb-4">
                     {v.scenarios.slice(0, 3).map(s => (
-                      <span key={s} className="bg-gray-100 text-gray-500 text-xs px-2.5 py-1 rounded-full">{s}</span>
+                      <span key={s} className="text-xs px-2.5 py-1 rounded-full"
+                        style={{ background: '#F5F5F5', color: '#555' }}>{s}</span>
                     ))}
                   </div>
                   <button onClick={() => selectVehicle(v.id)}
-                    className="w-full py-3.5 rounded-2xl text-white font-bold text-sm flex items-center justify-center gap-1.5"
+                    className="w-full py-3.5 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-1.5"
                     style={{ background: GRAD }}>
-                    了解详情并预约 <ChevronRight size={16} />
+                    查看详情并预约 <ChevronRight size={15} />
                   </button>
                 </div>
               </div>
@@ -391,107 +442,93 @@ export default function MoveBooking() {
 
         {/* ── STEP 1: Vehicle detail ── */}
         {step === 1 && vehicle && (
-          <div className="space-y-4">
-            {/* Photo banner */}
-            <div className="rounded-3xl overflow-hidden relative" style={{ height: '200px', background: '#f0f0f0' }}>
+          <div className="space-y-4 pb-28">
+
+            {/* Hero */}
+            <div className="rounded-2xl overflow-hidden relative" style={{ height: 220 }}>
               <img src={vehicle.img} alt={vehicle.name}
-                style={{
-                  position: 'absolute', inset: 0,
-                  width: '100%', height: '100%',
-                  objectFit: 'cover', objectPosition: 'center',
-                }}
-              />
-              <div className="absolute bottom-0 left-0 right-0 p-4"
-                style={{ background: 'linear-gradient(transparent, rgba(0,0,0,0.45))' }}>
-                <h2 className="text-white font-bold text-xl">{vehicle.name}</h2>
-                <p className="text-sm" style={{ color: 'rgba(255,255,255,0.8)' }}>
-                  {vehicle.nameEn} · {vehicle.dims} · {vehicle.volume}m³
-                </p>
+                className="absolute inset-0 w-full h-full object-cover" />
+              <div className="absolute inset-0"
+                style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.15) 60%, transparent 100%)' }} />
+              <div className="absolute bottom-0 left-0 right-0 p-5">
+                <p className="text-white font-extrabold text-2xl leading-tight">{vehicle.name}</p>
+                <p className="text-white/65 text-xs mt-1">{vehicle.nameEn} · {vehicle.dims} · {vehicle.volume}m³</p>
               </div>
               <button onClick={() => setStep(0)}
-                className="absolute top-3 right-3 text-white text-xs px-2.5 py-1 rounded-full"
+                className="absolute top-3 right-3 text-white text-xs px-3 py-1.5 rounded-full font-medium"
                 style={{ background: 'rgba(0,0,0,0.3)' }}>
                 更换车型
               </button>
             </div>
 
-            {/* Scenarios */}
-            <div className="bg-white rounded-2xl p-4 shadow-sm" style={{ border: `1px solid ${BORDER}` }}>
-              <h3 className="font-bold text-gray-800 mb-3 text-sm">适合搬运场景</h3>
-              <div className="grid grid-cols-2 gap-y-2 gap-x-3">
+            {/* 适合搬运场景 */}
+            <div className="bg-white rounded-2xl p-5" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1 h-4 rounded-full flex-shrink-0" style={{ background: MID }} />
+                <h3 className="font-bold text-gray-800 text-sm">适合搬运场景</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 mb-3">
                 {vehicle.scenarios.map(s => (
                   <div key={s} className="flex items-center gap-2 text-sm text-gray-700">
-                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: MID }} />
+                    <span className="w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center text-white"
+                      style={{ background: MID, fontSize: 9 }}>✓</span>
                     {s}
                   </div>
                 ))}
               </div>
               {vehicle.note && (
-                <div className="mt-3 rounded-xl p-2.5 text-xs text-orange-700 bg-orange-50">
-                  ⚠️ {vehicle.note}
+                <div className="rounded-xl px-3.5 py-2.5 flex items-start gap-2"
+                  style={{ background: '#FFFBF0', borderLeft: '3px solid #F59E0B' }}>
+                  <span className="text-sm flex-shrink-0">⚠️</span>
+                  <p className="text-xs text-amber-800 leading-snug font-medium">{vehicle.note}</p>
                 </div>
               )}
             </div>
 
-            {/* Pricing / team config */}
-            <div className="bg-white rounded-2xl p-4 shadow-sm" style={{ border: `1px solid ${BORDER}` }}>
-              <h3 className="font-bold text-gray-800 mb-3 text-sm">收费方式</h3>
+            {/* 收费方式 */}
+            <div className="bg-white rounded-2xl p-5" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1 h-4 rounded-full flex-shrink-0" style={{ background: MID }} />
+                <h3 className="font-bold text-gray-800 text-sm">收费方式</h3>
+              </div>
               {vehicle.configs.length > 1 ? (
-                <>
-                  <p className="text-xs text-gray-400 mb-2">选择团队配置</p>
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    {vehicle.configs.map((c, i) => (
-                      <button key={c.key} onClick={() => setConfigIdx(i)}
-                        className="p-3.5 rounded-2xl border-2 text-left transition-all"
-                        style={configIdx === i
-                          ? { borderColor: MID, background: BG }
-                          : { borderColor: '#e5e7eb', background: 'white' }
-                        }>
-                        <p className="font-bold text-sm"
-                          style={{ color: configIdx === i ? MID : '#374151' }}>
-                          {c.label}
-                        </p>
-                        <p className="text-xl font-black mt-0.5"
-                          style={{ color: configIdx === i ? MID : '#111827' }}>
-                          ${c.rate}
-                          <span className="text-xs font-normal text-gray-400">/h</span>
-                        </p>
-                        <p className="text-xs text-gray-400 mt-0.5">最少 {c.minHours}h</p>
-                      </button>
-                    ))}
-                  </div>
-                </>
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  {vehicle.configs.map((c, i) => (
+                    <button key={c.key} onClick={() => setConfigIdx(i)}
+                      className="p-4 rounded-xl border-2 text-left transition-all"
+                      style={configIdx === i
+                        ? { borderColor: MID, background: '#FDF2F2' }
+                        : { borderColor: '#EFEFEF', background: 'white' }}>
+                      <p className="text-xs text-gray-400 mb-1">👥 {c.label}</p>
+                      <p className="font-black leading-none" style={{ fontSize: '1.6rem', color: configIdx === i ? MID : '#111' }}>
+                        ${c.rate}<span className="text-xs font-normal text-gray-400"> / h</span>
+                      </p>
+                      <p className="text-xs text-gray-400 mt-2">最少 {c.minHours} 小时</p>
+                    </button>
+                  ))}
+                </div>
               ) : (
-                <div className="rounded-xl p-3 mb-3" style={{ background: BG }}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-bold text-sm" style={{ color: MID }}>
-                        {vehicle.configs[0].label}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        最少 {vehicle.configs[0].minHours}h
-                      </p>
-                    </div>
-                    <p className="text-2xl font-black" style={{ color: MID }}>
-                      ${vehicle.configs[0].rate}
-                      <span className="text-xs font-normal text-gray-400">/h</span>
-                    </p>
+                <div className="rounded-xl p-4 mb-4 flex items-center justify-between"
+                  style={{ background: '#FDF2F2', border: `1px solid #EDCCD0` }}>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">👥 {vehicle.configs[0].label}</p>
+                    <p className="text-xs text-gray-400">最少 {vehicle.configs[0].minHours}h</p>
                   </div>
+                  <p className="font-black" style={{ fontSize: '2rem', color: MID, lineHeight: 1 }}>
+                    ${vehicle.configs[0].rate}<span className="text-xs font-normal text-gray-400">/h</span>
+                  </p>
                 </div>
               )}
-              {/* Return trip fee */}
               {(() => {
                 const fee = vehicle.configs[configIdx]?.returnFee
                 return fee ? (
-                  <div className="rounded-xl px-3 py-2.5 mb-3 flex items-start justify-between gap-3"
-                    style={{ background: '#FFF8F7', border: '1px solid #EAD5D1' }}>
+                  <div className="rounded-xl px-4 py-3 mb-4 flex items-center justify-between gap-3"
+                    style={{ borderLeft: '3px solid #F59E0B', background: 'white', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
                     <div>
-                      <p className="text-xs font-semibold text-gray-600">出车回程费</p>
-                      <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
-                        一次性收费，会依据距离远近上调或下调，具体以客服报价为准
-                      </p>
+                      <p className="text-xs font-bold text-gray-700">↩ 回程费</p>
+                      <p className="text-xs text-gray-400 mt-0.5">根据距离调整，以客服报价为准</p>
                     </div>
-                    <p className="text-base font-black flex-shrink-0" style={{ color: '#B3475C' }}>
+                    <p className="font-black text-lg flex-shrink-0" style={{ color: MID }}>
                       ${fee}<span className="text-xs font-normal text-gray-400">起</span>
                     </p>
                   </div>
@@ -503,51 +540,140 @@ export default function MoveBooking() {
               </div>
             </div>
 
-            {/* Load reference */}
-            <div className="bg-white rounded-2xl p-4 shadow-sm" style={{ border: `1px solid ${BORDER}` }}>
-              <h3 className="font-bold text-gray-800 mb-2 text-sm">装载参考</h3>
-              <p className="text-sm text-gray-600 mb-3">{vehicle.loadRef}</p>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-xl p-2.5 text-center" style={{ background: BG }}>
-                  <p className="text-lg font-black" style={{ color: MID }}>
-                    {vehicle.volume}<span className="text-xs">m³</span>
-                  </p>
-                  <p className="text-gray-400 text-xs">容积</p>
-                </div>
-                <div className="rounded-xl p-2.5 text-center" style={{ background: BG }}>
-                  <p className="text-sm font-bold" style={{ color: MID }}>
-                    {vehicle.weight ? `${vehicle.weight}T` : '—'}
-                  </p>
-                  <p className="text-gray-400 text-xs">载重</p>
-                </div>
-                <div className="rounded-xl p-2.5 text-center" style={{ background: BG }}>
-                  <p className="text-xs font-semibold leading-tight" style={{ color: MID }}>
-                    {vehicle.dims}
-                  </p>
-                  <p className="text-gray-400 text-xs mt-0.5">货厢</p>
-                </div>
+            {/* 费用计算方式 */}
+            <div className="bg-white rounded-2xl p-5" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-1 h-4 rounded-full flex-shrink-0" style={{ background: MID }} />
+                <h3 className="font-bold text-gray-800 text-sm">费用计算方式</h3>
               </div>
-            </div>
-
-            {/* Advantages */}
-            <div className="bg-white rounded-2xl p-4 shadow-sm" style={{ border: `1px solid ${BORDER}` }}>
-              <h3 className="font-bold text-gray-800 mb-3 text-sm">车型优势</h3>
-              <div className="grid grid-cols-2 gap-2">
-                {vehicle.advantages.map(a => (
-                  <div key={a} className="flex items-center gap-2 py-1.5 px-2.5 rounded-xl text-sm"
-                    style={{ background: BG }}>
-                    <span className="text-green-500 font-bold">✓</span>
-                    <span className="text-gray-700">{a}</span>
+              <div className="flex items-center gap-1 mb-4">
+                {[
+                  { label: '时间费用' },
+                  { sym: '+' },
+                  { label: '回程费' },
+                  { sym: '+' },
+                  { label: '楼梯费' },
+                  { sym: '+' },
+                  { label: '其他费用' },
+                  { sym: '=' },
+                  { label: '总费用', highlight: true },
+                ].map((item, i) => (
+                  'sym' in item ? (
+                    <span key={i} className="text-gray-400 font-bold text-xs flex-shrink-0">{item.sym}</span>
+                  ) : (
+                    <div key={i} className="flex-1 py-2 rounded-lg text-center min-w-0"
+                      style={{ background: item.highlight ? MID : '#F5F5F5' }}>
+                      <span style={{ fontSize: 9.5, fontWeight: 600, color: item.highlight ? 'white' : '#666', display: 'block', lineHeight: 1.4 }}>
+                        {item.label}
+                      </span>
+                    </div>
+                  )
+                ))}
+              </div>
+              <div className="space-y-2 pt-3" style={{ borderTop: '1px solid #F5F5F5' }}>
+                {['按实际时间计费', '搬前可确认大致费用'].map(t => (
+                  <div key={t} className="flex items-center gap-2 text-xs text-gray-600">
+                    <span className="font-bold flex-shrink-0" style={{ color: MID }}>✓</span>
+                    {t}
                   </div>
                 ))}
               </div>
             </div>
 
-            <button onClick={() => setStep(2)}
-              className="w-full py-4 rounded-2xl text-white font-bold text-sm shadow-sm"
-              style={{ background: GRAD }}>
-              立即预约此车型 →
-            </button>
+            {/* 装载能力 */}
+            <div className="bg-white rounded-2xl p-5" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1 h-4 rounded-full flex-shrink-0" style={{ background: MID }} />
+                <h3 className="font-bold text-gray-800 text-sm">装载能力（约可装）</h3>
+              </div>
+              <p className="text-sm text-gray-600 mb-3">{vehicle.loadRef}</p>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { val: `${vehicle.volume}m³`, label: '容积' },
+                  { val: vehicle.weight || '—', label: '载重' },
+                  { val: vehicle.dims.split('×')[0].trim() + 'm', label: '车长' },
+                ].map(item => (
+                  <div key={item.label} className="rounded-xl p-3 text-center" style={{ background: '#F7F7F7' }}>
+                    <p className="font-black text-base leading-tight" style={{ color: MID }}>{item.val}</p>
+                    <p className="text-gray-400 text-xs mt-1">{item.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 可能产生的额外费用 */}
+            <div className="bg-white rounded-2xl overflow-hidden"
+              style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', borderLeft: '3px solid #F59E0B' }}>
+              <div className="p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-1 h-4 rounded-full flex-shrink-0" style={{ background: '#F59E0B' }} />
+                  <h3 className="font-bold text-gray-800 text-sm">可能产生的额外费用</h3>
+                </div>
+                <div className="space-y-3.5 mb-4">
+                  {[
+                    { icon: '🪜', name: '楼梯费',        fee: '$10 / 人 / 层', note: '无电梯或需要爬楼时收取' },
+                    { icon: '📍', name: '超远距离',      fee: '按距离计算',    note: '超出常规服务范围按实况收取' },
+                    { icon: '🅿️', name: '停车费 / Toll', fee: '客户承担',      note: '停车费、过路费由客户承担' },
+                    { icon: '⚖️', name: '重物费',        fee: '现场评估',      note: '钢琴、大理石等重物另行收费' },
+                  ].map(item => (
+                    <div key={item.name} className="flex items-start gap-3">
+                      <span className="text-base flex-shrink-0 mt-0.5">{item.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline justify-between gap-2 mb-0.5">
+                          <span className="text-sm font-semibold text-gray-700">{item.name}</span>
+                          <span className="text-sm font-bold flex-shrink-0" style={{ color: MID }}>{item.fee}</span>
+                        </div>
+                        <p className="text-xs text-gray-400">{item.note}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 pt-3 text-xs text-gray-500"
+                  style={{ borderTop: '1px solid #F5F5F5' }}>
+                  <span style={{ color: MID }}>✓</span>
+                  所有费用可提前确认，透明无隐藏收费
+                </div>
+              </div>
+            </div>
+
+
+{/* 信任条 */}
+            <div className="bg-white rounded-2xl grid grid-cols-4 py-4 px-2"
+              style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+              {[
+                { icon: '👍', value: '1000+', label: '客户好评' },
+                { icon: '⭐', value: '4.9',   label: '服务评分' },
+                { icon: '📅', value: '7天',   label: '可预约'   },
+                { icon: '🛡️', value: '运输',  label: '保险保障' },
+              ].map((t, i) => (
+                <div key={t.label} className="text-center"
+                  style={i > 0 ? { borderLeft: '1px solid #F0F0F0' } : {}}>
+                  <p className="text-base leading-none mb-1">{t.icon}</p>
+                  <p className="text-sm font-extrabold" style={{ color: MID }}>{t.value}</p>
+                  <p className="text-xs mt-0.5" style={{ color: '#999' }}>{t.label}</p>
+                </div>
+              ))}
+            </div>
+
+          </div>
+        )}
+
+        {/* ── Fixed bottom CTA (step 1 only) ── */}
+        {step === 1 && vehicle && (
+          <div className="fixed bottom-0 left-0 right-0 z-20 px-4 pb-6 pt-3"
+            style={{ background: 'linear-gradient(to top, #F7F7F7 75%, transparent)' }}>
+            <div className="max-w-lg mx-auto flex gap-3">
+              <button onClick={() => setStep(2)}
+                className="flex-1 py-4 rounded-2xl text-white font-bold text-base"
+                style={{ background: GRAD, boxShadow: '0 4px 20px rgba(139,38,53,0.35)' }}>
+                立即预约 · {vehicle.name} →
+              </button>
+              <a href="tel:0426033899"
+                className="flex-shrink-0 py-4 px-5 rounded-2xl font-bold text-sm flex items-center gap-1.5"
+                style={{ background: 'white', border: `1.5px solid ${MID}`, color: MID, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                📞 咨询
+              </a>
+            </div>
           </div>
         )}
 
@@ -556,7 +682,7 @@ export default function MoveBooking() {
           <>
           <div className="space-y-4 pb-36">
             {/* Summary */}
-            <div className="rounded-2xl px-4 py-3" style={{ background: BG, border: `1px solid ${BORDER}` }}>
+            <div className="rounded-2xl px-4 py-3" style={{ background: BG, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-bold text-sm" style={{ color: MID }}>
@@ -573,7 +699,7 @@ export default function MoveBooking() {
             </div>
 
             {/* 1. Date + Time */}
-            <div className="bg-white rounded-2xl p-4 shadow-sm" style={{ border: `1px solid ${BORDER}` }}>
+            <div className="bg-white rounded-2xl p-4 shadow-sm" style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
               <h3 className="font-bold text-gray-800 mb-3 text-sm">搬家日期与到达时段</h3>
               <input type="date" value={form.date}
                 onChange={e => set('date', e.target.value)}
@@ -615,7 +741,7 @@ export default function MoveBooking() {
 
             {/* 2. Contact */}
             <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3"
-              style={{ border: `1px solid ${BORDER}` }}>
+              style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
               <h3 className="font-bold text-gray-800 text-sm">联系方式</h3>
               {[
                 { k: 'name',   label: '姓名 *',        ph: '您的姓名',     type: 'text' },
@@ -635,7 +761,7 @@ export default function MoveBooking() {
 
             {/* 3. Addresses */}
             <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3"
-              style={{ border: `1px solid ${BORDER}` }}>
+              style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
               <h3 className="font-bold text-gray-800 text-sm">搬运地址</h3>
               <div>
                 <label className="text-xs text-gray-500 mb-1.5 block font-medium">搬出地址 *</label>
@@ -667,7 +793,7 @@ export default function MoveBooking() {
             </div>
 
             {/* 4+5+6. Extras collapsible: Stairs + Heavy Items + Materials */}
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: `1px solid ${BORDER}` }}>
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
               <button type="button" onClick={() => setExtrasOpen(o => !o)}
                 className="w-full px-4 py-4 flex items-center justify-between text-left">
                 <div className="flex-1 min-w-0">
@@ -714,7 +840,7 @@ export default function MoveBooking() {
 
                     {form.stairs === 'stairs' && (
                       <div className="mt-3 rounded-xl px-4 py-3 flex items-center justify-between"
-                        style={{ background: BG, border: `1px solid ${BORDER}` }}>
+                        style={{ background: BG, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
                         <div>
                           <p className="text-sm font-medium text-gray-700">楼层数</p>
                           <p className="text-xs text-gray-400">每人/每层 $10</p>
@@ -788,7 +914,7 @@ export default function MoveBooking() {
             </div>
 
             {/* 7. Items description */}
-            <div className="bg-white rounded-2xl p-4 shadow-sm" style={{ border: `1px solid ${BORDER}` }}>
+            <div className="bg-white rounded-2xl p-4 shadow-sm" style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
               <h3 className="font-bold text-gray-800 mb-1 text-sm">搬运物品说明和备注</h3>
               <p className="text-xs text-gray-400 mb-2">
                 如：床 1 张、沙发 1 套、冰箱 1 台、纸箱约 10 箱等
@@ -801,7 +927,7 @@ export default function MoveBooking() {
             </div>
 
             {/* 8. Deposit */}
-            <div className="bg-white rounded-2xl p-4 shadow-sm" style={{ border: `1px solid ${BORDER}` }}>
+            <div className="bg-white rounded-2xl p-4 shadow-sm" style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
               <h3 className="font-bold text-gray-800 mb-1 text-sm">定金说明 <span className="text-red-500">*</span></h3>
               <p className="text-xs text-gray-500 mb-3">
                 请先转账定金，上传截图后方可提交预约。截图确认后档期锁定。
@@ -947,7 +1073,7 @@ function DistanceSurchargeCard({ km, vehicleKey }) {
 
       {/* Surcharge breakdown */}
       {hasSurcharge && (
-        <div className="px-4 pt-3 pb-4 bg-amber-50">
+        <div className="px-4 pt-3 pb-4 bg-white" style={{ borderLeft: '3px solid #F59E0B' }}>
           <p className="text-xs font-semibold text-amber-800 mb-2.5">额外费用说明</p>
           <div className="space-y-2 mb-3">
             <div className="flex justify-between items-center">

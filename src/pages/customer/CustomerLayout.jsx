@@ -8,8 +8,8 @@ const TABS = [
   { path: '/profile',  label: '我的', Icon: User          },
 ]
 
-const MID    = '#C95E70'
-const BORDER = '#EAD5D1'
+const MID    = '#8B2635'
+const BORDER = '#EFEFEF'
 
 export default function CustomerLayout() {
   const navigate = useNavigate()

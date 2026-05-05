@@ -22,11 +22,11 @@ function calcFee(boxes, furniture, weeks) {
   return { weekly, total: weekly * weeks, boxRate, furRate, short }
 }
 
-const GRAD   = 'linear-gradient(135deg, #C94F6D, #E97873)'
-const BG     = '#FFF3F0'
-const MID    = '#C94F6D'
-const BORDER = '#F3C9C3'
-const DARK   = '#A03050'
+const GRAD   = 'linear-gradient(135deg, #C03448, #D03C52)'
+const BG     = '#F7F7F7'
+const MID    = '#C03448'
+const BORDER = '#EFEFEF'
+const DARK   = '#7a1e28'
 
 export default function StorageBooking() {
   const navigate = useNavigate()
@@ -139,7 +139,8 @@ export default function StorageBooking() {
           <p className="text-gray-500 text-sm mb-1">订单号：<strong className="text-gray-800">{orderId}</strong></p>
           <p className="text-gray-400 text-sm mb-4">客服将在 1 小时内联系您确认详情</p>
 
-          <div className="rounded-2xl p-4 text-left space-y-1.5 mb-4 text-sm" style={{ background: BG }}>
+          <div className="rounded-2xl p-4 text-left space-y-1.5 mb-4 text-sm bg-white"
+            style={{ borderLeft: '3px solid #F59E0B', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
             <div className="flex justify-between">
               <span className="text-gray-500">纸箱</span>
               <span className="font-medium">{boxes} 箱</span>
@@ -159,7 +160,8 @@ export default function StorageBooking() {
             <p className="text-xs text-gray-400">运输费另计，客服确认后报价</p>
           </div>
 
-          <div className="rounded-2xl p-4 text-left mb-4" style={{ background: BG }}>
+          <div className="rounded-2xl p-4 text-left mb-4 bg-white"
+            style={{ borderLeft: '3px solid #F59E0B', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
             <p className="font-bold text-sm mb-2.5" style={{ color: MID }}>📋 温馨提示</p>
             <div className="space-y-1.5 text-sm text-gray-600">
               {['请提前整理好需要寄存的物品', '易碎品请提前说明', '公寓请提前预约电梯', '请提前预留停车位'].map(tip => (

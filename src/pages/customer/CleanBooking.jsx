@@ -19,11 +19,11 @@ const ROOM_TYPES = [
   { key: '4b+',    label: '4+ Bedrooms' },
 ]
 
-const BLUE_GRAD   = 'linear-gradient(135deg, #C94F6D, #E97873)'
-const BLUE_BG     = '#FFF3F0'
-const BLUE_MID    = '#C94F6D'
-const BLUE_BORDER = '#F3C9C3'
-const BLUE_DARK   = '#A03050'
+const BLUE_GRAD   = 'linear-gradient(135deg, #8B2635, #C0392B)'
+const BLUE_BG     = '#F7F7F7'
+const BLUE_MID    = '#8B2635'
+const BLUE_BORDER = '#EFEFEF'
+const BLUE_DARK   = '#6b1420'
 
 export default function CleanBooking() {
   const navigate = useNavigate()
@@ -71,7 +71,7 @@ export default function CleanBooking() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background: BLUE_BG }}>
         <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-sm text-center" style={{ border: `1px solid ${BLUE_BORDER}` }}>
-          <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: '#FFF3F0' }}>
+          <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: '#F7F7F7' }}>
             <CheckCircle size={40} style={{ color: BLUE_MID }} />
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">预约成功！</h2>
@@ -114,7 +114,7 @@ export default function CleanBooking() {
             <button key={c.key} onClick={() => setCleanType(c.key)}
               className="w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 text-left transition-all"
               style={cleanType === c.key
-                ? { borderColor: '#F3C9C3', background: BLUE_BG }
+                ? { borderColor: '#EFEFEF', background: BLUE_BG }
                 : { borderColor: '#e5e7eb' }}>
               <span className="text-2xl flex-shrink-0">{c.icon}</span>
               <div className="flex-1">
@@ -122,7 +122,7 @@ export default function CleanBooking() {
                   <p className="font-semibold text-sm" style={{ color: cleanType === c.key ? BLUE_MID : '#1f2937' }}>{c.label}</p>
                   {c.popular && (
                     <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
-                      style={{ background: '#FFF3F0', color: BLUE_MID }}>常见</span>
+                      style={{ background: '#F7F7F7', color: BLUE_MID }}>常见</span>
                   )}
                 </div>
                 <p className="text-xs text-gray-400 mt-0.5">{c.desc}</p>
@@ -145,7 +145,7 @@ export default function CleanBooking() {
               <button key={r.key} onClick={() => setRoomType(r.key)}
                 className="px-4 py-2.5 rounded-xl border-2 text-sm font-medium transition-all"
                 style={roomType === r.key
-                  ? { borderColor: '#F3C9C3', background: BLUE_BG, color: BLUE_MID }
+                  ? { borderColor: '#EFEFEF', background: BLUE_BG, color: BLUE_MID }
                   : { borderColor: '#e5e7eb', color: '#4b5563' }}>
                 {r.label}
               </button>
@@ -159,7 +159,7 @@ export default function CleanBooking() {
                   <button key={n} onClick={() => setBathroomCount(n)}
                     className="px-4 py-2.5 rounded-xl border-2 text-sm font-medium transition-all"
                     style={bathroomCount === n
-                      ? { borderColor: '#F3C9C3', background: BLUE_BG, color: BLUE_MID }
+                      ? { borderColor: '#EFEFEF', background: BLUE_BG, color: BLUE_MID }
                       : { borderColor: '#e5e7eb', color: '#4b5563' }}>
                     {n === 3 ? '3+' : n} {n === 1 ? 'Bathroom' : 'Bathrooms'}
                   </button>
@@ -177,7 +177,7 @@ export default function CleanBooking() {
               <button key={e} onClick={() => toggleExtra(e)}
                 className="px-3 py-2 rounded-xl border-2 text-xs font-medium transition-all"
                 style={extras.includes(e)
-                  ? { borderColor: '#F3C9C3', background: BLUE_BG, color: BLUE_MID }
+                  ? { borderColor: '#EFEFEF', background: BLUE_BG, color: BLUE_MID }
                   : { borderColor: '#e5e7eb', color: '#4b5563' }}>
                 {extras.includes(e) ? '✓ ' : ''}{e}
               </button>

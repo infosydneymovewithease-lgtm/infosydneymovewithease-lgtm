@@ -30,11 +30,11 @@ const IKEA_STORE_ADDRESSES = {
   'IKEA Tempe':  'IKEA Tempe, 634 Princes Hwy, Tempe NSW 2044',
 }
 
-const GRAD   = 'linear-gradient(135deg, #C94F6D, #E97873)'
-const BG     = '#FFF3F0'
-const MID    = '#C94F6D'
-const BORDER = '#F3C9C3'
-const DARK   = '#A03050'
+const GRAD   = 'linear-gradient(135deg, #C03448, #D03C52)'
+const BG     = '#F7F7F7'
+const MID    = '#C03448'
+const BORDER = '#EFEFEF'
+const DARK   = '#7a1e28'
 
 export default function IkeaBooking() {
   const navigate = useNavigate()
@@ -174,7 +174,8 @@ export default function IkeaBooking() {
           </p>
           <p className="text-gray-400 text-sm mb-4">客服将在 1 小时内与您确认</p>
 
-          <div className="rounded-2xl p-4 text-left mb-4" style={{ background: BG }}>
+          <div className="rounded-2xl p-4 text-left mb-4 bg-white"
+            style={{ borderLeft: '3px solid #F59E0B', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
             <p className="font-bold text-sm mb-2.5" style={{ color: MID }}>📋 温馨提示</p>
             <div className="space-y-1.5 text-sm text-gray-600">
               {['请确认 IKEA 订单已可取货', '请提供完整订单截图 / 二维码', '请提前预留停车位', '公寓请提前预约电梯'].map(tip => (
