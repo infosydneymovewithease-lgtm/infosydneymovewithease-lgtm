@@ -348,7 +348,7 @@ export default function MoveBooking() {
     <div className="bg-white sticky top-0 z-10" style={{ borderBottom: `1px solid ${BORDER}` }}>
       <div className="max-w-lg mx-auto px-4 h-14 flex items-center gap-3">
         <button
-          onClick={() => step === 0 ? navigate(-1) : setStep(s => s - 1)}
+          onClick={() => step === 0 ? navigate('/') : setStep(s => s - 1)}
           className="p-2 -ml-2 text-gray-500">
           <ArrowLeft size={20} />
         </button>
