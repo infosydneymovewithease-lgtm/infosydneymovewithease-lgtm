@@ -1029,7 +1029,7 @@ export default function MoveBooking() {
                     <p className="text-sm font-medium text-green-600">截图已上传</p>
                     <p className="text-xs text-gray-400">{depositFile.name}</p>
                   </div>
-                  <button onClick={() => setDepositFile(null)} className="p-1 text-gray-400">
+                  <button onClick={() => { setDepositFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }} className="p-1 text-gray-400">
                     <X size={16} />
                   </button>
                 </div>
