@@ -203,7 +203,14 @@ export default function MoveBooking() {
   const hasSubmittedRef = useRef(false)
 
   async function handleSubmit() {
-    if (hasSubmittedRef.current || !validate()) return
+    if (hasSubmittedRef.current) return
+    if (!validate()) {
+      setTimeout(() => {
+        const el = document.querySelector('.border-red-400')
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 30)
+      return
+    }
     hasSubmittedRef.current = true
     setSubmitting(true)
     setSubmitError(null)
