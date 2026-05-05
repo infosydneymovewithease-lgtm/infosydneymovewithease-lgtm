@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft, Phone, CheckCircle, ChevronRight, Upload, X } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
@@ -6,17 +6,17 @@ import dayjs from 'dayjs'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
 import { getDistanceKm } from '../../utils/googleMaps'
 import { calcRemoteSurcharge } from '../../utils/remoteFee'
+import { SLOT_CONFIG, fetchSlotsAvailability } from '../../utils/slotAvailability'
 
 const GRAD   = 'linear-gradient(135deg, #A52535, #C0392B)'
 const BG     = '#F7F7F7'
 const MID    = '#A52535'
 const BORDER = '#EFEFEF'
 
-// First slot is always exact 08:00; subsequent slots are arrival windows
 const TIME_SLOTS = {
-  van:   ['08:00 准时到达', '10:30–12:30', '13:00–15:00', '15:30–17:30', '18:00–20:00'],
-  small: ['08:00 准时到达', '11:30–13:30', '15:30–17:30'],
-  large: ['08:00 准时到达', '15:00–17:00'],
+  van:   SLOT_CONFIG.van.slots,
+  small: SLOT_CONFIG.small.slots,
+  large: SLOT_CONFIG.large.slots,
 }
 
 const VEHICLES = [
@@ -74,7 +74,7 @@ const STAIRS_OPTIONS = [
 export default function MoveBooking() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { createOrder } = useApp()
+  const { createOrderWithSlotCheck } = useApp()
   const fileInputRef = useRef(null)
 
   const initId = location.state?.vehicleId ?? null
@@ -91,6 +91,10 @@ export default function MoveBooking() {
   const [packingItems,    setPackingItems]    = useState(0)
   const [extrasOpen, setExtrasOpen]           = useState(false)
   const [showWechat, setShowWechat]           = useState(false)
+  const [slotAvailability, setSlotAvailability] = useState({})
+  const [availabilityLoading, setAvailabilityLoading] = useState(false)
+  const [submitting, setSubmitting]           = useState(false)
+  const [submitError, setSubmitError]         = useState(null)
 
   const [form, setForm] = useState({
     name: '', phone: '', wechat: '',
@@ -135,10 +139,25 @@ export default function MoveBooking() {
     }
   }
 
+  // Load availability whenever vehicle or date changes (only matters from step 2 onward)
+  useEffect(() => {
+    if (!vehicleId || !form.date) return
+    let cancelled = false
+    setAvailabilityLoading(true)
+    fetchSlotsAvailability(vehicleId, form.date).then(result => {
+      if (!cancelled) {
+        setSlotAvailability(result)
+        setAvailabilityLoading(false)
+      }
+    })
+    return () => { cancelled = true }
+  }, [vehicleId, form.date])
+
   function selectVehicle(id) {
     setVehicleId(id)
     setConfigIdx(0)
-    setForm(f => ({ ...f, timeSlot: TIME_SLOTS[id][0] }))
+    setSlotAvailability({})
+    setForm(f => ({ ...f, timeSlot: '' }))
     setStep(1)
   }
 
@@ -168,46 +187,56 @@ export default function MoveBooking() {
 
   const hasSubmittedRef = useRef(false)
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (hasSubmittedRef.current || !validate()) return
     hasSubmittedRef.current = true
+    setSubmitting(true)
+    setSubmitError(null)
+
     const stairsLabel = STAIRS_OPTIONS.find(s => s.value === form.stairs)?.label ?? ''
-    const order = createOrder({
-      customerName: form.name,
-      customerPhone: form.phone,
-      wechat: form.wechat,
-      fromAddress: form.fromAddress,
-      toAddress: form.toAddress,
-      date: form.date,
-      startTime: form.timeSlot,
-      vehicle: config.key,
-      vehicleName: vehicle.name,
-      vehicleConfig: config.label,
-      items: form.items,
-      stairs: stairsLabel,
-      depositScreenshot: depositFile || null,
-      depositStatus: depositFile ? '已上传截图' : '待付定金',
-      notes: form.notes,
-      distanceKm: form.distanceKm,
-      stairsFloors: form.stairs === 'stairs' ? form.stairsFloors : 0,
-      stairsFee,
-      serviceType: '搬家',
-      source: '官网自助预约',
-      status: '待确认',
-      quote: totalEstimate,
-      quoteNote: [
-        `$${config.rate}×${config.minHours}h + $${config.rate}(返程费) = $${baseEstimate}`,
-        remoteEstimate > 0 ? `+ 远途 $${remoteEstimate}` : null,
-        stairsFee      > 0 ? `+ 楼梯 $${stairsFee}`     : null,
-        materialsEstimate > 0 ? `+ 物资 $${materialsEstimate}` : null,
-        `= $${totalEstimate}起`,
-      ].filter(Boolean).join(' '),
-      requestedMaterials: (boxesNeeded > 0 || wrapNeeded > 0 || mattressCovers > 0 || packingItems > 0)
-        ? { boxes: boxesNeeded, wrapItems: wrapNeeded, mattressCovers, packingItems }
-        : null,
-    })
-    setOrderId(order.id)
-    setSubmitted(true)
+
+    try {
+      const order = await createOrderWithSlotCheck({
+        customerName:   form.name,
+        customerPhone:  form.phone,
+        wechat:         form.wechat,
+        fromAddress:    form.fromAddress,
+        toAddress:      form.toAddress,
+        date:           form.date,
+        startTime:      form.timeSlot,
+        vehicle:        config.key,
+        items:          form.items,
+        notes:          [stairsLabel ? `楼梯：${stairsLabel}` : null, form.notes].filter(Boolean).join('；'),
+        depositScreenshot: depositFile || null,
+        depositStatus:  depositFile ? '已上传截图' : '待付定金',
+        distanceKm:     form.distanceKm,
+        remoteSurcharge: remoteEstimate,
+        stairFee:       stairsFee,
+        serviceType:    '搬家',
+        source:         '官网自助预约',
+        status:         '待确认',
+        quote:          totalEstimate,
+        quoteNote: [
+          `$${config.rate}×${config.minHours}h + $${config.rate}(返程费) = $${baseEstimate}`,
+          remoteEstimate    > 0 ? `+ 远途 $${remoteEstimate}`         : null,
+          stairsFee         > 0 ? `+ 楼梯 $${stairsFee}`             : null,
+          materialsEstimate > 0 ? `+ 物资 $${materialsEstimate}`      : null,
+          `= $${totalEstimate}起`,
+        ].filter(Boolean).join(' '),
+        requestedMaterials: (boxesNeeded > 0 || wrapNeeded > 0 || mattressCovers > 0 || packingItems > 0)
+          ? { boxes: boxesNeeded, wrapItems: wrapNeeded, mattressCovers, packingItems }
+          : null,
+      })
+      setOrderId(order.id)
+      setSubmitted(true)
+    } catch (err) {
+      hasSubmittedRef.current = false
+      setSubmitError(err.message || '提交失败，请重试')
+      // Refresh availability so the UI reflects current real state
+      fetchSlotsAvailability(vehicleId, form.date).then(setSlotAvailability)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   /* ── Success screen ── */
@@ -711,27 +740,44 @@ export default function MoveBooking() {
               <p className="text-xs text-gray-400 mb-2">
                 第一单可准时到达；后续时段受上一单工时及路况影响，为预计窗口
               </p>
+              {availabilityLoading && (
+                <p className="text-xs text-gray-400 mb-2 text-center">正在查询可用时段…</p>
+              )}
               <div className="space-y-2">
-                {slots.map((slot, idx) => {
-                  const isFixed = idx === 0
+                {slots.map(slot => {
+                  const avail    = slotAvailability[slot]
+                  const isFull   = avail && avail.available <= 0
+                  const isLimited = avail && avail.available > 0 && avail.available < avail.capacity
                   const selected = form.timeSlot === slot
                   return (
-                    <button key={slot} onClick={() => set('timeSlot', slot)}
+                    <button key={slot}
+                      disabled={isFull}
+                      onClick={() => !isFull && set('timeSlot', slot)}
                       className="w-full px-4 py-2.5 rounded-xl text-sm font-medium transition-colors text-left flex items-center justify-between"
-                      style={selected
-                        ? { background: GRAD, color: 'white' }
-                        : { background: '#f3f4f6', color: '#374151' }
+                      style={
+                        isFull
+                          ? { background: '#f3f4f6', color: '#9ca3af', cursor: 'not-allowed', opacity: 0.55 }
+                          : selected
+                          ? { background: GRAD, color: 'white' }
+                          : { background: '#f3f4f6', color: '#374151' }
                       }>
                       <span>{slot}</span>
-                      {isFixed && (
-                        <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                          style={selected
-                            ? { background: 'rgba(255,255,255,0.25)', color: 'white' }
-                            : { background: '#dcfce7', color: '#16a34a' }
-                          }>
-                          准时
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {isFull && (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-gray-200 text-gray-400">
+                            已满
+                          </span>
+                        )}
+                        {isLimited && (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                            style={selected
+                              ? { background: 'rgba(255,255,255,0.25)', color: 'white' }
+                              : { background: '#FEF3C7', color: '#D97706' }
+                            }>
+                            剩余1个
+                          </span>
+                        )}
+                      </div>
                     </button>
                   )
                 })}
@@ -1018,10 +1064,14 @@ export default function MoveBooking() {
                   {materialsEstimate > 0 && <p style={{ color: MID }}>+ 物资 ${materialsEstimate}</p>}
                 </div>
               </div>
+              {submitError && (
+                <p className="text-center text-xs mb-2" style={{ color: MID }}>{submitError}</p>
+              )}
               <button onClick={handleSubmit}
+                disabled={submitting}
                 className="w-full py-3.5 rounded-2xl text-white font-bold text-sm"
-                style={{ background: GRAD }}>
-                提交预约申请
+                style={{ background: GRAD, opacity: submitting ? 0.7 : 1 }}>
+                {submitting ? '提交中…' : '提交预约申请'}
               </button>
               <p className="text-center text-xs text-gray-400 mt-2">
                 客服确认后支付定金锁定档期，方为正式预约

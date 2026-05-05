@@ -218,6 +218,41 @@ export function AppProvider({ children }) {
     return newOrder
   }
 
+  // Atomic slot-checked order creation via Supabase RPC.
+  // Throws with a user-readable message if the slot is full or on network error.
+  async function createOrderWithSlotCheck(orderData) {
+    const payload = pickOrder({
+      ...orderData,
+      // normalise stairsFee (JS name) → stairFee (DB column)
+      stairFee:      orderData.stairFee ?? orderData.stairsFee ?? 0,
+      createdAt:     new Date().toISOString(),
+      createdBy:     user?.id || 'customer',
+      createdByName: user?.name || '客户自助',
+      status:        orderData.status || '待确认',
+      assignedTo:    null,
+      assignedWorkers: [],
+    })
+
+    const { data, error } = await supabase.rpc('create_order_with_slot_check', {
+      p_order: payload,
+    })
+
+    if (error) throw new Error('网络错误，请稍后重试')
+    if (!data?.success) {
+      throw new Error(
+        data?.error === 'slot_full'
+          ? '该时段已满，请选择其他时段或联系客服'
+          : data?.error || '提交失败，请重试'
+      )
+    }
+
+    // Build local order object with the server-generated ID
+    const newOrder = { ...payload, id: data.order_id }
+    // Guard against realtime duplicate (subscription will also fire INSERT)
+    setOrders(prev => prev.some(x => x.id === newOrder.id) ? prev : [newOrder, ...prev])
+    return newOrder
+  }
+
   function updateOrder(orderId, updates) {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o))
     bg(supabase.from('orders').update(pickOrder(updates)).eq('id', orderId))
@@ -414,7 +449,8 @@ export function AppProvider({ children }) {
     <AppContext.Provider value={{
       user, worker, login, logout,
       orders, confirmOrder, completeOrder, getMyOrders,
-      createOrder, updateOrder, dispatchOrder, updateOrderStatus,
+      createOrder, createOrderWithSlotCheck,
+      updateOrder, dispatchOrder, updateOrderStatus,
       storageOrders, createStorageOrder, updateStorageOrder, deleteOrder,
       secondhandItems, createSecondhandItem, updateSecondhandItem,
       secondhandLeads, createSecondhandLead, updateSecondhandLead,
