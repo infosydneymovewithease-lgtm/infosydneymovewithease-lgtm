@@ -261,6 +261,8 @@ export default function MoveBooking() {
       })
       setOrderId(order.id)
       setCustomerCode(order.customer_code || null)
+      localStorage.setItem('mwe_phone', form.phone.trim())
+      localStorage.setItem('mwe_name', form.name.trim())
       setSubmitted(true)
     } catch (err) {
       hasSubmittedRef.current = false
