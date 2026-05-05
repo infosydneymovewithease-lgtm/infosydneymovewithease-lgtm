@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft, Phone, CheckCircle, ChevronRight, Upload, X } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { supabase } from '../../lib/supabase'
+import VerifyCodeModal from '../../components/VerifyCodeModal'
 import dayjs from 'dayjs'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
 import { getDistanceKm } from '../../utils/googleMaps'
@@ -96,6 +97,8 @@ export default function MoveBooking() {
   const [availabilityLoading, setAvailabilityLoading] = useState(false)
   const [submitting, setSubmitting]           = useState(false)
   const [submitError, setSubmitError]         = useState(null)
+  const [showVerify, setShowVerify]           = useState(false)
+  const [customerCode, setCustomerCode]       = useState(null)
 
   const [form, setForm] = useState({
     name: '', phone: '', wechat: '',
@@ -202,8 +205,8 @@ export default function MoveBooking() {
 
   const hasSubmittedRef = useRef(false)
 
-  async function handleSubmit() {
-    if (hasSubmittedRef.current) return
+  // Step 1: validate form → show verify modal
+  function handleSubmit() {
     if (!validate()) {
       setTimeout(() => {
         const el = document.querySelector('.border-red-400')
@@ -211,6 +214,13 @@ export default function MoveBooking() {
       }, 30)
       return
     }
+    setShowVerify(true)
+  }
+
+  // Step 2: called by VerifyCodeModal after code confirmed → create order
+  async function handleVerifySuccess() {
+    setShowVerify(false)
+    if (hasSubmittedRef.current) return
     hasSubmittedRef.current = true
     setSubmitting(true)
     setSubmitError(null)
@@ -250,11 +260,11 @@ export default function MoveBooking() {
           : null,
       })
       setOrderId(order.id)
+      setCustomerCode(order.customer_code || null)
       setSubmitted(true)
     } catch (err) {
       hasSubmittedRef.current = false
       setSubmitError(err.message || '提交失败，请重试')
-      // Refresh availability so the UI reflects current real state
       fetchSlotsAvailability(vehicleId, form.date).then(setSlotAvailability)
     } finally {
       setSubmitting(false)
@@ -271,11 +281,18 @@ export default function MoveBooking() {
             style={{ background: BG }}>
             <CheckCircle size={40} style={{ color: MID }} />
           </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-1">申请已提交</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-1">预约成功</h2>
           <p className="text-gray-500 text-sm mb-1">
             订单号：<strong className="text-gray-800">{orderId}</strong>
           </p>
-          <p className="text-gray-400 text-sm mb-6">已提交预约申请，客服确认后生效</p>
+          {customerCode && (
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl mb-2"
+              style={{ background: '#FDF2F2', border: `1.5px solid #EDCCD0` }}>
+              <span className="text-xs text-gray-500">档案编号</span>
+              <span className="font-black text-lg tracking-widest" style={{ color: MID }}>{customerCode}</span>
+            </div>
+          )}
+          <p className="text-gray-400 text-sm mb-6">已为您建立订单档案，客服会尽快联系您确认</p>
 
           <div className="rounded-2xl p-4 text-left space-y-2 mb-4 text-sm" style={{ background: BG }}>
             <div className="flex justify-between">
@@ -1096,13 +1113,20 @@ export default function MoveBooking() {
                 {submitting ? '提交中…' : '提交预约申请'}
               </button>
               <p className="text-center text-xs text-gray-400 mt-2">
-                客服确认后支付定金锁定档期，方为正式预约
+                提交后将验证手机号并自动建立订单档案，方便随时查询进度
               </p>
             </div>
           </div>
           </>
         )}
       </div>
+      {showVerify && (
+        <VerifyCodeModal
+          phone={form.phone}
+          onVerified={handleVerifySuccess}
+          onClose={() => setShowVerify(false)}
+        />
+      )}
     </div>
   )
 }

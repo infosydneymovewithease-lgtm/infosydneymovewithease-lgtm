@@ -21,6 +21,7 @@ const ORDER_COLUMNS = new Set([
   'paymentStatus','collectedBy','completedAt',
   'materials','materialsCost',
   'fragileItems','fragileDescription','fragileEstimatedFee',
+  'customer_code',
 ])
 
 const STORAGE_COLUMNS = new Set([
@@ -240,14 +241,18 @@ export function AppProvider({ children }) {
     if (error) throw new Error('网络错误，请稍后重试')
     if (!data?.success) {
       throw new Error(
-        data?.error === 'slot_full'
-          ? '该时段已满，请选择其他时段或联系客服'
-          : data?.error || '提交失败，请重试'
+        data?.error === 'slot_full' ? '该时段已满，请选择其他时段或联系客服'
+        : data?.error === 'day_full' ? '该日期预约已满，请选择其他日期或联系客服'
+        : data?.error || '提交失败，请重试'
       )
     }
 
+    // Generate customer archive code and save to DB (fire-and-forget)
+    const customerCode = 'C' + Math.floor(100000 + Math.random() * 900000)
+    bg(supabase.from('orders').update({ customer_code: customerCode }).eq('id', data.order_id))
+
     // Build local order object with the server-generated ID
-    const newOrder = { ...payload, id: data.order_id }
+    const newOrder = { ...payload, id: data.order_id, customer_code: customerCode }
     // Guard against realtime duplicate (subscription will also fire INSERT)
     setOrders(prev => prev.some(x => x.id === newOrder.id) ? prev : [newOrder, ...prev])
     return newOrder
