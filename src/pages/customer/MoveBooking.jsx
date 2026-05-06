@@ -126,7 +126,7 @@ export default function MoveBooking() {
     boxesNeeded > 0 ? `纸箱 ×${boxesNeeded}` : null,
     wrapNeeded  > 0 ? `打包膜 ×${wrapNeeded}` : null,
   ].filter(Boolean)
-  const extrasSummary = extrasTags.length > 0 ? extrasTags.join(' · ') : '楼梯 · 特殊物品 · 打包物资'
+  const extrasSummary = extrasTags.length > 0 ? extrasTags.join(' · ') : '楼梯 · 重物大件 · 打包物资'
 
   function set(k, v) {
     setForm(f => ({ ...f, [k]: v }))
@@ -884,8 +884,8 @@ export default function MoveBooking() {
               <button type="button" onClick={() => setExtrasOpen(o => !o)}
                 className="w-full px-4 py-4 flex items-center justify-between text-left">
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-gray-800 text-sm">附加需求（可选）</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="font-bold text-gray-800 text-sm">附加费用（可选）</p>
+                  <p className="text-sm font-semibold text-gray-700 mt-1">
                     {extrasOpen ? '楼梯 · 重物大件 · 打包物资' : extrasSummary}
                   </p>
                 </div>
