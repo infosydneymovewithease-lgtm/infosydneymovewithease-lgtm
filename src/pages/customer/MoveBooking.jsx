@@ -92,6 +92,7 @@ export default function MoveBooking() {
   const [mattressCovers,  setMattressCovers]  = useState(0)
   const [packingItems,    setPackingItems]    = useState(0)
   const [extrasOpen, setExtrasOpen]           = useState(false)
+  const [alipayOpen, setAlipayOpen]           = useState(false)
   const [showWechat, setShowWechat]           = useState(false)
   const [slotAvailability, setSlotAvailability] = useState({})
   const [availabilityLoading, setAvailabilityLoading] = useState(false)
@@ -884,8 +885,8 @@ export default function MoveBooking() {
               <button type="button" onClick={() => setExtrasOpen(o => !o)}
                 className="w-full px-4 py-4 flex items-center justify-between text-left">
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-gray-800 text-sm">附加费用（可选）</p>
-                  <p className="text-sm font-semibold text-gray-700 mt-1">
+                  <p className="font-extrabold text-gray-900 text-base">附加费用（可选）</p>
+                  <p className="text-base font-extrabold mt-1.5" style={{ color: MID }}>
                     {extrasOpen ? '楼梯 · 重物大件 · 打包物资' : extrasSummary}
                   </p>
                 </div>
@@ -951,22 +952,48 @@ export default function MoveBooking() {
 
                   {/* Special items notice */}
                   <div>
-                    <p className="text-xs font-semibold text-gray-600 mb-2">特殊物品说明（可选）</p>
-                    <div className="rounded-xl p-3.5" style={{ background: '#FFFBF0', border: '1px solid #FDE68A' }}>
-                      <p className="text-xs text-amber-800 mb-2 leading-relaxed">
+                    <p className="text-xs font-semibold text-gray-600 mb-2">产生附加费的物品说明（可选）</p>
+                    <div className="rounded-xl p-4" style={{ background: '#FFFBF0', border: '1px solid #FDE68A' }}>
+
+                      {/* Section 1: what triggers extra fees */}
+                      <p className="text-sm font-bold text-amber-800 mb-2.5 leading-relaxed">
                         以下情况可能产生附加费用，具体以客服确认或现场评估为准：
                       </p>
-                      <div className="space-y-1.5 mb-2.5">
+                      <div className="space-y-2 mb-4">
                         {[
-                          '单件约 100kg 以上重物',
-                          '大型易碎物品',
-                          '超尺寸家具 / 家电',
+                          '单件约 100kg 以上重物：钢琴、双门冰箱等',
+                          '大型易碎物品：大理石、大型玻璃制品',
+                          '超尺寸家具 / 家电：大实木柜子、65 寸以上电视等',
                           '特殊搬运环境（远距离上坡、掉重等）',
                         ].map(item => (
-                          <p key={item} className="text-xs text-amber-700">· {item}</p>
+                          <p key={item} className="text-sm text-amber-700">· {item}</p>
                         ))}
                       </div>
-                      <p className="text-xs text-amber-500">建议提交后加微信联系客服，发图片确认或现场评估。</p>
+
+                      {/* Section 2: clear call-to-action sentence */}
+                      <div className="rounded-lg px-3.5 py-3 mb-4 flex items-start gap-2"
+                        style={{ background: 'white', borderLeft: `4px solid ${MID}`, boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}>
+                        <span className="text-base flex-shrink-0 leading-tight">💡</span>
+                        <p className="text-base font-bold leading-relaxed" style={{ color: MID }}>
+                          如不确定是否会产生额外费用，可添加客服微信发送照片确认，或预约现场评估。
+                        </p>
+                      </div>
+
+                      {/* Section 3: prominent QR + WeChat ID */}
+                      <div className="rounded-xl bg-white p-4 flex items-center gap-4"
+                        style={{ border: '1px solid #FDE68A' }}>
+                        <img src="/wechat-qr.jpg" alt="微信二维码"
+                          className="w-32 h-32 rounded-lg object-cover flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-gray-500 mb-1">扫码或搜索微信号</p>
+                          <p className="font-extrabold text-xl text-gray-900 mb-1 tracking-wide break-all">
+                            qianxibanjia888
+                          </p>
+                          <p className="text-xs text-gray-500 leading-relaxed">
+                            发送照片<br />1 分钟确认报价
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -1019,9 +1046,20 @@ export default function MoveBooking() {
               <p className="text-xs text-gray-500 mb-3">
                 请先转账定金，上传截图后方可提交预约。截图确认后档期锁定。
               </p>
+
+              {/* Fixed deposit amount banner */}
+              <div className="rounded-xl px-4 py-2.5 mb-3 flex items-center justify-between"
+                style={{ background: '#FFF7ED', border: '1px solid #FED7AA' }}>
+                <div>
+                  <p className="text-xs font-semibold text-orange-700">定金（每单）</p>
+                  <p className="text-xs text-orange-400 mt-0.5">提交后档期锁定</p>
+                </div>
+                <p className="font-extrabold text-lg text-orange-700">$30 <span className="text-xs font-semibold">AUD</span></p>
+              </div>
+
               <div className="rounded-xl p-3 mb-3 text-xs"
                 style={{ background: '#FFF7ED', border: '1px solid #FED7AA' }}>
-                <p className="font-semibold text-orange-800 mb-2">转账收款账户</p>
+                <p className="font-semibold text-orange-800 mb-2">银行转账（澳洲账户 · $30 AUD）</p>
                 <div className="space-y-1 text-orange-700">
                   <div className="flex justify-between">
                     <span className="text-orange-500">银行</span>
@@ -1029,22 +1067,54 @@ export default function MoveBooking() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-orange-500">户名</span>
-                    <span className="font-medium">Move With Ease</span>
+                    <span className="font-medium">movewithease</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-orange-500">BSB</span>
-                    <span className="font-medium">062-000</span>
+                    <span className="font-medium">062-161</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-orange-500">账号</span>
-                    <span className="font-medium">1234 5678</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-orange-500">PayID</span>
-                    <span className="font-medium">0426 033 899</span>
+                    <span className="font-medium">10950608</span>
                   </div>
                 </div>
-                <p className="text-orange-500 mt-2">转账备注请填写您的姓名及订单号</p>
+                <p className="text-orange-500 mt-2">转账后请在下方上传付款成功截图，为您锁定档期</p>
+              </div>
+
+              {/* Alipay collapsible */}
+              <div className="rounded-xl mb-3 overflow-hidden"
+                style={{ background: '#EFF6FF', border: '1px solid #BFDBFE' }}>
+                <button type="button" onClick={() => setAlipayOpen(o => !o)}
+                  className="w-full px-3 py-2.5 flex items-center justify-between text-left">
+                  <div>
+                    <p className="font-semibold text-xs" style={{ color: '#1E40AF' }}>或使用支付宝（¥150 RMB）</p>
+                    <p className="text-xs mt-0.5" style={{ color: '#3B82F6' }}>不方便银行转账？点开扫码支付</p>
+                  </div>
+                  <ChevronRight size={16}
+                    className={`flex-shrink-0 transition-transform duration-200 ${alipayOpen ? 'rotate-90' : ''}`}
+                    style={{ color: '#3B82F6' }} />
+                </button>
+
+                {alipayOpen && (
+                  <div className="px-3 pb-3 pt-1 text-xs">
+                    <div className="flex items-start gap-3">
+                      <img src="/alipay-qr.jpg" alt="支付宝二维码"
+                        className="w-28 rounded-lg flex-shrink-0"
+                        style={{ border: '1px solid #BFDBFE' }} />
+                      <div className="flex-1 space-y-1" style={{ color: '#1E3A8A' }}>
+                        <div className="flex justify-between">
+                          <span style={{ color: '#3B82F6' }}>收款人</span>
+                          <span className="font-medium">晨曦</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span style={{ color: '#3B82F6' }}>金额</span>
+                          <span className="font-medium">¥150 RMB</span>
+                        </div>
+                        <p className="mt-2" style={{ color: '#3B82F6' }}>打开支付宝扫一扫，转账后请在下方上传付款成功截图，为您锁定档期</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               <p className="text-xs text-gray-500 mb-2 font-medium">
                 转账后请上传截图 <span className="text-red-500">（必填）</span>
