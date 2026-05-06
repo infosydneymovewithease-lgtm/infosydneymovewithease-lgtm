@@ -4,7 +4,7 @@ import { useState } from 'react'
 import {
   LayoutDashboard, ClipboardList, PlusCircle, Truck,
   Users, Building2, DollarSign, Package, Recycle,
-  Settings, LogOut, Menu, X, ChevronRight, Ban, Sparkles
+  Settings, LogOut, Menu, X, ChevronRight, Ban, Sparkles, Gauge
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -27,6 +27,7 @@ const NAV_ITEMS = [
   { label: '寄存业务', icon: Package,          to: '/admin/storage' },
   { label: '二手物品', icon: Recycle,          to: '/admin/secondhand' },
   { divider: true },
+  { label: '运力管理', icon: Gauge,             to: '/admin/vehicles',   adminOnly: true },
   { label: '系统设置', icon: Settings,         to: '/admin/settings',   adminOnly: true },
 ]
 

@@ -28,6 +28,7 @@ import SecondhandList from './pages/admin/SecondhandList'
 import SecondhandDetail from './pages/admin/SecondhandDetail'
 import CancelledOrders from './pages/admin/CancelledOrders'
 import CleaningOrders from './pages/admin/CleaningOrders'
+import VehicleManagement from './pages/admin/VehicleManagement'
 // Customer portal
 import CustomerLayout from './pages/customer/CustomerLayout'
 import CustomerHome from './pages/customer/CustomerHome'
@@ -151,6 +152,7 @@ function AppRoutes() {
         <Route path="secondhand/:id" element={<SecondhandDetail />} />
         <Route path="cleaning" element={<CleaningOrders />} />
         <Route path="cancelled" element={<CancelledOrders />} />
+        <Route path="vehicles" element={<VehicleManagement />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

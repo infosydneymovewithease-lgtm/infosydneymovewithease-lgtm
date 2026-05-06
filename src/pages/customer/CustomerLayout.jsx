@@ -1,5 +1,7 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { Home, BookOpen, ClipboardList, User } from 'lucide-react'
+import DesktopHeader from '../../components/DesktopHeader'
+import DesktopFooter from '../../components/DesktopFooter'
 
 const TABS = [
   { path: '/',         label: '首页', Icon: Home          },
@@ -16,10 +18,15 @@ export default function CustomerLayout() {
   const { pathname } = useLocation()
 
   return (
-    <div style={{ paddingBottom: 64 }}>
+    <div className="md:pb-0" style={{ paddingBottom: 64 }}>
+      <DesktopHeader />
+
       <Outlet />
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white z-50"
+      <DesktopFooter />
+
+      {/* Mobile bottom tab bar — hidden on desktop */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white z-50"
         style={{ borderTop: `1px solid ${BORDER}` }}>
         <div className="max-w-lg mx-auto flex">
           {TABS.map(({ path, label, Icon }) => {

@@ -32,7 +32,9 @@ export default function CustomerHome() {
   }, [])
 
   return (
-    <div style={{ background: '#F7F7F7', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', color: T1 }}>
+    <>
+    {/* ============== MOBILE H5 (≤ md) ============== */}
+    <div className="md:hidden" style={{ background: '#F7F7F7', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', color: T1 }}>
 
       {/* ── Topbar ── */}
       <div style={{ background: BRAND }}>
@@ -312,5 +314,227 @@ export default function CustomerHome() {
       </div>
 
     </div>
+
+    {/* ============== DESKTOP (≥ md) ============== */}
+    <div className="hidden md:block" style={{ background: '#FFF', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', color: T1 }}>
+
+      {/* Hero */}
+      <section className="relative overflow-hidden" style={{ height: 560 }}>
+        <img
+          key={slide}
+          src={SLIDES[slide]}
+          alt="迁喜搬家"
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{
+            opacity: fading ? 0 : 1,
+            transition: 'opacity 0.5s ease',
+            filter: 'brightness(0.85)',
+          }}
+        />
+        <div className="absolute inset-0"
+          style={{ background: 'linear-gradient(110deg, rgba(20,8,12,0.82) 0%, rgba(20,8,12,0.5) 50%, rgba(20,8,12,0.15) 100%)' }} />
+
+        <div className="relative max-w-7xl mx-auto px-8 h-full flex items-center">
+          <div className="max-w-2xl">
+            <div className="flex flex-wrap gap-2 mb-5">
+              {['本地华人团队', '2000+ 订单经验', '运输保险保障', '7 天可预约'].map(t => (
+                <span key={t} className="text-xs px-3 py-1.5 rounded-full text-white"
+                  style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', backdropFilter: 'blur(8px)' }}>
+                  {t}
+                </span>
+              ))}
+            </div>
+            <h1 className="text-white font-extrabold mb-4"
+              style={{ fontSize: '4rem', lineHeight: 1.05, letterSpacing: '-0.02em', textShadow: '0 4px 24px rgba(0,0,0,0.4)' }}>
+              悉尼华人<br/>搬家服务
+            </h1>
+            <p className="text-white/85 text-lg mb-8 leading-relaxed max-w-xl">
+              专业本地华人团队，透明报价、运输保险、7 天预约。<br/>
+              一站式服务：搬家 · IKEA 提货 · 物品寄存 · 保洁
+            </p>
+            <div className="flex items-center gap-4">
+              <button onClick={() => navigate('/book/move')}
+                className="px-8 py-4 rounded-xl text-white font-bold text-base"
+                style={{
+                  background: `linear-gradient(135deg, ${BRAND}, ${BRAND_L})`,
+                  boxShadow: '0 8px 24px rgba(139,38,53,0.5)',
+                }}>
+                立即预约 ›
+              </button>
+              <a href="tel:0426033899"
+                className="px-6 py-4 rounded-xl font-semibold text-base text-white flex items-center gap-2"
+                style={{ background: 'rgba(255,255,255,0.12)', border: '1.5px solid rgba(255,255,255,0.4)', backdropFilter: 'blur(8px)' }}>
+                <Phone size={16} /> 0426 033 899
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* Slide dots */}
+        <div className="absolute bottom-8 right-8 flex gap-2">
+          {SLIDES.map((_, i) => (
+            <button key={i} onClick={() => setSlide(i)}
+              style={{
+                width: i === slide ? 32 : 8,
+                height: 8,
+                borderRadius: 4,
+                background: i === slide ? 'white' : 'rgba(255,255,255,0.5)',
+                border: 'none',
+                padding: 0,
+                transition: 'all 0.3s ease',
+                cursor: 'pointer',
+              }} />
+          ))}
+        </div>
+      </section>
+
+      {/* Trust strip */}
+      <section className="max-w-7xl mx-auto px-8 -mt-12 relative z-10">
+        <div className="bg-white rounded-2xl grid grid-cols-4 py-8"
+          style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.08)', border: '1px solid #F0F0F0' }}>
+          {[
+            { icon: '👥', value: '2000+', label: '搬家订单' },
+            { icon: '🛡️', value: '本地',  label: '华人团队' },
+            { icon: '🚚', value: '运输',  label: '保险保障' },
+            { icon: '📅', value: '7天',   label: '可预约'   },
+          ].map((t, i) => (
+            <div key={t.label} className="text-center px-4"
+              style={i > 0 ? { borderLeft: '1px solid #F0F0F0' } : {}}>
+              <p className="text-3xl mb-2">{t.icon}</p>
+              <p className="text-2xl font-extrabold mb-1" style={{ color: BRAND }}>{t.value}</p>
+              <p className="text-sm" style={{ color: T3 }}>{t.label}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Vehicle pricing */}
+      <section className="max-w-7xl mx-auto px-8 pt-20">
+        <div className="text-center mb-10">
+          <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: BRAND }}>悉尼搬家报价</p>
+          <h2 className="text-4xl font-extrabold mb-3" style={{ color: T1 }}>透明定价 · 按工时计费</h2>
+          <p className="text-base" style={{ color: T2 }}>价格透明，先报价再搬运 · 返程费另计</p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-6">
+          {[
+            { name: '面包车', price: '$60',  unit: '/小时起', id: 'van',   img: '/images/van.jpg',
+              desc: '适合小户型，单身公寓搬家', features: ['1-2 人团队', '500kg 载重', '小型家具'] },
+            { name: '小卡车', price: '$110', unit: '/小时起', id: 'small', img: '/images/small-truck.jpg',
+              desc: '一房一厅或两房搬家首选', features: ['2-3 人团队', '1.5T 载重', '中型家具'] },
+            { name: '大卡车', price: '$120', unit: '/小时起', id: 'large', img: '/images/large-truck.jpg',
+              desc: '三房以上大型搬家', features: ['3-4 人团队', '3T+ 载重', '大型家具'] },
+          ].map(v => (
+            <button key={v.id} onClick={() => navigate('/book/move', { state: { vehicleId: v.id } })}
+              className="bg-white rounded-2xl overflow-hidden text-left transition-all hover:scale-[1.02]"
+              style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.06)', border: '1px solid #F0F0F0' }}>
+              <div className="aspect-[4/3] overflow-hidden bg-gray-100">
+                <img src={v.img} alt={v.name} className="w-full h-full object-cover" />
+              </div>
+              <div className="p-6">
+                <div className="flex items-baseline justify-between mb-2">
+                  <h3 className="font-extrabold text-xl" style={{ color: T1 }}>{v.name}</h3>
+                  <p>
+                    <span className="font-extrabold text-2xl" style={{ color: BRAND }}>{v.price}</span>
+                    <span className="text-xs ml-1" style={{ color: T3 }}>{v.unit}</span>
+                  </p>
+                </div>
+                <p className="text-sm mb-4" style={{ color: T2 }}>{v.desc}</p>
+                <ul className="space-y-1.5 mb-5">
+                  {v.features.map(f => (
+                    <li key={f} className="flex items-center gap-2 text-xs" style={{ color: T2 }}>
+                      <span style={{ color: BRAND }}>✓</span> {f}
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex items-center justify-between text-sm font-semibold pt-4"
+                  style={{ borderTop: '1px solid #F0F0F0', color: BRAND }}>
+                  立即预约 <ChevronRight size={16} />
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* Other services */}
+      <section className="max-w-7xl mx-auto px-8 pt-20">
+        <div className="text-center mb-10">
+          <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: BRAND }}>其他服务</p>
+          <h2 className="text-4xl font-extrabold" style={{ color: T1 }}>一站式生活服务</h2>
+        </div>
+
+        <div className="grid grid-cols-3 gap-6">
+          {[
+            { emoji: '🛋️', name: 'IKEA 提货安装',  desc: '提货 + 运输 + 组装一站式，省心省力',           path: '/book/ikea' },
+            { emoji: '📦', name: '物品寄存',        desc: '灵活按周计费，安全仓储，随时取回',            path: '/book/storage' },
+            { emoji: '🛒', name: '二手物品',        desc: '本地华人二手交易，发布闲置，淘到好物',         path: '/book/secondhand' },
+          ].map(s => (
+            <button key={s.name} onClick={() => navigate(s.path)}
+              className="bg-white rounded-2xl p-8 text-left transition-all hover:scale-[1.02]"
+              style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.06)', border: '1px solid #F0F0F0' }}>
+              <span className="text-5xl block mb-4">{s.emoji}</span>
+              <p className="font-bold text-lg mb-2" style={{ color: T1 }}>{s.name}</p>
+              <p className="text-sm leading-relaxed mb-4" style={{ color: T2 }}>{s.desc}</p>
+              <div className="flex items-center gap-1 text-sm font-semibold" style={{ color: BRAND }}>
+                了解更多 <ChevronRight size={14} />
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* Why us */}
+      <section className="max-w-7xl mx-auto px-8 pt-20">
+        <div className="text-center mb-10">
+          <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: BRAND }}>为什么选我们</p>
+          <h2 className="text-4xl font-extrabold" style={{ color: T1 }}>专业 · 透明 · 安心</h2>
+        </div>
+
+        <div className="grid grid-cols-4 gap-6">
+          {[
+            { icon: '🏆', title: '专业团队', desc: '本地华人团队，经验丰富，沟通无障碍' },
+            { icon: '💰', title: '价格透明', desc: '先报价再搬运，按实际工时计费，无隐藏收费' },
+            { icon: '🔒', title: '运输保险', desc: '全程投保，物品安全有保障' },
+            { icon: '📅', title: '7 天可约', desc: '8:00–21:00 灵活预约，急单加急也可以' },
+          ].map(item => (
+            <div key={item.title} className="bg-white rounded-2xl p-6"
+              style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.06)', border: '1px solid #F0F0F0' }}>
+              <span className="text-4xl block mb-3">{item.icon}</span>
+              <p className="font-bold text-base mb-2" style={{ color: T1 }}>{item.title}</p>
+              <p className="text-sm leading-relaxed" style={{ color: T2 }}>{item.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* CTA banner */}
+      <section className="max-w-7xl mx-auto px-8 pt-20 pb-10">
+        <div className="rounded-3xl p-12 flex items-center justify-between"
+          style={{
+            background: `linear-gradient(135deg, ${BRAND} 0%, ${BRAND_L} 100%)`,
+            boxShadow: '0 12px 40px rgba(139,38,53,0.3)',
+          }}>
+          <div>
+            <h3 className="text-white font-extrabold text-3xl mb-3">不确定费用？</h3>
+            <p className="text-white/85 text-base">电话或微信联系我们，免费为您报价</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <a href="tel:0426033899"
+              className="px-8 py-4 rounded-xl bg-white font-bold text-base flex items-center gap-2"
+              style={{ color: BRAND }}>
+              <Phone size={16} /> 电话咨询
+            </a>
+            <a href={`weixin://contacts/profile/${WECHAT}`}
+              className="px-8 py-4 rounded-xl font-bold text-base text-white flex items-center gap-2"
+              style={{ background: 'rgba(255,255,255,0.15)', border: '1.5px solid rgba(255,255,255,0.5)', backdropFilter: 'blur(8px)' }}>
+              💬 微信咨询
+            </a>
+          </div>
+        </div>
+      </section>
+
+    </div>
+    </>
   )
 }
