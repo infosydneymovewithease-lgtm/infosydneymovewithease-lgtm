@@ -105,6 +105,13 @@ export default function AdminOrderDetail() {
   const custLevel = getCustomerLevel(orders, order.customerPhone)
   const canDispatch = !['已完成','已取消'].includes(order.status)
   const materialsCost = order.materialsCost || 0
+  // Customer self-orders (from public booking page) MUST pass verification before dispatch.
+  // CS-created orders are exempt — CS already verified info while filling the form.
+  const isCustomerSelfOrder = order.source === '官网自助预约' || order.createdBy === 'customer'
+  const dispatchBlocked = order.status === '待确认' && isCustomerSelfOrder && !(
+    (checks.called || checks.wechat || checks.replied) &&
+    checks.timeOk && checks.addressOk
+  )
 
   function toggleWorkerSelect(wid) {
     setSelectedWorkers(prev =>
@@ -188,11 +195,19 @@ export default function AdminOrderDetail() {
       {!order.assignedTo && canDispatch && (
         <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-3">
           <AlertTriangle size={16} className="text-red-500 flex-shrink-0" />
-          <span className="text-red-700 text-sm flex-1">此订单尚未派单</span>
+          <span className="text-red-700 text-sm flex-1">
+            {dispatchBlocked ? '请先完成核实（联系客户 + 时间确认 + 地址确认），才能派单' : '此订单尚未派单'}
+          </span>
           <button
-            onClick={() => setShowDispatch(true)}
-            className="text-sm text-white px-3 py-1.5 rounded-lg font-semibold"
-            style={{ background: '#c0392b' }}
+            onClick={() => !dispatchBlocked && setShowDispatch(true)}
+            disabled={dispatchBlocked}
+            title={dispatchBlocked ? '请先完成核实再派单' : ''}
+            className="text-sm text-white px-3 py-1.5 rounded-lg font-semibold transition-opacity"
+            style={{
+              background: '#c0392b',
+              opacity: dispatchBlocked ? 0.4 : 1,
+              cursor: dispatchBlocked ? 'not-allowed' : 'pointer',
+            }}
           >
             立即派单
           </button>
@@ -574,6 +589,38 @@ export default function AdminOrderDetail() {
             <span className="text-green-600 font-bold text-lg">${order.finalAmount}</span>
           </Row>
         )}
+        {/* Bill breakdown — only for orders submitted after FormPage upgrade */}
+        {order.finalAmount && (order.timeFee != null || order.hourlyRate != null) && (
+          <div className="mt-3 rounded-xl bg-gray-50 p-3 text-sm" style={{ border: '1px solid #E5E7EB' }}>
+            <p className="font-semibold text-gray-700 mb-2 text-xs">收费明细</p>
+            <div className="space-y-1.5">
+              {order.timeFee > 0 && (
+                <BreakdownRow
+                  label={`工时费 (${order.billedHours || 0} 小时 × $${order.hourlyRate || 0}/小时)`}
+                  value={order.timeFee} />
+              )}
+              {order.returnFee > 0 && <BreakdownRow label="返程费"     value={order.returnFee} />}
+              {order.stairsFee > 0 && <BreakdownRow label="楼梯费"     value={order.stairsFee} />}
+              {order.overtimeFee > 0 && <BreakdownRow label="超时费"   value={order.overtimeFee} />}
+              {order.heavyFee > 0 && <BreakdownRow label="重物费"      value={order.heavyFee} />}
+              {order.fragileFee > 0 && <BreakdownRow label="易碎物品费" value={order.fragileFee} />}
+              {order.highwayFee > 0 && <BreakdownRow label="高速费"    value={order.highwayFee} />}
+              {order.parkingFee > 0 && <BreakdownRow label="停车违规费" value={order.parkingFee} />}
+              {order.suppliesFee > 0 && <BreakdownRow label="物资费"   value={order.suppliesFee} />}
+              {order.fuelFee > 0 && <BreakdownRow label="油费"        value={order.fuelFee} />}
+              {order.discountAmount > 0 && <BreakdownRow label="折扣"  value={-order.discountAmount} negative />}
+              {order.gst > 0 && <BreakdownRow label="GST (转账 +10%)" value={order.gst} />}
+              {order.deposit > 0 && order.depositPaid && (
+                <BreakdownRow label="减定金" value={-order.deposit} negative />
+              )}
+              <div className="h-px bg-gray-200 my-1.5" />
+              <div className="flex justify-between text-sm font-bold pt-0.5">
+                <span className="text-gray-700">实收</span>
+                <span className="text-green-600">${order.finalAmount}</span>
+              </div>
+            </div>
+          </div>
+        )}
         {order.paymentStatus === 'unpaid' && (
           <p className="text-red-500 text-xs mt-1">⚠️ 客户未付款，请跟进</p>
         )}
@@ -758,14 +805,25 @@ export default function AdminOrderDetail() {
           <div className="text-center py-2">
             <p className="text-gray-400 text-sm mb-3">尚未分配师傅</p>
             {canDispatch && (
-              <button
-                onClick={() => { setSelectedWorkers([]); setShowDispatch(true) }}
-                className="text-white px-6 py-2.5 rounded-xl font-semibold text-sm"
-                style={{ background: 'linear-gradient(135deg, #6b1414, #c0392b)' }}
-              >
-                <Truck size={16} className="inline mr-2" />
-                派单给师傅
-              </button>
+              <>
+                <button
+                  onClick={() => !dispatchBlocked && (setSelectedWorkers([]), setShowDispatch(true))}
+                  disabled={dispatchBlocked}
+                  title={dispatchBlocked ? '请先完成核实再派单' : ''}
+                  className="text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-opacity"
+                  style={{
+                    background: 'linear-gradient(135deg, #6b1414, #c0392b)',
+                    opacity: dispatchBlocked ? 0.4 : 1,
+                    cursor: dispatchBlocked ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <Truck size={16} className="inline mr-2" />
+                  派单给师傅
+                </button>
+                {dispatchBlocked && (
+                  <p className="text-xs text-orange-600 mt-2">需完成「联系客户 + 时间确认 + 地址确认」才能派单</p>
+                )}
+              </>
             )}
           </div>
         )}
@@ -932,6 +990,17 @@ function Row({ icon, label, children }) {
       {icon}
       <span className="text-gray-500 text-sm flex-1">{label}</span>
       <div className="text-gray-800 text-sm font-medium">{children}</div>
+    </div>
+  )
+}
+
+function BreakdownRow({ label, value, negative }) {
+  const num = Number(value) || 0
+  const formatted = (num < 0 ? '-' : '') + '$' + Math.abs(num).toFixed(2).replace(/\.?0+$/, '')
+  return (
+    <div className="flex justify-between text-xs">
+      <span className="text-gray-500">{label}</span>
+      <span className={negative ? 'text-orange-600' : 'text-gray-700'}>{formatted}</span>
     </div>
   )
 }

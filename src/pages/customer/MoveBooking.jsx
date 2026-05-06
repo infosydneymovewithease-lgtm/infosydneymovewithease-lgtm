@@ -786,11 +786,14 @@ export default function MoveBooking() {
                 <p className="text-xs text-gray-400 mb-2 text-center">正在查询可用时段…</p>
               )}
               <div className="space-y-2">
-                {slots.map(slot => {
+                {slots.map((slot, idx) => {
                   const avail    = slotAvailability[slot]
                   const isFull   = avail && avail.available <= 0
                   const isLimited = avail && avail.available > 0 && avail.available < avail.capacity
                   const selected = form.timeSlot === slot
+                  const slotLabel = idx === 0
+                    ? `${slot.split('–')[0]} 准时到达`
+                    : slot
                   return (
                     <button key={slot}
                       disabled={isFull}
@@ -803,7 +806,7 @@ export default function MoveBooking() {
                           ? { background: GRAD, color: 'white' }
                           : { background: '#f3f4f6', color: '#374151' }
                       }>
-                      <span>{slot}</span>
+                      <span>{slotLabel}</span>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         {isFull && (
                           <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-gray-200 text-gray-400">

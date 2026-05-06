@@ -100,6 +100,16 @@ export default function FormPage() {
       overtimeFee: result?.overtimeFee || 0,
       heavyFee: result?.heavyFee || 0,
       fragileFee: fragileOn ? Number(fragile) || 0 : 0,
+      // Full breakdown fields (saved to dedicated columns in orders)
+      timeFee:        result?.timeFee || 0,
+      returnFee:      Number(returnFee) || 0,
+      highwayFee:     result?.highwayFee || 0,
+      parkingFee:     result?.parkingFee || 0,
+      suppliesFee:    Number(supplies) || 0,
+      fuelFee:        Number(fuel) || 0,
+      discountAmount: result?.discountAmount || 0,
+      gst:            result?.gst || 0,
+      hourlyRate:     v.hourlyRate,
     })
     setTimerState(null)
     navigate(`/order/${id}/summary`, {
