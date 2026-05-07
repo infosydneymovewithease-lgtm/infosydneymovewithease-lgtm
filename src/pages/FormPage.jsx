@@ -462,6 +462,7 @@ export default function FormPage() {
       {result && (
         <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-2xl bg-white border-t border-gray-200 px-4 pt-3 pb-6 shadow-lg">
           <div className="space-y-1 mb-3">
+            {result.vanDiscount > 0 && <FeeRow label="面包车优惠" value={-result.vanDiscount} green />}
             <FeeRow label="小计" value={result.subtotal} />
             {result.discountAmount > 0 && <FeeRow label="折扣" value={-result.discountAmount} green />}
             {result.gst > 0 && <FeeRow label="GST (10%)" value={result.gst} />}

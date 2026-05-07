@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
-import { VEHICLES, STAIRS_FEE } from '../../data/vehicles'
+import { VEHICLES, STAIRS_FEE, VAN_PROMO_DISCOUNT } from '../../data/vehicles'
 import { calcRemoteSurcharge, getDistanceTier } from '../../utils/remoteFee'
 import { SLOT_CONFIG, fetchSlotsAvailability } from '../../utils/slotAvailability'
 import { supabase } from '../../lib/supabase'
@@ -263,7 +263,8 @@ export default function NewOrder() {
     ? (STAIRS_FEE[v.people] || 0) * Number(form.floors)
     : 0
   const heavyFeeNum = Number(form.heavyFee) || 0
-  const suggestedQuote = baseQuote + remote.total + materialsCost + stairsFee + heavyFeeNum
+  const vanDiscount = form.vehicle === '面包车' ? VAN_PROMO_DISCOUNT : 0
+  const suggestedQuote = baseQuote + remote.total + materialsCost + stairsFee + heavyFeeNum - vanDiscount
   const finalQuote = parseFloat(form.quote) || suggestedQuote
   const discountedQuote = Math.round(finalQuote * form.discount)
 
@@ -284,6 +285,7 @@ export default function NewOrder() {
 
     const autoQuoteNote = v ? [
       `$${v.hourlyRate}×${v.minHours}h + $${v.returnFee}(返程费) = $${baseQuote}`,
+      vanDiscount > 0 ? `- 优惠 $${vanDiscount}` : null,
       remote.total > 0 ? `+ 远途 $${remote.total}` : null,
       stairsFee > 0 ? `+ 楼梯 $${stairsFee}` : null,
       heavyFeeNum > 0 ? `+ 重物 $${heavyFeeNum}` : null,
@@ -1205,6 +1207,12 @@ export default function NewOrder() {
                   <div className="flex justify-between">
                     <span>物资费</span>
                     <span>${materialsCost}</span>
+                  </div>
+                )}
+                {vanDiscount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>面包车优惠</span>
+                    <span>-${vanDiscount}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-bold pt-1 border-t border-blue-200 text-blue-800">

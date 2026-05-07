@@ -68,6 +68,9 @@ export default function SummaryPage() {
             {result.highwayFee > 0 && <ReceiptRow label="高速费" value={result.highwayFee} />}
             {result.parkingFee > 0 && <ReceiptRow label="违章停车押金" value={result.parkingFee} />}
             {result.miscFee > 0 && <ReceiptRow label="其他费用" value={result.miscFee} />}
+            {result.vanDiscount > 0 && (
+              <ReceiptRow label="面包车优惠" value={-result.vanDiscount} color="text-green-600" />
+            )}
           </div>
 
           {/* 合计区域 */}

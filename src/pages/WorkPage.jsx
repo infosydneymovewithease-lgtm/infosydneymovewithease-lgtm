@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { calcTotal, formatDuration, billedHours } from '../utils/pricing'
-import { VEHICLES } from '../data/vehicles'
+import { VEHICLES, VAN_PROMO_DISCOUNT } from '../data/vehicles'
 import { ArrowLeft, Play, Pause, StopCircle, Clock } from 'lucide-react'
 
 export default function WorkPage() {
@@ -44,6 +44,7 @@ export default function WorkPage() {
   const billed = billedHours(elapsed, v.minHours)
   const estimatedTimeFee = v.hourlyRate * billed
   const returnFeeDefault = v.returnFee
+  const vanDiscount = vehicle === '面包车' ? VAN_PROMO_DISCOUNT : 0
 
   const timerColor =
     status === 'running' ? 'text-green-600' :
@@ -165,8 +166,9 @@ export default function WorkPage() {
                 <div className="space-y-2">
                   <FeeRow label={`工时费 ($${v.hourlyRate}/h × ${billed}h)`} value={estimatedTimeFee} />
                   <FeeRow label="回程费（默认）" value={returnFeeDefault} muted />
+                  {vanDiscount > 0 && <FeeRow label="面包车优惠" value={-vanDiscount} green />}
                   <div className="border-t border-gray-100 pt-2 mt-2">
-                    <FeeRow label="小计（不含附加费）" value={estimatedTimeFee + returnFeeDefault} bold />
+                    <FeeRow label="小计（不含附加费）" value={estimatedTimeFee + returnFeeDefault - vanDiscount} bold />
                   </div>
                 </div>
 
@@ -187,12 +189,15 @@ export default function WorkPage() {
   )
 }
 
-function FeeRow({ label, value, muted, bold }) {
+function FeeRow({ label, value, muted, bold, green }) {
+  const formatted = value < 0
+    ? `-$${Math.abs(value).toFixed(2)}`
+    : `$${value.toFixed(2)}`
   return (
     <div className="flex items-center justify-between">
       <span className={`text-sm ${muted ? 'text-gray-400' : 'text-gray-600'}`}>{label}</span>
-      <span className={`text-sm ${bold ? 'font-bold text-gray-900' : muted ? 'text-gray-400' : 'text-gray-800'}`}>
-        ${value.toFixed(2)}
+      <span className={`text-sm ${bold ? 'font-bold text-gray-900' : green ? 'text-green-600' : muted ? 'text-gray-400' : 'text-gray-800'}`}>
+        {formatted}
       </span>
     </div>
   )

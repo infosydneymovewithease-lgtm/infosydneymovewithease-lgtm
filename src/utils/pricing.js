@@ -1,4 +1,4 @@
-import { VEHICLES, STAIRS_FEE } from '../data/vehicles'
+import { VEHICLES, STAIRS_FEE, VAN_PROMO_DISCOUNT } from '../data/vehicles'
 
 // 超10分钟算半小时（满10分钟进位）
 export function roundToHalfHour(totalSeconds) {
@@ -70,6 +70,8 @@ export function calcTotal({
     + (Number(supplies) || 0)
     + (Number(fuel) || 0)
 
+  const vanDiscount = vehicle === '面包车' ? VAN_PROMO_DISCOUNT : 0
+
   const subtotal = timeFee
     + (Number(returnFee) || 0)
     + stairsFee
@@ -78,6 +80,7 @@ export function calcTotal({
     + highwayFee
     + parkingFee
     + miscFee
+    - vanDiscount
 
   const discountRate = discount === 9 ? 0.9 : discount === 9.5 ? 0.95 : 1
   const afterDiscount = subtotal * discountRate
@@ -99,6 +102,7 @@ export function calcTotal({
     highwayFee,
     parkingFee,
     miscFee:       Math.round(miscFee * 100) / 100,
+    vanDiscount,
     subtotal:      Math.round(subtotal * 100) / 100,
     discountAmount:Math.round(discountAmount * 100) / 100,
     afterDiscount: Math.round(afterDiscount * 100) / 100,

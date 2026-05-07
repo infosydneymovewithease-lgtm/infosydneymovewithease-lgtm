@@ -9,6 +9,7 @@ import AddressAutocomplete from '../../components/AddressAutocomplete'
 import { getDistanceKm } from '../../utils/googleMaps'
 import { calcRemoteSurcharge } from '../../utils/remoteFee'
 import { SLOT_CONFIG, fetchSlotsAvailability } from '../../utils/slotAvailability'
+import { VAN_PROMO_DISCOUNT } from '../../data/vehicles'
 
 const GRAD   = 'linear-gradient(135deg, #A52535, #C0392B)'
 const BG     = '#F7F7F7'
@@ -32,7 +33,7 @@ const VEHICLES = [
     loadRef: '约可装 35 标准纸箱左右 / 1 个床垫 + 少量纸箱 / 少量小型家具等',
     note: '物品较多（2 房以上）建议选小卡车',
     configs: [
-      { key: '面包车', label: '司机 1 人', people: 1, rate: 60, minHours: 1, returnFee: 50 },
+      { key: '面包车', label: '司机 1 人', people: 1, rate: 60, minHours: 1, returnFee: 60 },
     ],
   },
   {
@@ -115,12 +116,13 @@ export default function MoveBooking() {
   const config  = vehicle?.configs[configIdx]
   const slots   = vehicleId ? TIME_SLOTS[vehicleId] : []
 
-  const baseEstimate    = config ? config.rate * config.minHours + config.rate : 0
+  const baseEstimate    = config ? config.rate * config.minHours + config.returnFee : 0
   const remoteEstimate  = (form.distanceKm !== null && config)
     ? calcRemoteSurcharge(form.distanceKm, config.key).total : 0
   const materialsEstimate = boxesNeeded * 5 + wrapNeeded * 3 + mattressCovers * 10 + packingItems * 5
   const stairsFee     = form.stairs === 'stairs' ? form.stairsFloors * 10 * (config?.people ?? 1) : 0
-  const totalEstimate = baseEstimate + remoteEstimate + materialsEstimate + stairsFee
+  const vanDiscount   = vehicleId === 'van' ? VAN_PROMO_DISCOUNT : 0
+  const totalEstimate = baseEstimate + remoteEstimate + materialsEstimate + stairsFee - vanDiscount
 
   const extrasTags = [
     form.stairs === 'elevator' ? '有电梯' : form.stairs === 'stairs' ? `楼梯 ${form.stairsFloors} 层` : null,
@@ -250,7 +252,8 @@ export default function MoveBooking() {
         status:         '待确认',
         quote:          totalEstimate,
         quoteNote: [
-          `$${config.rate}×${config.minHours}h + $${config.rate}(返程费) = $${baseEstimate}`,
+          `$${config.rate}×${config.minHours}h + $${config.returnFee}(返程费) = $${baseEstimate}`,
+          vanDiscount       > 0 ? `- 优惠 $${vanDiscount}`            : null,
           remoteEstimate    > 0 ? `+ 远途 $${remoteEstimate}`         : null,
           stairsFee         > 0 ? `+ 楼梯 $${stairsFee}`             : null,
           materialsEstimate > 0 ? `+ 物资 $${materialsEstimate}`      : null,
@@ -591,7 +594,8 @@ export default function MoveBooking() {
                 </div>
               )}
               {(() => {
-                const fee = vehicle.configs[configIdx]?.returnFee
+                const rawFee = vehicle.configs[configIdx]?.returnFee
+                const fee = vehicle.id === 'van' && rawFee ? rawFee - VAN_PROMO_DISCOUNT : rawFee
                 return fee ? (
                   <div className="rounded-xl px-4 py-3 mb-4 flex items-center justify-between gap-3"
                     style={{ borderLeft: '3px solid #F59E0B', background: 'white', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
@@ -760,7 +764,7 @@ export default function MoveBooking() {
                     {vehicle.name} · {config?.label}
                   </p>
                   <p className="text-gray-500 text-xs mt-0.5">
-                    ${config?.rate}/h · {config?.minHours}h起 · 30公里内${config?.returnFee}返程费 · 客服确认后为准
+                    ${config?.rate}/h · {config?.minHours}h起 · 30公里内${vehicle.id === 'van' ? (config?.returnFee ?? 0) - VAN_PROMO_DISCOUNT : config?.returnFee}返程费 · 客服确认后为准
                   </p>
                 </div>
                 <button onClick={() => setStep(1)} className="text-xs text-gray-400 underline">
@@ -1170,9 +1174,10 @@ export default function MoveBooking() {
                 </div>
                 <div className="text-right text-xs text-gray-400 leading-relaxed">
                   {config && (
-                    <p className="text-gray-500">${config.rate}×{config.minHours}h + ${config.rate}返程费</p>
+                    <p className="text-gray-500">${config.rate}×{config.minHours}h + ${config.returnFee}返程费</p>
                   )}
                   <p>= 基础 ${baseEstimate}</p>
+                  {vanDiscount > 0 && <p style={{ color: MID }}>- 优惠 ${vanDiscount}</p>}
                   {stairsFee > 0 && <p style={{ color: MID }}>+ 楼梯 ${stairsFee}</p>}
                   {remoteEstimate > 0 && <p style={{ color: MID }}>+ 远途 ${remoteEstimate}</p>}
                   {materialsEstimate > 0 && <p style={{ color: MID }}>+ 物资 ${materialsEstimate}</p>}
