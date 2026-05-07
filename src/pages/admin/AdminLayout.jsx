@@ -4,7 +4,7 @@ import { useState } from 'react'
 import {
   LayoutDashboard, ClipboardList, PlusCircle, Truck,
   Users, Building2, DollarSign, Package, Recycle,
-  Settings, LogOut, Menu, X, ChevronRight, Ban, Sparkles, Gauge
+  Settings, LogOut, Menu, X, ChevronRight, Ban, Sparkles, Gauge, BookOpen
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -29,6 +29,8 @@ const NAV_ITEMS = [
   { divider: true },
   { label: '运力管理', icon: Gauge,             to: '/admin/vehicles',   adminOnly: true },
   { label: '系统设置', icon: Settings,         to: '/admin/settings',   adminOnly: true },
+  { divider: true },
+  { label: '操作手册', icon: BookOpen,         to: '/admin/help' },
 ]
 
 export default function AdminLayout() {
