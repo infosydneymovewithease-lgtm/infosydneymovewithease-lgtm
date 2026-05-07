@@ -264,7 +264,7 @@ export default function OrderList() {
                 navigate(dest, { state: { allowDispatch: activeTab !== 'all' } })
               }}
               onCancel={
-                (order.serviceType === '寄存' || (order.id || '').startsWith('STG-') || order.status === '待确认')
+                (order.serviceType === '寄存' || (order.id || '').startsWith('STG-'))
                   ? null
                   : () => {
                       if (window.confirm(`确认取消「${order.customerName}」的订单？`)) {

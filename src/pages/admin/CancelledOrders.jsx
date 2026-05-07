@@ -8,11 +8,12 @@ const WORKER_NAMES = {
 }
 
 export default function CancelledOrders() {
-  const { orders, storageOrders, deleteOrder } = useApp()
+  const { orders, storageOrders, deleteOrder, user } = useApp()
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [selectedMonth, setSelectedMonth] = useState('')
   const [confirmingId, setConfirmingId] = useState(null)
+  const [bulkConfirming, setBulkConfirming] = useState(false)
 
   const combinedOrders = [...orders, ...(storageOrders || [])]
   const cancelled = combinedOrders.filter(o => o.status === '已取消')
@@ -40,9 +41,42 @@ export default function CancelledOrders() {
 
   return (
     <div className="p-5 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <h1 className="text-xl font-bold text-gray-900">取消历史订单</h1>
-        <span className="text-sm text-gray-400">{cancelled.length} 条已取消</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-400">{cancelled.length} 条已取消</span>
+          {user?.role === 'admin' && finalOrders.length > 0 && (
+            bulkConfirming ? (
+              <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
+                <span className="text-xs text-red-600 font-medium">
+                  确认彻底删除当前 {finalOrders.length} 单？无法恢复！
+                </span>
+                <button
+                  onClick={() => setBulkConfirming(false)}
+                  className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded border border-gray-200 bg-white"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => {
+                    finalOrders.forEach(o => deleteOrder(o.id))
+                    setBulkConfirming(false)
+                  }}
+                  className="text-xs text-white px-3 py-1 rounded bg-red-500 hover:bg-red-600 font-semibold"
+                >
+                  确认清空
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setBulkConfirming(true)}
+                className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 border border-red-200 hover:bg-red-50 px-3 py-1.5 rounded-lg font-medium"
+              >
+                <Trash2 size={13} /> 清空当前列表（仅管理员）
+              </button>
+            )
+          )}
+        </div>
       </div>
 
       {/* Month filter */}
