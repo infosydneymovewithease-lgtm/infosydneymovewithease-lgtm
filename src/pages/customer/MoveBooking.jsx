@@ -26,7 +26,7 @@ const VEHICLES = [
   {
     id: 'van', name: '面包车', nameEn: 'Toyota Hiace',
     tagline: '小件搬运首选，灵活便捷',
-    volume: '6.2', weight: '900公斤', dims: '2.55 × 1.54 × 1.32 m',
+    volume: '6.2', weight: '900公斤', dims: '5.3 × 1.9 × 2.1 m', cargoDims: '2.55 × 1.54 × 1.32 m',
     img: '/images/van-full.jpg',
     scenarios: ['单身公寓搬出', '合租房间搬运', '学生搬家', '少量家具', '行李搬运', '小件配送'],
     advantages: ['价格最低', '灵活好停车', '地库友好', '市区高效'],
@@ -39,7 +39,7 @@ const VEHICLES = [
   {
     id: 'small', name: '小卡车', nameEn: 'Isuzu 4.5T',
     tagline: '1–2 房搬家最受欢迎，性价比最高',
-    volume: '20', weight: '4.5T', dims: '4.4 × 2.25 × 2.2 m',
+    volume: '20', weight: '4.5T', dims: '6.2 × 2.3 × 3.1 m', cargoDims: '4.4 × 2.25 × 2.2 m',
     img: '/images/small-truck.jpg',
     tag: '最受欢迎',
     scenarios: ['1–2 房公寓整体搬家', '家具家电较多', '中型搬迁', '跨区搬家'],
@@ -54,7 +54,7 @@ const VEHICLES = [
   {
     id: 'large', name: '大卡车', nameEn: 'Hino 8T',
     tagline: '3 房以上 / House，一次搬完',
-    volume: '30', weight: '8T', dims: '6.0 × 2.2 × 2.35 m',
+    volume: '30', weight: '8T', dims: '7.5 × 2.4 × 3.3 m', cargoDims: '6.0 × 2.2 × 2.35 m',
     img: '/images/large-truck.jpg',
     scenarios: ['3 房以上 / House', '整屋搬迁', '大型家具家电', '别墅搬家'],
     advantages: ['超大容积', '专业大件搬运', '一次装完', '效率最高'],
@@ -674,6 +674,12 @@ export default function MoveBooking() {
                   </div>
                 ))}
               </div>
+              {vehicle.cargoDims && (
+                <div className="mt-3 flex items-center justify-between text-xs text-gray-500 px-1">
+                  <span>车厢内尺寸（长×宽×高）</span>
+                  <span className="font-mono text-gray-700">{vehicle.cargoDims}</span>
+                </div>
+              )}
             </div>
 
             {/* 可能产生的额外费用 */}
