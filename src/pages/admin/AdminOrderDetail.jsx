@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { VEHICLES } from '../../data/vehicles'
+import { HEAVY_ITEM_OPTIONS, calcHeavyTotal } from '../../data/heavyItems'
 import {
   ArrowLeft, Phone, MapPin, Package, MessageSquare,
   DollarSign, Calendar, Truck, CheckCircle, User,
@@ -92,6 +93,25 @@ export default function AdminOrderDetail() {
   const [quoteNoteInput, setQuoteNoteInput] = useState(order?.quoteNote || '')
   const [checks,  setChecks]  = useState(() => order?.confirmChecks || {})
   const [csNote,  setCsNote]  = useState(() => order?.csNote || '')
+  const [heavyItems, setHeavyItemsState] = useState(() => order?.heavyItems || {})
+
+  // 编辑重物项目金额（自动保存到订单 + 更新合计）
+  function updateHeavyItem(itemId, amount) {
+    const next = { ...heavyItems, [itemId]: amount }
+    setHeavyItemsState(next)
+    const newTotal = calcHeavyTotal(next)
+    updateOrder(id, { heavyItems: next, heavyFee: newTotal })
+  }
+  function updateOtherHeavy(field, value) {
+    const next = {
+      ...heavyItems,
+      other: { ...(heavyItems.other || {}), [field]: value }
+    }
+    setHeavyItemsState(next)
+    const newTotal = calcHeavyTotal(next)
+    updateOrder(id, { heavyItems: next, heavyFee: newTotal })
+  }
+  const heavyTotal = calcHeavyTotal(heavyItems)
 
   if (!order) return (
     <div className="flex items-center justify-center h-64 text-gray-400">订单不存在</div>
@@ -686,32 +706,66 @@ export default function AdminOrderDetail() {
             )}
           </Card>
 
-          {/* 3. 风险项目 */}
-          <Card title="风险项目（勾选客户有的物品）">
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { key: 'risk_fridge',  label: '双开门冰箱' },
-                { key: 'risk_tv',      label: '65" 以上电视' },
-                { key: 'risk_marble',  label: '大理石台面' },
-                { key: 'risk_piano',   label: '钢琴' },
-                { key: 'risk_heavy',   label: '100kg+ 重物' },
-                { key: 'risk_parking', label: '特殊停车' },
-                { key: 'risk_none',    label: '无 / 其他' },
-              ].map(item => (
-                <button
-                  key={item.key}
-                  onClick={() => toggleCheck(item.key)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm border transition-colors ${
-                    checks[item.key]
-                      ? 'bg-amber-50 border-amber-300 text-amber-700 font-medium'
-                      : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-gray-300'
-                  }`}
-                >
-                  <span className="text-base">{checks[item.key] ? '⚠️' : '○'}</span>
-                  {item.label}
-                </button>
-              ))}
+          {/* 3. 附加费用（重物 / 大件）*/}
+          <Card title="附加费用（重物 / 大件）">
+            <p className="text-xs text-gray-400 mb-3">
+              💡 通过电话/微信跟客户确认有哪些重物，按需填金额（不需要全部勾选）。师傅打开账单时自动同步。
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {HEAVY_ITEM_OPTIONS.map(item => {
+                const value = heavyItems[item.id] || ''
+                const enabled = Number(value) > 0
+                return (
+                  <div
+                    key={item.id}
+                    className={`rounded-xl px-3 py-2 flex items-center gap-3 transition-colors ${
+                      enabled ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50'
+                    }`}
+                  >
+                    <span className="text-sm text-gray-700 flex-1 font-medium">{item.name}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-gray-400 text-sm">$</span>
+                      <input
+                        type="number"
+                        value={value}
+                        onChange={e => updateHeavyItem(item.id, e.target.value)}
+                        placeholder="0"
+                        className="w-20 px-2 py-1.5 border border-gray-200 rounded-md text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-200"
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+              {/* 其他重物（带描述）— 桌面端跨两列 */}
+              <div className="bg-gray-50 rounded-xl p-3 sm:col-span-2">
+                <p className="text-sm font-medium text-gray-700 mb-2">其他重物（自定义）</p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    value={heavyItems.other?.description || ''}
+                    onChange={e => updateOtherHeavy('description', e.target.value)}
+                    placeholder="物品名称（如：保险柜）"
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                  <div className="flex items-center gap-2 sm:w-40">
+                    <span className="text-gray-500 text-sm">$</span>
+                    <input
+                      type="number"
+                      value={heavyItems.other?.amount || ''}
+                      onChange={e => updateOtherHeavy('amount', e.target.value)}
+                      placeholder="0"
+                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
+            {heavyTotal > 0 && (
+              <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center justify-between">
+                <span className="text-sm font-medium text-amber-800">附加费用合计</span>
+                <span className="text-amber-800 font-bold">${heavyTotal}</span>
+              </div>
+            )}
           </Card>
 
           {/* 4. 客服备注 + 快捷模板 */}
