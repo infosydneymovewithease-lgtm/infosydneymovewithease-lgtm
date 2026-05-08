@@ -712,7 +712,7 @@ export default function NewOrder() {
               💡 通过电话/微信跟客户确认有哪些重物，按需在下面填金额（不需要全部勾选）。
               师傅打开账单时会自动看到，现场可加可减。
             </p>
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {HEAVY_ITEM_OPTIONS.map(item => (
                 <HeavyItemRow
                   key={item.id}
@@ -721,8 +721,8 @@ export default function NewOrder() {
                   onChange={amt => set('heavyItems', { ...form.heavyItems, [item.id]: amt })}
                 />
               ))}
-              {/* 其他重物（带描述）*/}
-              <div className="bg-gray-50 rounded-xl p-3">
+              {/* 其他重物（带描述）— 桌面端跨两列 */}
+              <div className="bg-gray-50 rounded-xl p-3 sm:col-span-2">
                 <p className="text-sm font-medium text-gray-700 mb-2">其他重物（自定义）</p>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <input
