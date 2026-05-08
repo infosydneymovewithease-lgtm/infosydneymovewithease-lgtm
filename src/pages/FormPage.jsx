@@ -161,7 +161,7 @@ export default function FormPage() {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 pt-4 space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 md:items-start">
+      <div className="max-w-3xl mx-auto px-4 pt-4 space-y-3">
 
         {/* 工时摘要（只读） */}
         <Section title="工时摘要">
@@ -225,8 +225,8 @@ export default function FormPage() {
               </p>
             </div>
           )}
-          {/* 14 项 2 列网格（桌面端），手机端仍单列 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {/* 14 项单列 + 其他重物 */}
+          <div className="space-y-2">
             {HEAVY_ITEM_OPTIONS.map(item => (
               <WorkerHeavyItemRow
                 key={item.id}
@@ -235,8 +235,8 @@ export default function FormPage() {
                 onChange={amt => setHeavyItem(item.id, amt)}
               />
             ))}
-            {/* 其他重物（带描述）— 桌面端跨两列 */}
-            <div className="bg-gray-50 rounded-xl p-3 sm:col-span-2">
+            {/* 其他重物（带描述）*/}
+            <div className="bg-gray-50 rounded-xl p-3">
               <p className="text-sm font-medium text-gray-700 mb-2">其他重物（自定义）</p>
               <div className="flex flex-col sm:flex-row gap-2">
                 <input
