@@ -46,11 +46,6 @@ export default function FormPage() {
   const [highwayAmount, setHighwayAmount] = useState('30')
   const [parkingViolation, setParkingViolation] = useState(false)
 
-  // 易碎物品
-  const [fragileOn, setFragileOn] = useState(false)
-  const [fragile, setFragile] = useState('')
-  const [fragileNote, setFragileNote] = useState('')
-
   // 物资 — 跟客户下单/客服派单同结构（4 个标准物资数量 + 其他金额）
   // 师傅打开账单时数量预填客户预订值，可在现场加减
   const rm = order?.requestedMaterials
@@ -103,7 +98,7 @@ export default function FormPage() {
     highway,
     highwayAmount,
     parkingViolation,
-    fragile: fragileOn ? fragile : '',
+    fragile: '',
     supplies,
     fuel,
     discount,
@@ -124,7 +119,7 @@ export default function FormPage() {
       heavyFee: result?.heavyFee || 0,
       // 保留师傅最终确认的结构化重物数据（覆盖客服派单时的预填）
       heavyItems: heavyItems,
-      fragileFee: fragileOn ? Number(fragile) || 0 : 0,
+      fragileFee: 0,
       // Full breakdown fields (saved to dedicated columns in orders)
       timeFee:        result?.timeFee || 0,
       returnFee:      Number(returnFee) || 0,
@@ -222,7 +217,7 @@ export default function FormPage() {
         </Section>
 
         {/* 重物费 */}
-        <Section title="重物费">
+        <Section title="附加费用">
           {heavyItemsPrefilled && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
               <p className="text-xs text-amber-800 font-medium">
@@ -270,26 +265,8 @@ export default function FormPage() {
           )}
         </Section>
 
-        {/* 易碎物品费 */}
-        <Section title="易碎物品费">
-          <Toggle label="有易碎物品" value={fragileOn} onChange={setFragileOn} />
-          {fragileOn && (
-            <div className="mt-3 space-y-2">
-              <p className="text-gray-600 text-sm font-medium">收费金额（固定价格）</p>
-              <MoneyInput value={fragile} onChange={setFragile} quickAdds={[30, 60, 90, 150]} />
-              <input
-                type="text"
-                value={fragileNote}
-                onChange={e => setFragileNote(e.target.value)}
-                placeholder="备注（如：大镜子、玻璃餐桌）"
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
-            </div>
-          )}
-        </Section>
-
-        {/* 其他附加费 */}
-        <Section title="其他附加费">
+        {/* 其他费用 */}
+        <Section title="其他费用">
           {/* 高速费 */}
           <Toggle label="走高速" value={highway} onChange={setHighway} />
           {highway && (
