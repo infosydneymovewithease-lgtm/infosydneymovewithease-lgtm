@@ -8,6 +8,7 @@ import WorkPage from './pages/WorkPage'
 import FormPage from './pages/FormPage'
 import SummaryPage from './pages/SummaryPage'
 import WorkerStorageDetail from './pages/WorkerStorageDetail'
+import WorkerHistory from './pages/WorkerHistory'
 import AdminLayout from './pages/admin/AdminLayout'
 import Dashboard from './pages/admin/Dashboard'
 import OrderList from './pages/admin/OrderList'
@@ -128,6 +129,7 @@ function AppRoutes() {
       <Route path="/order/:id/form" element={<WorkerRoute><FormPage /></WorkerRoute>} />
       <Route path="/order/:id/summary" element={<WorkerRoute><SummaryPage /></WorkerRoute>} />
       <Route path="/storage/:id" element={<WorkerRoute><WorkerStorageDetail /></WorkerRoute>} />
+      <Route path="/worker/history" element={<WorkerRoute><WorkerHistory /></WorkerRoute>} />
 
       {/* ── Admin routes ── */}
       <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>

@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { getTodayHoliday } from '../data/holidays'
 import { MOCK_ANNOUNCEMENTS } from '../data/mockData'
-import { AlertTriangle, Bell, ChevronRight, Clock, CheckCircle, Loader, LogOut } from 'lucide-react'
+import { AlertTriangle, Bell, ChevronRight, Clock, CheckCircle, Loader, LogOut, History } from 'lucide-react'
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
 dayjs.locale('zh-cn')
@@ -150,11 +150,20 @@ export default function Home() {
                   onClick={() => navigate(`/order/${order.id}`)} />
               ))}
             </div>
-            <p className="text-xs text-gray-400 mt-2 px-1">
-              更早的记录请联系客服查询
-            </p>
           </div>
         )}
+
+        {/* 历史订单入口 */}
+        <button
+          onClick={() => navigate('/worker/history')}
+          className="w-full bg-white rounded-xl py-3 px-4 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow active:opacity-70"
+        >
+          <span className="flex items-center gap-2 text-gray-700 font-semibold text-sm">
+            <History size={16} className="text-gray-500" />
+            历史订单（含 7 天前已完成单 + 寄存）
+          </span>
+          <ChevronRight size={18} className="text-gray-300" />
+        </button>
 
         {/* 寄存任务 */}
         {activeStorage.length > 0 && (
