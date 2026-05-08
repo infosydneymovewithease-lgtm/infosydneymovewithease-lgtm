@@ -225,7 +225,8 @@ export default function FormPage() {
               </p>
             </div>
           )}
-          <div className="space-y-2">
+          {/* 14 项 2 列网格（桌面端），手机端仍单列 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {HEAVY_ITEM_OPTIONS.map(item => (
               <WorkerHeavyItemRow
                 key={item.id}
@@ -234,25 +235,27 @@ export default function FormPage() {
                 onChange={amt => setHeavyItem(item.id, amt)}
               />
             ))}
-            {/* 其他重物（带描述）*/}
-            <div className="bg-gray-50 rounded-xl p-3">
+            {/* 其他重物（带描述）— 桌面端跨两列 */}
+            <div className="bg-gray-50 rounded-xl p-3 sm:col-span-2">
               <p className="text-sm font-medium text-gray-700 mb-2">其他重物（自定义）</p>
-              <input
-                type="text"
-                value={heavyItems.other?.description || ''}
-                onChange={e => setOtherHeavyField('description', e.target.value)}
-                placeholder="物品名称（如：保险柜）"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 mb-2"
-              />
-              <div className="flex items-center gap-2">
-                <span className="text-gray-500 text-sm">$</span>
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
-                  type="number"
-                  value={heavyItems.other?.amount || ''}
-                  onChange={e => setOtherHeavyField('amount', e.target.value)}
-                  placeholder="0"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  type="text"
+                  value={heavyItems.other?.description || ''}
+                  onChange={e => setOtherHeavyField('description', e.target.value)}
+                  placeholder="物品名称（如：保险柜）"
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
+                <div className="flex items-center gap-2 sm:w-40">
+                  <span className="text-gray-500 text-sm">$</span>
+                  <input
+                    type="number"
+                    value={heavyItems.other?.amount || ''}
+                    onChange={e => setOtherHeavyField('amount', e.target.value)}
+                    placeholder="0"
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
               </div>
             </div>
           </div>
