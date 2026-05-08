@@ -685,6 +685,68 @@ export default function AdminOrderDetail() {
         )}
       </Card>
 
+      {/* 附加费用（重物 / 大件）— 始终显示，不管订单状态如何 */}
+      <Card title="附加费用（重物 / 大件）">
+        <p className="text-xs text-gray-400 mb-3">
+          💡 通过电话/微信跟客户确认有哪些重物，按需填金额（不需要全部勾选）。师傅打开账单时自动同步。
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {HEAVY_ITEM_OPTIONS.map(item => {
+            const value = heavyItems[item.id] || ''
+            const enabled = Number(value) > 0
+            return (
+              <div
+                key={item.id}
+                className={`rounded-xl px-3 py-2 flex items-center gap-3 transition-colors ${
+                  enabled ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50'
+                }`}
+              >
+                <span className="text-sm text-gray-700 flex-1 font-medium">{item.name}</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-gray-400 text-sm">$</span>
+                  <input
+                    type="number"
+                    value={value}
+                    onChange={e => updateHeavyItem(item.id, e.target.value)}
+                    placeholder="0"
+                    className="w-20 px-2 py-1.5 border border-gray-200 rounded-md text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-200"
+                  />
+                </div>
+              </div>
+            )
+          })}
+          {/* 其他重物（带描述）— 桌面端跨两列 */}
+          <div className="bg-gray-50 rounded-xl p-3 sm:col-span-2">
+            <p className="text-sm font-medium text-gray-700 mb-2">其他重物（自定义）</p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                value={heavyItems.other?.description || ''}
+                onChange={e => updateOtherHeavy('description', e.target.value)}
+                placeholder="物品名称（如：保险柜）"
+                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              <div className="flex items-center gap-2 sm:w-40">
+                <span className="text-gray-500 text-sm">$</span>
+                <input
+                  type="number"
+                  value={heavyItems.other?.amount || ''}
+                  onChange={e => updateOtherHeavy('amount', e.target.value)}
+                  placeholder="0"
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+        {heavyTotal > 0 && (
+          <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center justify-between">
+            <span className="text-sm font-medium text-amber-800">附加费用合计</span>
+            <span className="text-amber-800 font-bold">${heavyTotal}</span>
+          </div>
+        )}
+      </Card>
+
       {/* ── Confirmation modules — shown for 待确认 and unconfirmed CS orders ── */}
       {showConfirmFlow && (
         <>
@@ -742,68 +804,6 @@ export default function AdminOrderDetail() {
             </div>
             {(!checks.timeOk || !checks.addressOk) && (
               <p className="text-xs text-orange-500 mt-2">时间与地址确认为必须项，完成后才可确认订单</p>
-            )}
-          </Card>
-
-          {/* 3. 附加费用（重物 / 大件）*/}
-          <Card title="附加费用（重物 / 大件）">
-            <p className="text-xs text-gray-400 mb-3">
-              💡 通过电话/微信跟客户确认有哪些重物，按需填金额（不需要全部勾选）。师傅打开账单时自动同步。
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {HEAVY_ITEM_OPTIONS.map(item => {
-                const value = heavyItems[item.id] || ''
-                const enabled = Number(value) > 0
-                return (
-                  <div
-                    key={item.id}
-                    className={`rounded-xl px-3 py-2 flex items-center gap-3 transition-colors ${
-                      enabled ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50'
-                    }`}
-                  >
-                    <span className="text-sm text-gray-700 flex-1 font-medium">{item.name}</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-gray-400 text-sm">$</span>
-                      <input
-                        type="number"
-                        value={value}
-                        onChange={e => updateHeavyItem(item.id, e.target.value)}
-                        placeholder="0"
-                        className="w-20 px-2 py-1.5 border border-gray-200 rounded-md text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-200"
-                      />
-                    </div>
-                  </div>
-                )
-              })}
-              {/* 其他重物（带描述）— 桌面端跨两列 */}
-              <div className="bg-gray-50 rounded-xl p-3 sm:col-span-2">
-                <p className="text-sm font-medium text-gray-700 mb-2">其他重物（自定义）</p>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="text"
-                    value={heavyItems.other?.description || ''}
-                    onChange={e => updateOtherHeavy('description', e.target.value)}
-                    placeholder="物品名称（如：保险柜）"
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
-                  <div className="flex items-center gap-2 sm:w-40">
-                    <span className="text-gray-500 text-sm">$</span>
-                    <input
-                      type="number"
-                      value={heavyItems.other?.amount || ''}
-                      onChange={e => updateOtherHeavy('amount', e.target.value)}
-                      placeholder="0"
-                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-            {heavyTotal > 0 && (
-              <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center justify-between">
-                <span className="text-sm font-medium text-amber-800">附加费用合计</span>
-                <span className="text-amber-800 font-bold">${heavyTotal}</span>
-              </div>
             )}
           </Card>
 

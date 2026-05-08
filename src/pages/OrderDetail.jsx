@@ -4,6 +4,7 @@ import {
   ArrowLeft, Phone, MapPin, Package, MessageSquare,
   DollarSign, Calendar, Truck, CheckCircle, PlayCircle
 } from 'lucide-react'
+import { HEAVY_ITEM_OPTIONS, calcHeavyTotal } from '../data/heavyItems'
 function mapUrl(address) {
   const encoded = encodeURIComponent(address)
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
@@ -208,6 +209,42 @@ export default function OrderDetail() {
                 </div>
               </InfoCard>
             )}
+
+            {/* 附加费用（重物 / 大件）— 客服已确认的，师傅只读显示 */}
+            {(() => {
+              const hi = order.heavyItems || {}
+              const items = HEAVY_ITEM_OPTIONS.filter(opt => Number(hi[opt.id]) > 0)
+              const hasOther = hi.other && Number(hi.other.amount) > 0
+              const total = calcHeavyTotal(hi)
+              if (items.length === 0 && !hasOther) return null
+              return (
+                <InfoCard title="附加费用（重物 / 大件）">
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 mb-2">
+                    💪 客服已确认的重物费 — 详细金额可在账单页调整
+                  </p>
+                  <div className="space-y-1.5 text-sm">
+                    {items.map(opt => (
+                      <div key={opt.id} className="flex justify-between">
+                        <span className="text-gray-700">{opt.name}</span>
+                        <span className="font-medium text-gray-800">${hi[opt.id]}</span>
+                      </div>
+                    ))}
+                    {hasOther && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-700">
+                          其他：{hi.other.description || '未命名'}
+                        </span>
+                        <span className="font-medium text-gray-800">${hi.other.amount}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between pt-1.5 mt-1.5 border-t border-gray-100">
+                      <span className="text-amber-800 font-medium">附加费用合计</span>
+                      <span className="text-amber-800 font-bold">${total}</span>
+                    </div>
+                  </div>
+                </InfoCard>
+              )
+            })()}
 
             {/* 风险提醒（客服已标注）*/}
             {riskFlags.length > 0 && (
