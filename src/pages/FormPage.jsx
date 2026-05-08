@@ -19,9 +19,13 @@ export default function FormPage() {
   // 回程费
   const [returnFee, setReturnFee] = useState(String(v?.returnFee ?? ''))
 
-  // 楼梯费
-  const [hasElevator, setHasElevator] = useState(true)
-  const [floors, setFloors] = useState('')
+  // 楼梯费 — 同步自客户/客服订单的 stairFee（反算楼层数）
+  const orderStairFee = Number(order?.stairFee) || 0
+  const stairsPerFloor = STAIRS_FEE[v?.people || 1] || 10
+  const inferredFloors = orderStairFee > 0 ? Math.round(orderStairFee / stairsPerFloor) : 0
+  const stairsPrefilled = inferredFloors > 0
+  const [hasElevator, setHasElevator] = useState(!stairsPrefilled)
+  const [floors, setFloors] = useState(stairsPrefilled ? String(inferredFloors) : '')
 
   // 重物费（冰箱单选 + 其他各自开关）
   const [fridgeType, setFridgeType] = useState(null) // null | 'elevator' | 'stairs'
@@ -185,6 +189,13 @@ export default function FormPage() {
 
         {/* 楼梯费 */}
         <Section title="楼梯费">
+          {stairsPrefilled && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+              <p className="text-xs text-amber-800 font-medium">
+                🪜 客户下单时填了「无电梯 {inferredFloors} 层」（已自动选好，可现场调整）
+              </p>
+            </div>
+          )}
           <Toggle label="有电梯" value={hasElevator} onChange={v => { setHasElevator(v); if (v) setFloors('') }} />
           {!hasElevator && (
             <div className="mt-3 space-y-2">
