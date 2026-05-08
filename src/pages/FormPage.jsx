@@ -43,8 +43,14 @@ export default function FormPage() {
   const [fragile, setFragile] = useState('')
   const [fragileNote, setFragileNote] = useState('')
 
-  // 其他费用
-  const [supplies, setSupplies] = useState('')
+  // 客户预订的物资（同步自下单时填的）
+  const rm = order?.requestedMaterials
+  const requestedMaterialsCost = rm
+    ? (rm.boxes || 0) * 5 + (rm.wrapItems || 0) * 3 + (rm.mattressCovers || 0) * 10 + (rm.packingItems || 0) * 5
+    : 0
+
+  // 其他费用 — 物资费用预填客户已下单金额，师傅可加可减
+  const [supplies, setSupplies] = useState(requestedMaterialsCost > 0 ? String(requestedMaterialsCost) : '')
   const [fuel, setFuel] = useState('')
 
   // 支付/折扣/定金/状态
@@ -294,6 +300,19 @@ export default function FormPage() {
           <div className="mt-3 space-y-3">
             <div>
               <p className="text-gray-600 text-sm mb-1.5">物资费用</p>
+              {requestedMaterialsCost > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
+                  <p className="text-xs text-amber-800 font-medium mb-1">📦 客户预订物资（已自动填入）</p>
+                  <p className="text-xs text-amber-700 leading-relaxed">
+                    {rm.boxes > 0     && <>纸箱 <strong>{rm.boxes}</strong> 个 (${rm.boxes * 5})　</>}
+                    {rm.wrapItems > 0 && <>打包膜 <strong>{rm.wrapItems}</strong> 卷 (${rm.wrapItems * 3})　</>}
+                    {rm.mattressCovers > 0 && <>床垫套 <strong>{rm.mattressCovers}</strong> 个 (${rm.mattressCovers * 10})　</>}
+                    {rm.packingItems > 0 && <>打包物品 <strong>{rm.packingItems}</strong> 件 (${rm.packingItems * 5})　</>}
+                    = <strong>${requestedMaterialsCost}</strong>
+                  </p>
+                  <p className="text-xs text-amber-600 mt-1">实际未用或多用 → 直接修改下方金额</p>
+                </div>
+              )}
               <MoneyInput value={supplies} onChange={setSupplies} />
             </div>
             <div>
