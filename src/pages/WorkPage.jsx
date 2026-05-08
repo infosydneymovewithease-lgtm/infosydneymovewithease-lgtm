@@ -46,6 +46,15 @@ export default function WorkPage() {
   const returnFeeDefault = v.returnFee
   const vanDiscount = vehicle === '面包车' ? VAN_PROMO_DISCOUNT : 0
 
+  // 已同步在订单上的附加费（客户下单 / 客服派单时已确认）
+  const stairFee        = Number(order?.stairFee)        || 0
+  const remoteSurcharge = Number(order?.remoteSurcharge) || 0
+  const materialsCost   = Number(order?.materialsCost)   || 0
+  const heavyFee        = Number(order?.heavyFee)        || 0
+  const estimatedTotal  = estimatedTimeFee + returnFeeDefault
+    + stairFee + remoteSurcharge + materialsCost + heavyFee
+    - vanDiscount
+
   const timerColor =
     status === 'running' ? 'text-green-600' :
     status === 'paused'  ? 'text-amber-500' :
@@ -166,9 +175,13 @@ export default function WorkPage() {
                 <div className="space-y-2">
                   <FeeRow label={`工时费 ($${v.hourlyRate}/h × ${billed}h)`} value={estimatedTimeFee} />
                   <FeeRow label="回程费（默认）" value={returnFeeDefault} muted />
+                  {remoteSurcharge > 0 && <FeeRow label="远途附加费" value={remoteSurcharge} />}
+                  {stairFee > 0 && <FeeRow label="楼梯费" value={stairFee} />}
+                  {heavyFee > 0 && <FeeRow label="附加费用（重物）" value={heavyFee} />}
+                  {materialsCost > 0 && <FeeRow label="物资费" value={materialsCost} />}
                   {vanDiscount > 0 && <FeeRow label="面包车优惠" value={-vanDiscount} green />}
                   <div className="border-t border-gray-100 pt-2 mt-2">
-                    <FeeRow label="小计（不含附加费）" value={estimatedTimeFee + returnFeeDefault - vanDiscount} bold />
+                    <FeeRow label="估算总额（实际以账单为准）" value={estimatedTotal} bold />
                   </div>
                 </div>
 

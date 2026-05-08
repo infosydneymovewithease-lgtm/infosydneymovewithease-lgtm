@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { VEHICLES, VAN_PROMO_DISCOUNT } from '../../data/vehicles'
@@ -139,6 +139,18 @@ export default function AdminOrderDetail() {
     updateOrder(id, { heavyItems: next, ...recalc })
   }
   const heavyTotal = calcHeavyTotal(heavyItems)
+
+  // 自动修复：旧订单（fix 之前加的重物）quoteNote 没含「重物」字样 + heavyFee>0 → 自动重算一次
+  useEffect(() => {
+    if (!order) return
+    const heavyTotalSaved = calcHeavyTotal(order.heavyItems || {})
+    const noteHasHeavy = (order.quoteNote || '').includes('重物')
+    if (heavyTotalSaved > 0 && !noteHasHeavy) {
+      const recalc = rebuildQuote(order.heavyItems || {})
+      if (recalc) updateOrder(id, recalc)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.id])
 
   if (!order) return (
     <div className="flex items-center justify-center h-64 text-gray-400">订单不存在</div>
