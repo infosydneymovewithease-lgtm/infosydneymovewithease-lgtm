@@ -650,12 +650,12 @@ export default function NewOrder() {
             </Field>
 
             {/* Distance + remote fee */}
-            <Field label="预计公里数（两点之间）">
+            <Field label="远途档位距离（公司→较远一端）">
               <input
                 type="number"
                 value={form.distanceKm}
                 onChange={e => set('distanceKm', e.target.value)}
-                placeholder="例如 25"
+                placeholder="自动填充，可手动覆盖"
                 className={inputCls}
               />
             </Field>
