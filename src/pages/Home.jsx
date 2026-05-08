@@ -160,7 +160,7 @@ export default function Home() {
         >
           <span className="flex items-center gap-2 text-gray-700 font-semibold text-sm">
             <History size={16} className="text-gray-500" />
-            历史订单（含 7 天前已完成单 + 寄存）
+            历史订单（最近 7 天 · 含搜索/筛选）
           </span>
           <ChevronRight size={18} className="text-gray-300" />
         </button>

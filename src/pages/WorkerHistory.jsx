@@ -20,17 +20,23 @@ export default function WorkerHistory() {
   const [search, setSearch] = useState('')
   const [selectedMonth, setSelectedMonth] = useState('')
 
-  // Combine completed orders + completed storage
+  // 师傅端硬性限制：只能看最近 7 天的完成订单（更早的只在管理员后台可见）
+  const recentCutoff = dayjs().subtract(7, 'day').format('YYYY-MM-DD')
+  const isRecent = o => (o.date || '') >= recentCutoff
+
+  // Combine completed orders + completed storage (限定 7 天内)
   const allCompleted = useMemo(() => {
     const orders = getMyOrders()
-      .filter(o => o.status === '已完成')
+      .filter(o => o.status === '已完成' && isRecent(o))
       .map(o => ({ ...o, _kind: 'order' }))
     const storage = getMyStorageOrders()
       .filter(o => o.status === '寄存中')
       .map(o => ({ ...o, _kind: 'storage', date: o.moveInDate || o.date }))
+      .filter(isRecent)
     return [...orders, ...storage].sort((a, b) =>
       (b.date || '').localeCompare(a.date || '')
     )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getMyOrders, getMyStorageOrders])
 
   // Distinct months for filter
@@ -81,7 +87,7 @@ export default function WorkerHistory() {
           <div>
             <h1 className="text-white font-bold text-lg">历史订单</h1>
             <p className="text-red-300 text-xs">
-              {allCompleted.length} 单已完成 · 按服务日期倒序
+              最近 7 天 · {allCompleted.length} 单已完成
             </p>
           </div>
         </div>
@@ -145,30 +151,35 @@ export default function WorkerHistory() {
           <div className="bg-white rounded-xl p-12 text-center shadow-sm">
             <ClipboardList size={40} className="mx-auto mb-3 text-gray-200" />
             <p className="text-gray-400 font-medium">
-              {allCompleted.length === 0 ? '暂无历史订单' : '没有符合条件的订单'}
+              {allCompleted.length === 0 ? '最近 7 天无已完成订单' : '没有符合条件的订单'}
             </p>
             {allCompleted.length === 0 && (
-              <p className="text-gray-300 text-sm mt-1">完成第一单后会出现在这里</p>
+              <p className="text-gray-300 text-sm mt-1">7 天前的订单请联系客服查询</p>
             )}
           </div>
         ) : (
-          Object.entries(grouped).map(([ym, list]) => (
-            <div key={ym}>
-              <div className="flex items-center gap-2 mb-2 px-1">
-                <span className="text-sm font-bold text-gray-700">{formatMonth(ym)}</span>
-                <span className="text-xs text-gray-400">{list.length} 单</span>
+          <>
+            {Object.entries(grouped).map(([ym, list]) => (
+              <div key={ym}>
+                <div className="flex items-center gap-2 mb-2 px-1">
+                  <span className="text-sm font-bold text-gray-700">{formatMonth(ym)}</span>
+                  <span className="text-xs text-gray-400">{list.length} 单</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {list.map(o => (
+                    <HistoryCard
+                      key={o.id}
+                      order={o}
+                      onClick={() => navigate(o._kind === 'storage' ? `/storage/${o.id}` : `/order/${o.id}`)}
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {list.map(o => (
-                  <HistoryCard
-                    key={o.id}
-                    order={o}
-                    onClick={() => navigate(o._kind === 'storage' ? `/storage/${o.id}` : `/order/${o.id}`)}
-                  />
-                ))}
-              </div>
-            </div>
-          ))
+            ))}
+            <p className="text-xs text-gray-400 text-center pt-4 pb-2">
+              师傅端仅显示最近 7 天 · 7 天前订单请联系客服查询
+            </p>
+          </>
         )}
       </div>
     </div>
