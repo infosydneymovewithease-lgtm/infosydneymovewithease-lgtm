@@ -4,7 +4,7 @@ import { ArrowLeft, Phone, CheckCircle, Upload, X } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import dayjs from 'dayjs'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
-import { getDistanceKm } from '../../utils/googleMaps'
+import { getRemoteDistanceKm } from '../../utils/googleMaps'
 import { calcRemoteSurcharge } from '../../utils/remoteFee'
 
 const SERVICES = [
@@ -75,7 +75,7 @@ export default function IkeaBooking() {
     set('toAddress', address)
     const from = IKEA_STORE_ADDRESSES[form.fromAddress] || form.fromAddress
     if (from && address) {
-      const km = await getDistanceKm(from, address)
+      const km = await getRemoteDistanceKm(from, address)
       if (km !== null) setForm(f => ({ ...f, distanceKm: km }))
     }
   }
@@ -417,7 +417,7 @@ export default function IkeaBooking() {
             {errors.toAddress && <p className="text-red-500 text-xs mt-1">请填写送达地址</p>}
             {remoteEstimate > 0 && (
               <p className="text-xs mt-1.5 font-medium" style={{ color: MID }}>
-                📍 约 {form.distanceKm} km · 远途附加费 +${remoteEstimate}
+                📍 远途附加费 +${remoteEstimate}
               </p>
             )}
           </div>

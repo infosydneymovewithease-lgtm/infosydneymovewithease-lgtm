@@ -8,7 +8,7 @@ import { SLOT_CONFIG, fetchSlotsAvailability } from '../../utils/slotAvailabilit
 import { supabase } from '../../lib/supabase'
 import { ArrowLeft, MapPin, Package, AlertTriangle, Info, CheckCircle, ExternalLink, Upload, X } from 'lucide-react'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
-import { getDistanceKm } from '../../utils/googleMaps'
+import { getRemoteDistanceKm } from '../../utils/googleMaps'
 import dayjs from 'dayjs'
 
 // Upload an image to Supabase Storage with base64 fallback. Returns { name, url? , data? }.
@@ -221,7 +221,7 @@ export default function NewOrder() {
     const from = field === 'fromAddress' ? address : form.fromAddress
     const to   = field === 'toAddress'   ? address : form.toAddress
     if (from && to) {
-      const km = await getDistanceKm(from, to)
+      const km = await getRemoteDistanceKm(from, to)
       if (km !== null) set('distanceKm', String(km))
     }
   }
@@ -232,7 +232,7 @@ export default function NewOrder() {
     const to   = form.toAddress.trim()
     if (from.length < 5 || to.length < 5) return
     const timer = setTimeout(async () => {
-      const km = await getDistanceKm(from, to)
+      const km = await getRemoteDistanceKm(from, to)
       if (km !== null) set('distanceKm', String(km))
     }, 800)
     return () => clearTimeout(timer)

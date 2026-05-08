@@ -1,5 +1,8 @@
 const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
 
+// 公司基地（远途费档位的锚点）
+export const COMPANY_ADDRESS = '6 Hammond Pl, Narwee NSW 2209'
+
 // Places Autocomplete (New) — Australian addresses
 export async function autocompleteAddress(input) {
   if (!input || input.length < 3 || !KEY) return []
@@ -60,4 +63,16 @@ export async function getDistanceKm(origin, destination) {
     console.error('[Routes API] fetch error', e)
     return null
   }
+}
+
+// 远途档位距离 = max(公司→搬出地, 公司→搬入地)
+// 用于远途费 / 返程费档位判断（取较远那一端，因为师傅必须跑到那里）
+export async function getRemoteDistanceKm(fromAddr, toAddr) {
+  if (!fromAddr || !toAddr || !KEY) return null
+  const [d1, d2] = await Promise.all([
+    getDistanceKm(COMPANY_ADDRESS, fromAddr),
+    getDistanceKm(COMPANY_ADDRESS, toAddr),
+  ])
+  if (d1 == null && d2 == null) return null
+  return Math.max(d1 ?? 0, d2 ?? 0)
 }

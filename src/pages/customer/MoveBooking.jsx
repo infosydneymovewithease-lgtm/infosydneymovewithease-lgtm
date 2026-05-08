@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase'
 import VerifyCodeModal from '../../components/VerifyCodeModal'
 import dayjs from 'dayjs'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
-import { getDistanceKm } from '../../utils/googleMaps'
+import { getRemoteDistanceKm } from '../../utils/googleMaps'
 import { calcRemoteSurcharge } from '../../utils/remoteFee'
 import { SLOT_CONFIG, fetchSlotsAvailability } from '../../utils/slotAvailability'
 import { VAN_PROMO_DISCOUNT } from '../../data/vehicles'
@@ -141,7 +141,7 @@ export default function MoveBooking() {
     const from = field === 'fromAddress' ? address : form.fromAddress
     const to   = field === 'toAddress'   ? address : form.toAddress
     if (from && to) {
-      const km = await getDistanceKm(from, to)
+      const km = await getRemoteDistanceKm(from, to)
       if (km !== null) setForm(f => ({ ...f, distanceKm: km }))
     }
   }
@@ -1231,17 +1231,17 @@ function DistanceSurchargeCard({ km, vehicleKey }) {
   return (
     <div className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${borderColor}` }}>
 
-      {/* Distance row */}
+      {/* Surcharge tier badge */}
       <div className="px-4 py-3 flex items-center justify-between" style={{ background: headerBg }}>
         <span className="text-sm font-semibold" style={{ color: headerColor }}>
-          📍 两地距离约 {km} km
+          📍 服务范围
         </span>
         {!hasSurcharge && !isSpecial && (
           <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 font-medium">无附加费</span>
         )}
         {(hasSurcharge || isSpecial) && (
           <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 font-medium">
-            {tier?.label}
+            远途附加 +${remote.total}
           </span>
         )}
       </div>
