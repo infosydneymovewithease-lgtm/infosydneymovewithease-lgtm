@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
-import { VEHICLES } from '../../data/vehicles'
+import { VEHICLES, VAN_PROMO_DISCOUNT } from '../../data/vehicles'
 import { HEAVY_ITEM_OPTIONS, calcHeavyTotal } from '../../data/heavyItems'
 import {
   ArrowLeft, Phone, MapPin, Package, MessageSquare,
@@ -95,12 +95,39 @@ export default function AdminOrderDetail() {
   const [csNote,  setCsNote]  = useState(() => order?.csNote || '')
   const [heavyItems, setHeavyItemsState] = useState(() => order?.heavyItems || {})
 
-  // 编辑重物项目金额（自动保存到订单 + 更新合计）
+  // 重新计算订单总报价 + 拆分明细文案
+  function rebuildQuote(newHeavyItems) {
+    if (!order) return null
+    const v = VEHICLES[order.vehicle]
+    if (!v) return null
+    const newHeavyFee = calcHeavyTotal(newHeavyItems)
+    const baseFee = v.hourlyRate * v.minHours
+    const returnFee = v.returnFee
+    const remote = Number(order.remoteSurcharge) || 0
+    const stairs = Number(order.stairFee) || 0
+    const materials = Number(order.materialsCost) || 0
+    const vanDiscount = order.vehicle === '面包车' ? VAN_PROMO_DISCOUNT : 0
+    const newQuote = Math.max(0,
+      baseFee + returnFee + remote + stairs + materials + newHeavyFee - vanDiscount
+    )
+    const note = [
+      `$${v.hourlyRate}×${v.minHours}h + $${returnFee}(返程费) = $${baseFee + returnFee}`,
+      vanDiscount > 0 ? `- 优惠 $${vanDiscount}` : null,
+      remote   > 0 ? `+ 远途 $${remote}`     : null,
+      stairs   > 0 ? `+ 楼梯 $${stairs}`     : null,
+      newHeavyFee > 0 ? `+ 重物 $${newHeavyFee}` : null,
+      materials > 0 ? `+ 物资 $${materials}` : null,
+      `= $${newQuote}起`,
+    ].filter(Boolean).join(' ')
+    return { quote: newQuote, quoteNote: note, heavyFee: newHeavyFee }
+  }
+
+  // 编辑重物项目金额（自动同步保存：heavyItems + heavyFee + quote + quoteNote）
   function updateHeavyItem(itemId, amount) {
     const next = { ...heavyItems, [itemId]: amount }
     setHeavyItemsState(next)
-    const newTotal = calcHeavyTotal(next)
-    updateOrder(id, { heavyItems: next, heavyFee: newTotal })
+    const recalc = rebuildQuote(next)
+    updateOrder(id, { heavyItems: next, ...recalc })
   }
   function updateOtherHeavy(field, value) {
     const next = {
@@ -108,8 +135,8 @@ export default function AdminOrderDetail() {
       other: { ...(heavyItems.other || {}), [field]: value }
     }
     setHeavyItemsState(next)
-    const newTotal = calcHeavyTotal(next)
-    updateOrder(id, { heavyItems: next, heavyFee: newTotal })
+    const recalc = rebuildQuote(next)
+    updateOrder(id, { heavyItems: next, ...recalc })
   }
   const heavyTotal = calcHeavyTotal(heavyItems)
 
