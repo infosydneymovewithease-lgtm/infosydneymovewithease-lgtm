@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { VEHICLES, STAIRS_FEE, VAN_PROMO_DISCOUNT } from '../../data/vehicles'
+import { HEAVY_ITEM_OPTIONS, calcHeavyTotal } from '../../data/heavyItems'
 import { calcRemoteSurcharge, getDistanceTier } from '../../utils/remoteFee'
 import { SLOT_CONFIG, fetchSlotsAvailability } from '../../utils/slotAvailability'
 import { supabase } from '../../lib/supabase'
@@ -102,8 +103,9 @@ export default function NewOrder() {
     notes: '',
     hasElevator: true,             // true = 有电梯, false = 有楼梯
     floors: 0,                     // floor count when stairs
-    heavyFee: '',                  // CS-estimated heavy item fee
-    heavyDescription: '',          // text describing the heavy items
+    heavyFee: '',                  // CS-estimated heavy item fee（自动算自 heavyItems 总和）
+    heavyItems: {},                // 结构化重物（{ piano: 240, safeBox: 80, other: { description, amount } }）
+    heavyDescription: '',          // text describing the heavy items（保留作备注）
     fragileItems: [],
     fragileDescription: '',
     fragileEstimatedFee: '',
@@ -262,7 +264,8 @@ export default function NewOrder() {
   const stairsFee = (!form.hasElevator && Number(form.floors) > 0 && v)
     ? (STAIRS_FEE[v.people] || 0) * Number(form.floors)
     : 0
-  const heavyFeeNum = Number(form.heavyFee) || 0
+  // 重物费总额：优先用结构化 heavyItems 自动算，回退到 heavyFee 单一字段
+  const heavyFeeNum = calcHeavyTotal(form.heavyItems) || Number(form.heavyFee) || 0
   const vanDiscount = form.vehicle === '面包车' ? VAN_PROMO_DISCOUNT : 0
   const suggestedQuote = baseQuote + remote.total + materialsCost + stairsFee + heavyFeeNum - vanDiscount
   const finalQuote = parseFloat(form.quote) || suggestedQuote
@@ -390,6 +393,7 @@ export default function NewOrder() {
         remoteSurcharge: remote.total || null,
         stairsFee,
         heavyFee: heavyFeeNum,
+        heavyItems: form.heavyItems || {},
         heavyDescription: form.heavyDescription || null,
         materialsCost,
         quote: discountedQuote,
@@ -704,19 +708,53 @@ export default function NewOrder() {
         {/* Section: 重物大件 (搬家专属) */}
         {form.serviceType === '搬家' && (
           <Section title="重物 / 大件">
-            <Field label="重物描述">
-              <input type="text" value={form.heavyDescription}
-                onChange={e => set('heavyDescription', e.target.value)}
-                placeholder="如：双开门冰箱、立式钢琴、大理石餐桌" className={inputCls} />
-              <p className="text-xs text-gray-400 mt-1">
-                参考：双开门冰箱 $50（电梯）/ $100（楼梯）· 钢琴 $240–$300 · 大理石 $60–$90
-              </p>
-            </Field>
-            <Field label="重物附加费 $">
-              <input type="number" value={form.heavyFee}
-                onChange={e => set('heavyFee', e.target.value)}
-                placeholder="0" className={inputCls} />
-            </Field>
+            <p className="text-xs text-gray-400 mb-3">
+              💡 通过电话/微信跟客户确认有哪些重物，按需在下面填金额（不需要全部勾选）。
+              师傅打开账单时会自动看到，现场可加可减。
+            </p>
+            <div className="space-y-2">
+              {HEAVY_ITEM_OPTIONS.map(item => (
+                <HeavyItemRow
+                  key={item.id}
+                  label={item.name}
+                  value={form.heavyItems?.[item.id] || ''}
+                  onChange={amt => set('heavyItems', { ...form.heavyItems, [item.id]: amt })}
+                />
+              ))}
+              {/* 其他重物（带描述）*/}
+              <div className="bg-gray-50 rounded-xl p-3">
+                <p className="text-sm font-medium text-gray-700 mb-2">其他重物（自定义）</p>
+                <input
+                  type="text"
+                  value={form.heavyItems?.other?.description || ''}
+                  onChange={e => set('heavyItems', {
+                    ...form.heavyItems,
+                    other: { ...(form.heavyItems?.other || {}), description: e.target.value }
+                  })}
+                  placeholder="物品名（如：石膏雕塑）"
+                  className={inputCls + ' mb-2'}
+                />
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500 text-sm">$</span>
+                  <input
+                    type="number"
+                    value={form.heavyItems?.other?.amount || ''}
+                    onChange={e => set('heavyItems', {
+                      ...form.heavyItems,
+                      other: { ...(form.heavyItems?.other || {}), amount: e.target.value }
+                    })}
+                    placeholder="0"
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+            </div>
+            {heavyFeeNum > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3 flex items-center justify-between">
+                <span className="text-sm font-medium text-amber-800">重物附加费合计</span>
+                <span className="text-amber-800 font-bold">${heavyFeeNum}</span>
+              </div>
+            )}
           </Section>
         )}
 
@@ -1359,6 +1397,28 @@ function Field({ label, required, icon, children }) {
         {icon}{label}{required && <span className="text-red-400">*</span>}
       </label>
       {children}
+    </div>
+  )
+}
+
+// 重物项目行（项目名 + 金额输入）
+function HeavyItemRow({ label, value, onChange }) {
+  const enabled = Number(value) > 0
+  return (
+    <div className={`rounded-xl px-3 py-2 flex items-center gap-3 transition-colors ${
+      enabled ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50'
+    }`}>
+      <span className="text-sm text-gray-700 flex-1 font-medium">{label}</span>
+      <div className="flex items-center gap-1">
+        <span className="text-gray-400 text-sm">$</span>
+        <input
+          type="number"
+          value={value || ''}
+          onChange={e => onChange(e.target.value)}
+          placeholder="0"
+          className="w-24 px-2 py-1.5 border border-gray-200 rounded-md text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-200"
+        />
+      </div>
     </div>
   )
 }

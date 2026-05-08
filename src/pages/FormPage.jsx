@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { calcTotal, billedHours, formatDuration } from '../utils/pricing'
 import { VEHICLES, STAIRS_FEE } from '../data/vehicles'
+import { HEAVY_ITEM_OPTIONS, calcHeavyTotal } from '../data/heavyItems'
 import { ArrowLeft, Upload, X } from 'lucide-react'
 
 export default function FormPage() {
@@ -27,15 +28,18 @@ export default function FormPage() {
   const [hasElevator, setHasElevator] = useState(!stairsPrefilled)
   const [floors, setFloors] = useState(stairsPrefilled ? String(inferredFloors) : '')
 
-  // 重物费（冰箱单选 + 其他各自开关）
-  const [fridgeType, setFridgeType] = useState(null) // null | 'elevator' | 'stairs'
-  const [pianoOn, setPianoOn] = useState(false)
-  const [pianoPrice, setPianoPrice] = useState('')
-  const [marbleOn, setMarbleOn] = useState(false)
-  const [marblePrice, setMarblePrice] = useState('')
-  const [otherHeavyOn, setOtherHeavyOn] = useState(false)
-  const [otherHeavyName, setOtherHeavyName] = useState('')
-  const [otherHeavyPrice, setOtherHeavyPrice] = useState('')
+  // 重物费 — 跟客服派单同结构（13 项 + 1 其他），从 order.heavyItems 自动同步
+  const [heavyItems, setHeavyItemsState] = useState(() => order?.heavyItems || {})
+  const heavyItemsPrefilled = !!(order?.heavyItems && Object.keys(order.heavyItems).length > 0)
+  function setHeavyItem(id, amount) {
+    setHeavyItemsState(prev => ({ ...prev, [id]: amount }))
+  }
+  function setOtherHeavyField(field, value) {
+    setHeavyItemsState(prev => ({
+      ...prev,
+      other: { ...(prev.other || {}), [field]: value }
+    }))
+  }
 
   // 其他附加费
   const [highway, setHighway] = useState(false)
@@ -84,12 +88,8 @@ export default function FormPage() {
 
   const billed = billedHours(elapsed, v.minHours)
 
-  // 重物费汇总
-  const heavyFee =
-    (fridgeType === 'elevator' ? 50 : fridgeType === 'stairs' ? 100 : 0) +
-    (pianoOn ? Number(pianoPrice) || 0 : 0) +
-    (marbleOn ? Number(marblePrice) || 0 : 0) +
-    (otherHeavyOn ? Number(otherHeavyPrice) || 0 : 0)
+  // 重物费汇总（自动从 13 项 + 其他算出来）
+  const heavyFee = calcHeavyTotal(heavyItems)
 
   const result = calcTotal({
     vehicle: order.vehicle,
@@ -122,6 +122,8 @@ export default function FormPage() {
       stairsFee: result?.stairsFee || 0,
       overtimeFee: result?.overtimeFee || 0,
       heavyFee: result?.heavyFee || 0,
+      // 保留师傅最终确认的结构化重物数据（覆盖客服派单时的预填）
+      heavyItems: heavyItems,
       fragileFee: fragileOn ? Number(fragile) || 0 : 0,
       // Full breakdown fields (saved to dedicated columns in orders)
       timeFee:        result?.timeFee || 0,
@@ -221,70 +223,49 @@ export default function FormPage() {
 
         {/* 重物费 */}
         <Section title="重物费">
-          {/* 冰箱单选 */}
-          <div className="mb-3">
-            <p className="text-gray-600 text-sm font-medium mb-2">双开门冰箱</p>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { val: null,       label: '无' },
-                { val: 'elevator', label: '有电梯\n$50' },
-                { val: 'stairs',   label: '无电梯\n$100' },
-              ].map(opt => (
-                <button
-                  key={String(opt.val)}
-                  onClick={() => setFridgeType(opt.val)}
-                  className={`py-2.5 px-2 rounded-xl border-2 text-sm font-medium whitespace-pre-line leading-tight transition-colors ${
-                    fridgeType === opt.val
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 bg-white text-gray-600'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+          {heavyItemsPrefilled && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+              <p className="text-xs text-amber-800 font-medium">
+                💪 客服已确认重物（已自动填入金额，可现场加减）
+              </p>
             </div>
-          </div>
-
-          <div className="border-t border-gray-100 pt-3 space-y-3">
-            {/* 钢琴 */}
-            <HeavyItemRow
-              label="立式钢琴"
-              hint="$240 – $300"
-              enabled={pianoOn}
-              onToggle={setPianoOn}
-              price={pianoPrice}
-              onPrice={setPianoPrice}
-            />
-            {/* 大理石 */}
-            <HeavyItemRow
-              label="大理石 / 石材"
-              hint="$60 – $90"
-              enabled={marbleOn}
-              onToggle={setMarbleOn}
-              price={marblePrice}
-              onPrice={setMarblePrice}
-            />
-            {/* 其他重物 */}
-            <div>
-              <Toggle label="其他重物" value={otherHeavyOn} onChange={setOtherHeavyOn} />
-              {otherHeavyOn && (
-                <div className="mt-2 space-y-2">
-                  <input
-                    type="text"
-                    value={otherHeavyName}
-                    onChange={e => setOtherHeavyName(e.target.value)}
-                    placeholder="物品名称（如：保险柜）"
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
-                  <MoneyInput value={otherHeavyPrice} onChange={setOtherHeavyPrice} quickAdds={[50, 100]} />
-                </div>
-              )}
+          )}
+          <div className="space-y-2">
+            {HEAVY_ITEM_OPTIONS.map(item => (
+              <WorkerHeavyItemRow
+                key={item.id}
+                label={item.name}
+                value={heavyItems[item.id] || ''}
+                onChange={amt => setHeavyItem(item.id, amt)}
+              />
+            ))}
+            {/* 其他重物（带描述）*/}
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-sm font-medium text-gray-700 mb-2">其他重物（自定义）</p>
+              <input
+                type="text"
+                value={heavyItems.other?.description || ''}
+                onChange={e => setOtherHeavyField('description', e.target.value)}
+                placeholder="物品名称（如：保险柜）"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 mb-2"
+              />
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 text-sm">$</span>
+                <input
+                  type="number"
+                  value={heavyItems.other?.amount || ''}
+                  onChange={e => setOtherHeavyField('amount', e.target.value)}
+                  placeholder="0"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+              </div>
             </div>
           </div>
 
           {heavyFee > 0 && (
-            <div className="mt-3 bg-blue-50 rounded-lg px-3 py-2">
-              <p className="text-blue-700 text-sm font-medium">重物费合计：<strong>${heavyFee}</strong></p>
+            <div className="mt-3 bg-blue-50 rounded-lg px-3 py-2 flex items-center justify-between">
+              <p className="text-blue-700 text-sm font-medium">重物费合计</p>
+              <span className="text-blue-700 font-bold">${heavyFee}</span>
             </div>
           )}
         </Section>
@@ -657,17 +638,24 @@ function MoneyInput({ value, onChange, placeholder = '0', quickAdds = [10, 50, 1
   )
 }
 
-// 重物行（钢琴/大理石）
-function HeavyItemRow({ label, hint, enabled, onToggle, price, onPrice }) {
+// 重物项目行（项目名 + 金额输入，跟客服派单同款）
+function WorkerHeavyItemRow({ label, value, onChange }) {
+  const enabled = Number(value) > 0
   return (
-    <div>
-      <Toggle label={label} value={enabled} onChange={onToggle} />
-      {enabled && (
-        <div className="mt-2">
-          <p className="text-gray-400 text-xs mb-1.5">参考范围：{hint}</p>
-          <MoneyInput value={price} onChange={onPrice} quickAdds={[50, 100]} />
-        </div>
-      )}
+    <div className={`rounded-xl px-3 py-2 flex items-center gap-3 transition-colors ${
+      enabled ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50'
+    }`}>
+      <span className="text-sm text-gray-700 flex-1 font-medium">{label}</span>
+      <div className="flex items-center gap-1">
+        <span className="text-gray-400 text-sm">$</span>
+        <input
+          type="number"
+          value={value || ''}
+          onChange={e => onChange(e.target.value)}
+          placeholder="0"
+          className="w-20 px-2 py-1.5 border border-gray-200 rounded-md text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-200"
+        />
+      </div>
     </div>
   )
 }

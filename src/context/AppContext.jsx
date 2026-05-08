@@ -14,7 +14,7 @@ const ORDER_COLUMNS = new Set([
   'id','createdAt','status','serviceType','customerName','customerPhone','wechat',
   'date','startTime','endTime','fromAddress','toAddress','vehicle','quote',
   'finalAmount','paymentMethod','depositPaid','depositStatus','depositScreenshot',
-  'deposit','distanceKm','remoteSurcharge','heavyItemFee','stairFee','quoteNote',
+  'deposit','distanceKm','remoteSurcharge','heavyItemFee','heavyFee','heavyItems','heavyDescription','stairFee','quoteNote',
   'requestedMaterials','items','notes','source','assignedTo','assignedWorkers',
   'dispatchedAt','confirmedAt','confirmChecks','csNote','createdBy','createdByName',
   'ikeaOrderNo','storeLocation','rubbishDisposal','riskItems','photos','hasVideo',
