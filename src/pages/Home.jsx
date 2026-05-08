@@ -32,10 +32,14 @@ export default function Home() {
   const myStorageOrders = getMyStorageOrders()
   const today = dayjs()
 
+  // 师傅端只显示最近 7 天的已完成订单，超过 7 天自动归档（管理员后台仍可查全量）
+  const recentCutoff = today.subtract(7, 'day').format('YYYY-MM-DD')
+  const isRecent = o => (o.date || '') >= recentCutoff
+
   const active = myOrders.filter(o => !['已完成', '已取消'].includes(o.status))
-  const done   = myOrders.filter(o => o.status === '已完成')
+  const done   = myOrders.filter(o => o.status === '已完成' && isRecent(o))
   const activeStorage = myStorageOrders.filter(o => o.status !== '寄存中')
-  const doneStorage   = myStorageOrders.filter(o => o.status === '寄存中')
+  const doneStorage   = myStorageOrders.filter(o => o.status === '寄存中' && isRecent(o))
   const totalPending = active.length + activeStorage.length
   const totalDone    = done.length + doneStorage.length
 
@@ -136,16 +140,19 @@ export default function Home() {
           )}
         </div>
 
-        {/* 已完成订单 */}
+        {/* 已完成订单（最近 7 天）*/}
         {done.length > 0 && (
           <div>
-            <SectionHeader label="已完成订单" count={done.length} />
+            <SectionHeader label="已完成订单（最近 7 天）" count={done.length} />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {done.map(order => (
                 <OrderCard key={order.id} order={order}
                   onClick={() => navigate(`/order/${order.id}`)} />
               ))}
             </div>
+            <p className="text-xs text-gray-400 mt-2 px-1">
+              更早的记录请联系客服查询
+            </p>
           </div>
         )}
 
@@ -162,7 +169,7 @@ export default function Home() {
         )}
         {doneStorage.length > 0 && (
           <div>
-            <SectionHeader label="已完成寄存" count={doneStorage.length} />
+            <SectionHeader label="已完成寄存（最近 7 天）" count={doneStorage.length} />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {doneStorage.map(order => (
                 <StorageCard key={order.id} order={order} onClick={() => navigate(`/storage/${order.id}`)} />
