@@ -43,14 +43,27 @@ export default function FormPage() {
   const [fragile, setFragile] = useState('')
   const [fragileNote, setFragileNote] = useState('')
 
-  // 客户预订的物资（同步自下单时填的）
+  // 物资 — 跟客户下单/客服派单同结构（4 个标准物资数量 + 其他金额）
+  // 师傅打开账单时数量预填客户预订值，可在现场加减
   const rm = order?.requestedMaterials
-  const requestedMaterialsCost = rm
-    ? (rm.boxes || 0) * 5 + (rm.wrapItems || 0) * 3 + (rm.mattressCovers || 0) * 10 + (rm.packingItems || 0) * 5
-    : 0
+  const [materialCounts, setMaterialCounts] = useState({
+    boxes:           rm?.boxes           || 0,
+    wrapItems:       rm?.wrapItems       || 0,
+    mattressCovers:  rm?.mattressCovers  || 0,
+    packingItems:    rm?.packingItems    || 0,
+  })
+  const [otherSupplies, setOtherSupplies] = useState('')
 
-  // 其他费用 — 物资费用预填客户已下单金额，师傅可加可减
-  const [supplies, setSupplies] = useState(requestedMaterialsCost > 0 ? String(requestedMaterialsCost) : '')
+  // 物资合计（自动计算）
+  const suppliesTotal =
+    materialCounts.boxes          * 5  +
+    materialCounts.wrapItems      * 3  +
+    materialCounts.mattressCovers * 10 +
+    materialCounts.packingItems   * 5  +
+    (Number(otherSupplies) || 0)
+  const supplies = String(suppliesTotal)
+
+  // 油费
   const [fuel, setFuel] = useState('')
 
   // 支付/折扣/定金/状态
@@ -112,6 +125,14 @@ export default function FormPage() {
       highwayFee:     result?.highwayFee || 0,
       parkingFee:     result?.parkingFee || 0,
       suppliesFee:    Number(supplies) || 0,
+      // 保留师傅最终确认的物资数量（覆盖客户预订值），让后台能看到现场实际给了多少
+      requestedMaterials: {
+        boxes:           materialCounts.boxes,
+        wrapItems:       materialCounts.wrapItems,
+        mattressCovers:  materialCounts.mattressCovers,
+        packingItems:    materialCounts.packingItems,
+        otherAmount:     Number(otherSupplies) || 0,
+      },
       fuelFee:        Number(fuel) || 0,
       discountAmount: result?.discountAmount || 0,
       gst:            result?.gst || 0,
@@ -296,29 +317,51 @@ export default function FormPage() {
             )}
           </div>
 
-          {/* 物资费用 */}
-          <div className="mt-3 space-y-3">
-            <div>
-              <p className="text-gray-600 text-sm mb-1.5">物资费用</p>
-              {requestedMaterialsCost > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
-                  <p className="text-xs text-amber-800 font-medium mb-1">📦 客户预订物资（已自动填入）</p>
-                  <p className="text-xs text-amber-700 leading-relaxed">
-                    {rm.boxes > 0     && <>纸箱 <strong>{rm.boxes}</strong> 个 (${rm.boxes * 5})　</>}
-                    {rm.wrapItems > 0 && <>打包膜 <strong>{rm.wrapItems}</strong> 卷 (${rm.wrapItems * 3})　</>}
-                    {rm.mattressCovers > 0 && <>床垫套 <strong>{rm.mattressCovers}</strong> 个 (${rm.mattressCovers * 10})　</>}
-                    {rm.packingItems > 0 && <>打包物品 <strong>{rm.packingItems}</strong> 件 (${rm.packingItems * 5})　</>}
-                    = <strong>${requestedMaterialsCost}</strong>
-                  </p>
-                  <p className="text-xs text-amber-600 mt-1">实际未用或多用 → 直接修改下方金额</p>
-                </div>
+          {/* 物资费用 — 跟客户下单同款 4 个数量 + 其他 */}
+          <div className="mt-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-gray-600 text-sm">物资费用</p>
+              {rm && (rm.boxes || rm.wrapItems || rm.mattressCovers || rm.packingItems) > 0 && (
+                <span className="text-xs text-amber-600 font-medium">📦 客户预订已填入，可现场调整</span>
               )}
-              <MoneyInput value={supplies} onChange={setSupplies} />
             </div>
-            <div>
-              <p className="text-gray-600 text-sm mb-1.5">油费</p>
-              <MoneyInput value={fuel} onChange={setFuel} quickAdds={[10, 20, 50]} />
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <SupplyRow
+                label="纸箱"   unit="个" price={5}
+                value={materialCounts.boxes}
+                onChange={n => setMaterialCounts(p => ({ ...p, boxes: Math.max(0, n) }))}
+              />
+              <SupplyRow
+                label="打包膜" unit="卷" price={3}
+                value={materialCounts.wrapItems}
+                onChange={n => setMaterialCounts(p => ({ ...p, wrapItems: Math.max(0, n) }))}
+              />
+              <SupplyRow
+                label="床垫套" unit="个" price={10}
+                value={materialCounts.mattressCovers}
+                onChange={n => setMaterialCounts(p => ({ ...p, mattressCovers: Math.max(0, n) }))}
+              />
+              <SupplyRow
+                label="打包物品" unit="件" price={5}
+                value={materialCounts.packingItems}
+                onChange={n => setMaterialCounts(p => ({ ...p, packingItems: Math.max(0, n) }))}
+              />
             </div>
+            <div className="mb-2">
+              <p className="text-gray-500 text-xs mb-1">其他物资（自定义金额）</p>
+              <MoneyInput value={otherSupplies} onChange={setOtherSupplies} quickAdds={[5, 10, 20]} />
+            </div>
+            {suppliesTotal > 0 && (
+              <div className="bg-blue-50 rounded-lg px-3 py-1.5 flex items-center justify-between">
+                <span className="text-xs text-blue-700 font-medium">物资合计</span>
+                <span className="text-blue-700 font-bold">${suppliesTotal.toFixed(2)}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-3">
+            <p className="text-gray-600 text-sm mb-1.5">油费</p>
+            <MoneyInput value={fuel} onChange={setFuel} quickAdds={[10, 20, 50]} />
           </div>
         </Section>
 
@@ -613,6 +656,36 @@ function HeavyItemRow({ label, hint, enabled, onToggle, price, onPrice }) {
           <p className="text-gray-400 text-xs mb-1.5">参考范围：{hint}</p>
           <MoneyInput value={price} onChange={onPrice} quickAdds={[50, 100]} />
         </div>
+      )}
+    </div>
+  )
+}
+
+// 物资数量行（跟客户/客服派单同款）
+function SupplyRow({ label, unit, price, value, onChange }) {
+  return (
+    <div className="bg-gray-50 rounded-xl p-2.5 text-center">
+      <p className="text-xs text-gray-700 font-medium mb-0.5">{label}</p>
+      <p className="text-xs text-gray-400 mb-1.5">${price}/{unit}</p>
+      <div className="flex items-center justify-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => onChange(value - 1)}
+          className="w-7 h-7 rounded-full bg-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-300 active:bg-gray-400"
+        >
+          −
+        </button>
+        <span className="w-8 text-center font-semibold text-gray-800 text-sm">{value}</span>
+        <button
+          type="button"
+          onClick={() => onChange(value + 1)}
+          className="w-7 h-7 rounded-full bg-red-100 text-red-600 font-bold text-sm hover:bg-red-200 active:bg-red-300"
+        >
+          ＋
+        </button>
+      </div>
+      {value > 0 && (
+        <p className="text-xs text-green-600 font-semibold mt-1">${value * price}</p>
       )}
     </div>
   )
