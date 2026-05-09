@@ -37,6 +37,7 @@ import CustomerHome from './pages/customer/CustomerHome'
 import GuidePage from './pages/customer/GuidePage'
 import ProfilePage from './pages/customer/ProfilePage'
 import MoveBooking from './pages/customer/MoveBooking'
+import MoveLandingPage from './pages/customer/MoveLandingPage'
 import StorageBooking from './pages/customer/StorageBooking'
 import IkeaBooking from './pages/customer/IkeaBooking'
 import CleanBooking from './pages/customer/CleanBooking'
@@ -111,6 +112,7 @@ function AppRoutes() {
       </Route>
 
       {/* ── Booking flows (no bottom nav — full screen) ── */}
+      <Route path="/lp/move" element={<MoveLandingPage />} />
       <Route path="/book/move" element={<MoveBooking />} />
       <Route path="/book/storage" element={<StorageBooking />} />
       <Route path="/book/ikea" element={<IkeaBooking />} />

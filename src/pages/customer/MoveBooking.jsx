@@ -80,6 +80,21 @@ export default function MoveBooking() {
   const { createOrderWithSlotCheck } = useApp()
   const fileInputRef = useRef(null)
 
+  // ── Source tracking from URL (?source=xiaohongshu_landing 等) ──
+  const sourceLabel = (() => {
+    const sp = new URLSearchParams(location.search)
+    const raw = sp.get('source')
+    const map = {
+      xiaohongshu_landing: '小红书落地页',
+      xiaohongshu:         '小红书',
+      wechat:              '微信',
+      gbp:                 'Google Business',
+      facebook:            'Facebook',
+      instagram:           'Instagram',
+    }
+    return map[raw] || (raw ? `自定义: ${raw}` : '官网自助预约')
+  })()
+
   const initId = location.state?.vehicleId ?? null
   const [step, setStep]           = useState(initId ? 1 : 0)
   const [vehicleId, setVehicleId] = useState(initId)
@@ -248,7 +263,7 @@ export default function MoveBooking() {
         remoteSurcharge: remoteEstimate,
         stairFee:       stairsFee,
         serviceType:    '搬家',
-        source:         '官网自助预约',
+        source:         sourceLabel,
         status:         '待确认',
         quote:          totalEstimate,
         quoteNote: [

@@ -311,6 +311,9 @@ function OrderCard({ order, onClick, onCancel }) {
             {order.deposit > 0 && !order.depositPaid && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 font-medium">定金未收</span>
             )}
+            {order.source && order.source !== '官网自助预约' && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 font-medium">📍 {order.source}</span>
+            )}
           </div>
 
           <div className="mt-1.5 flex items-center gap-3 text-sm text-gray-500">
