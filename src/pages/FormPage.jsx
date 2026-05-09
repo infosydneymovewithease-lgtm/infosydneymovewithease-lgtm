@@ -9,7 +9,7 @@ import { ArrowLeft, Upload, X } from 'lucide-react'
 export default function FormPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { orders, timerState, completeOrder, setTimerState } = useApp()
+  const { orders, timerState, completeOrder, updateOrder, setTimerState } = useApp()
   const order = orders.find(o => o.id === id)
   const v = VEHICLES[order?.vehicle]
 
@@ -492,15 +492,22 @@ export default function FormPage() {
           )}
         </Section>
 
-        {/* 师傅备注（特殊情况说明） */}
+        {/* 师傅备注（特殊情况说明）— 失焦即实时保存，无需等"确认提交" */}
         <Section title="备注（可选）">
           <textarea
             value={workerNote}
             onChange={e => setWorkerNote(e.target.value)}
+            onBlur={() => {
+              const trimmed = workerNote.trim()
+              if (trimmed !== (order?.workerNote || '')) {
+                updateOrder(id, { workerNote: trimmed || null })
+              }
+            }}
             placeholder="特殊情况说明，例如：客户临时加点、楼下不能停车、家具拆装超时等"
             rows={3}
             className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
           />
+          <p className="text-xs text-gray-400 mt-1">💡 离开输入框时自动保存，客服立即可见</p>
         </Section>
 
       </div>
