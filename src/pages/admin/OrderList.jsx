@@ -1,7 +1,26 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
-import { Search, PlusCircle, Download, ClipboardList } from 'lucide-react'
+import { Search, PlusCircle, Download, ClipboardList, Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
+import { SLOT_CONFIG } from '../../utils/slotAvailability'
+
+// 车型 → 时段配置组（与 NewOrder.jsx 保持一致）
+const VEHICLE_TO_GROUP = {
+  '面包车':   'van',
+  '卡车单人': 'van',
+  '小卡车':   'small',
+  '小卡三人': 'small',
+  '大卡车':   'large',
+  '大卡三人': 'large',
+  '双卡车':   'large',
+}
+
+// 各组展示信息 + 本地容量配置（与 slotAvailability.js FALLBACK 对齐）
+const GROUP_META = {
+  van:   { label: '面包车组', icon: '🚐', vehicles: ['面包车', '卡车单人'],          slotCap: 1, dailyCap: 5 },
+  small: { label: '小卡车组', icon: '🚚', vehicles: ['小卡车', '小卡三人'],          slotCap: 2, dailyCap: 6 },
+  large: { label: '大卡车组', icon: '🛻', vehicles: ['大卡车', '大卡三人', '双卡车'], slotCap: 1, dailyCap: 2 },
+}
 
 const STATUS_TABS = [
   { label: '全部',         value: 'all',       filter: null },
@@ -42,6 +61,7 @@ export default function OrderList() {
   const [search, setSearch]             = useState('')
   const [sortBy, setSortBy]             = useState('date-desc')
   const [selectedMonth, setSelectedMonth] = useState('')
+  const [selectedDate, setSelectedDate]   = useState(new Date().toISOString().slice(0, 10))
 
   function switchTab(tabValue) {
     setSearchParams(prev => {
@@ -80,10 +100,63 @@ export default function OrderList() {
     ? serviceFiltered.filter(o => (o.date || '').startsWith(selectedMonth))
     : serviceFiltered
 
+  // 日期筛选优先级高于月份；selectedDate=null 表示"查看全部日期"
+  const dateScoped = selectedDate
+    ? serviceFiltered.filter(o => o.date === selectedDate)
+    : monthFiltered
+
+  // 当日各车型组时段占用统计（用于时段可视化卡片）
+  function getSlotStats(group) {
+    const config = SLOT_CONFIG[group]
+    const meta = GROUP_META[group]
+    if (!config || !meta || !selectedDate) return null
+    const dayOrders = serviceFiltered.filter(o =>
+      o.date === selectedDate &&
+      meta.vehicles.includes(o.vehicle) &&
+      o.status !== '已取消'
+    )
+    const dailyBooked = dayOrders.length
+    const dailyFull = dailyBooked >= meta.dailyCap
+    return {
+      slots: config.slots.map(slot => {
+        const booked = dayOrders.filter(o => o.startTime === slot).length
+        return {
+          slot,
+          booked,
+          capacity: meta.slotCap,
+          full: booked >= meta.slotCap || dailyFull,
+        }
+      }),
+      dailyBooked,
+      dailyCap: meta.dailyCap,
+      dailyFull,
+    }
+  }
+
+  // 日期切换辅助
+  function shiftDate(days) {
+    const d = new Date(selectedDate || new Date().toISOString().slice(0, 10))
+    d.setDate(d.getDate() + days)
+    setSelectedDate(d.toISOString().slice(0, 10))
+    setSelectedMonth('')
+  }
+  function formatDateLabel(s) {
+    if (!s) return ''
+    const d = new Date(s)
+    const today = new Date().toISOString().slice(0, 10)
+    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1)
+    const tomorrowStr = tomorrow.toISOString().slice(0, 10)
+    const wd = ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()]
+    let prefix = ''
+    if (s === today) prefix = '今天 · '
+    else if (s === tomorrowStr) prefix = '明天 · '
+    return `${prefix}${d.getMonth() + 1}月${d.getDate()}日 ${wd}`
+  }
+
   const activeTabDef = STATUS_TABS.find(t => t.value === activeTab)
   const q = search.toLowerCase()
 
-  const filtered = monthFiltered.filter(o => {
+  const filtered = dateScoped.filter(o => {
     let matchTab
     if (activeTab === 'all') {
       matchTab = true
@@ -112,11 +185,11 @@ export default function OrderList() {
   const finalOrders = filtered.filter(o => o.status !== '已取消')
 
   const tabCounts = {}
-  monthFiltered.forEach(o => {
+  dateScoped.forEach(o => {
     tabCounts[o.status] = (tabCounts[o.status] || 0) + 1
   })
   const pendingCount = (tabCounts['待确认'] || 0) + (tabCounts['已报价'] || 0)
-  const todayUnassigned = monthFiltered.filter(o =>
+  const todayUnassigned = dateScoped.filter(o =>
     o.date === todayStr && !o.assignedTo && !['已完成','已取消'].includes(o.status)
   ).length
 
@@ -155,6 +228,103 @@ export default function OrderList() {
         </div>
       </div>
 
+      {/* Date filter + slot availability visualization */}
+      <div className="bg-white rounded-xl shadow-sm px-4 pt-3 pb-4 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Calendar size={15} className="text-gray-400" />
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">按日查看</span>
+          </div>
+          <button
+            onClick={() => { setSelectedDate(''); setSelectedMonth('') }}
+            className={`text-xs font-medium ${selectedDate ? 'text-red-500 hover:text-red-700' : 'text-gray-300'}`}
+            disabled={!selectedDate}
+          >
+            ✕ 查看全部日期
+          </button>
+        </div>
+
+        {/* Date picker row */}
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          <button
+            onClick={() => shiftDate(-1)}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"
+            title="前一天"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <input
+            type="date"
+            value={selectedDate || ''}
+            onChange={e => { setSelectedDate(e.target.value); setSelectedMonth('') }}
+            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-200"
+          />
+          <button
+            onClick={() => shiftDate(1)}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"
+            title="后一天"
+          >
+            <ChevronRight size={16} />
+          </button>
+          <button
+            onClick={() => { setSelectedDate(todayStr); setSelectedMonth('') }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              selectedDate === todayStr ? 'text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+            }`}
+            style={selectedDate === todayStr ? { background: 'linear-gradient(135deg, #6b1414, #c0392b)' } : {}}
+          >
+            今天
+          </button>
+          {selectedDate && (
+            <span className="text-sm text-gray-500 ml-1">{formatDateLabel(selectedDate)}</span>
+          )}
+        </div>
+
+        {/* Slot availability cards (only when a date is selected) */}
+        {selectedDate && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {Object.keys(GROUP_META).map(groupKey => {
+              const stats = getSlotStats(groupKey)
+              const meta = GROUP_META[groupKey]
+              if (!stats) return null
+              return (
+                <div key={groupKey} className="border border-gray-100 rounded-xl p-3 bg-gray-50/50">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-gray-700">
+                      {meta.icon} {meta.label}
+                    </span>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      stats.dailyFull
+                        ? 'bg-red-100 text-red-700'
+                        : 'bg-green-100 text-green-700'
+                    }`}>
+                      {stats.dailyBooked}/{stats.dailyCap} 单
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {stats.slots.map(s => (
+                      <div
+                        key={s.slot}
+                        className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded-lg border ${
+                          s.full
+                            ? 'bg-red-50 border-red-200 text-red-700'
+                            : 'bg-green-50 border-green-200 text-green-700'
+                        }`}
+                      >
+                        <span className="font-medium">{s.slot}</span>
+                        <span className="font-semibold">
+                          {s.full ? '已满' : '空余'} · {s.booked}/{s.capacity}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Month filter */}
       <div className="bg-white rounded-xl shadow-sm px-4 pt-3 pb-3 mb-4">
         <div className="flex items-center justify-between mb-2.5">
@@ -168,13 +338,13 @@ export default function OrderList() {
         </div>
         <div className="flex gap-1.5 overflow-x-auto pb-0.5">
           <button
-            onClick={() => setSelectedMonth('')}
+            onClick={() => { setSelectedMonth(''); setSelectedDate('') }}
             className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-              !selectedMonth ? 'text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              !selectedMonth && !selectedDate ? 'text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
             }`}
-            style={!selectedMonth ? { background: 'linear-gradient(135deg, #6b1414, #c0392b)' } : {}}>
+            style={!selectedMonth && !selectedDate ? { background: 'linear-gradient(135deg, #6b1414, #c0392b)' } : {}}>
             全部时间
-            <span className={`ml-1.5 ${!selectedMonth ? 'opacity-70' : 'text-gray-400'}`}>
+            <span className={`ml-1.5 ${!selectedMonth && !selectedDate ? 'opacity-70' : 'text-gray-400'}`}>
               {combinedOrders.length}
             </span>
           </button>
@@ -182,7 +352,7 @@ export default function OrderList() {
             const cnt = combinedOrders.filter(o => (o.date || '').startsWith(m)).length
             const active = selectedMonth === m
             return (
-              <button key={m} onClick={() => setSelectedMonth(m)}
+              <button key={m} onClick={() => { setSelectedMonth(m); setSelectedDate('') }}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                   active ? 'text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                 }`}
@@ -241,7 +411,8 @@ export default function OrderList() {
 
       {/* Results count */}
       <p className="text-sm text-gray-500 mb-3">
-        {selectedMonth && <span className="text-red-600 font-semibold mr-1.5">{formatMonth(selectedMonth)}</span>}
+        {selectedDate && <span className="text-red-600 font-semibold mr-1.5">{formatDateLabel(selectedDate)}</span>}
+        {selectedMonth && !selectedDate && <span className="text-red-600 font-semibold mr-1.5">{formatMonth(selectedMonth)}</span>}
         {finalOrders.length} 条订单
       </p>
 
