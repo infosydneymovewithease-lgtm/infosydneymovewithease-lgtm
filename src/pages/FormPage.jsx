@@ -76,6 +76,7 @@ export default function FormPage() {
   const [paymentStatus, setPaymentStatus] = useState('paid') // 'paid' | 'partial' | 'unpaid'
   const [amountOwed, setAmountOwed] = useState('')
   const [paymentNote, setPaymentNote] = useState('')
+  const [workerNote, setWorkerNote] = useState(order?.workerNote || '')
   const [transferScreenshot, setTransferScreenshot] = useState(null)
   const fileInputRef = useRef(null)
 
@@ -138,6 +139,7 @@ export default function FormPage() {
       discountAmount: result?.discountAmount || 0,
       gst:            result?.gst || 0,
       hourlyRate:     v.hourlyRate,
+      workerNote:     workerNote.trim() || null,
     })
     setTimerState(null)
     navigate(`/order/${id}/summary`, {
@@ -488,6 +490,17 @@ export default function FormPage() {
               />
             </div>
           )}
+        </Section>
+
+        {/* 师傅备注（特殊情况说明） */}
+        <Section title="备注（可选）">
+          <textarea
+            value={workerNote}
+            onChange={e => setWorkerNote(e.target.value)}
+            placeholder="特殊情况说明，例如：客户临时加点、楼下不能停车、家具拆装超时等"
+            rows={3}
+            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+          />
         </Section>
 
       </div>

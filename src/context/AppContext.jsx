@@ -21,7 +21,7 @@ const ORDER_COLUMNS = new Set([
   'paymentStatus','collectedBy','completedAt',
   'materials','materialsCost',
   'fragileItems','fragileDescription','fragileEstimatedFee',
-  'customer_code',
+  'customer_code','workerNote',
 ])
 
 const STORAGE_COLUMNS = new Set([
