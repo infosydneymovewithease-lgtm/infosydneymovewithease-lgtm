@@ -683,6 +683,15 @@ export default function AdminOrderDetail() {
         {order.paymentStatus === 'unpaid' && (
           <p className="text-red-500 text-xs mt-1">⚠️ 客户未付款，请跟进</p>
         )}
+        {order.workerNote && (
+          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <MessageSquare size={13} className="text-amber-600" />
+              <span className="text-xs font-semibold text-amber-700">师傅备注</span>
+            </div>
+            <p className="text-sm text-amber-900 whitespace-pre-wrap leading-relaxed">{order.workerNote}</p>
+          </div>
+        )}
       </Card>
 
       {/* 附加费用（重物 / 大件）— 始终显示，不管订单状态如何 */}
