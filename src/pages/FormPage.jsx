@@ -132,12 +132,12 @@ export default function FormPage() {
       paymentMethod,
       paymentStatus,
       completedAt: new Date().toISOString(),
-      stairsFee: result?.stairsFee || 0,
+      stairFee: result?.stairsFee || 0,
       overtimeFee: result?.overtimeFee || 0,
       heavyFee: result?.heavyFee || 0,
       // 保留师傅最终确认的结构化重物数据（覆盖客服派单时的预填）
       heavyItems: heavyItems,
-      fragileFee: 0,
+      fragileEstimatedFee: 0,
       // Full breakdown fields (saved to dedicated columns in orders)
       timeFee:        result?.timeFee || 0,
       returnFee:      Number(returnFee) || 0,

@@ -659,10 +659,10 @@ export default function AdminOrderDetail() {
                   value={order.timeFee} />
               )}
               {order.returnFee > 0 && <BreakdownRow label="返程费"     value={order.returnFee} />}
-              {order.stairsFee > 0 && <BreakdownRow label="楼梯费"     value={order.stairsFee} />}
+              {order.stairFee > 0 && <BreakdownRow label="楼梯费"     value={order.stairFee} />}
               {order.overtimeFee > 0 && <BreakdownRow label="超时费"   value={order.overtimeFee} />}
               {order.heavyFee > 0 && <BreakdownRow label="重物费"      value={order.heavyFee} />}
-              {order.fragileFee > 0 && <BreakdownRow label="易碎物品费" value={order.fragileFee} />}
+              {order.fragileEstimatedFee > 0 && <BreakdownRow label="易碎物品费" value={order.fragileEstimatedFee} />}
               {order.highwayFee > 0 && <BreakdownRow label="高速费"    value={order.highwayFee} />}
               {order.parkingFee > 0 && <BreakdownRow label="停车违规费" value={order.parkingFee} />}
               {order.suppliesFee > 0 && <BreakdownRow label="物资费"   value={order.suppliesFee} />}

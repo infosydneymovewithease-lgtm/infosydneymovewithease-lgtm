@@ -22,6 +22,9 @@ const ORDER_COLUMNS = new Set([
   'materials','materialsCost',
   'fragileItems','fragileDescription','fragileEstimatedFee',
   'customer_code','workerNote',
+  // 师傅交单时写入的费用明细 + 工时（5/7 加列，但白名单一直没收录，导致 completeOrder 走 pickOrder 后这些字段被过滤）
+  'billedHours','overtimeFee','timeFee','returnFee','highwayFee','parkingFee',
+  'suppliesFee','fuelFee','discountAmount','gst','hourlyRate',
 ])
 
 const STORAGE_COLUMNS = new Set([
@@ -186,7 +189,8 @@ export function AppProvider({ children }) {
   function completeOrder(orderId, result) {
     const updates = { status: '已完成', ...result }
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o))
-    bg(supabase.from('orders').update(updates).eq('id', orderId))
+    // 走 pickOrder 防御：未来再有字段名 typo 也不会让整个 update 静默失败（之前 stairsFee 拼错导致整单卡 5/7-5/10）
+    bg(supabase.from('orders').update(pickOrder(updates)).eq('id', orderId))
   }
 
   function getMyOrders() {

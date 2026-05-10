@@ -36,11 +36,11 @@ function calcWorkerWage(order, workerId) {
   const basePay = Math.round(rate * order.billedHours * 100) / 100
 
   // 楼梯费＋加班费：工人平分，公司不拿
-  const stairOvertime = (order.stairsFee || 0) + (order.overtimeFee || 0)
+  const stairOvertime = (order.stairFee || 0) + (order.overtimeFee || 0)
   const stairShare = stairOvertime > 0 ? Math.round(stairOvertime / workers * 100) / 100 : 0
 
   // 重物费＋易碎费：工人＋公司平分（公司算1份）
-  const heavyFragile = (order.heavyFee || 0) + (order.fragileFee || 0)
+  const heavyFragile = (order.heavyFee || 0) + (order.fragileEstimatedFee || 0)
   const heavyShare = heavyFragile > 0 ? Math.round(heavyFragile / (workers + 1) * 100) / 100 : 0
 
   return {
