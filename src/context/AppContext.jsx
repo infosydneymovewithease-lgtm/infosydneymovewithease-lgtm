@@ -183,14 +183,19 @@ export function AppProvider({ children }) {
   function confirmOrder(orderId) {
     const updates = { status: '师傅已确认', confirmedAt: new Date().toISOString() }
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o))
-    bg(supabase.from('orders').update(updates).eq('id', orderId))
+    bg(supabase.from('orders').update(pickOrder(updates)).eq('id', orderId))
   }
 
-  function completeOrder(orderId, result) {
+  // async + throw 版：调用方必须 await + try/catch，失败能给用户明确反馈
+  // 之前 fire-and-forget 导致师傅看到「提交成功」但 DB 实际没写（5/7-5/10 潜伏 bug）
+  async function completeOrder(orderId, result) {
     const updates = { status: '已完成', ...result }
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o))
-    // 走 pickOrder 防御：未来再有字段名 typo 也不会让整个 update 静默失败（之前 stairsFee 拼错导致整单卡 5/7-5/10）
-    bg(supabase.from('orders').update(pickOrder(updates)).eq('id', orderId))
+    const { error } = await supabase.from('orders').update(pickOrder(updates)).eq('id', orderId)
+    if (error) {
+      console.error('[Supabase] completeOrder failed:', error)
+      throw new Error(error.message || '提交失败,请重试')
+    }
   }
 
   function getMyOrders() {
@@ -276,12 +281,12 @@ export function AppProvider({ children }) {
       dispatchedAt: new Date().toISOString(),
     }
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o))
-    bg(supabase.from('orders').update(updates).eq('id', orderId))
+    bg(supabase.from('orders').update(pickOrder(updates)).eq('id', orderId))
   }
 
   function updateOrderStatus(orderId, status) {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o))
-    bg(supabase.from('orders').update({ status }).eq('id', orderId))
+    bg(supabase.from('orders').update(pickOrder({ status })).eq('id', orderId))
   }
 
   function createStorageOrder(data) {

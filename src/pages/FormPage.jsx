@@ -80,19 +80,20 @@ export default function FormPage() {
   const [workerNoteSaveStatus, setWorkerNoteSaveStatus] = useState('idle') // 'idle' | 'saving' | 'saved'
   const lastSavedNoteRef = useRef(order?.workerNote || '')
   const skipFirstSaveRef = useRef(true)
+  const debounceTimerRef = useRef(null)
 
   // 备注 debounce 自动保存：输入停 1.5 秒后写库，不依赖失焦
   useEffect(() => {
     if (skipFirstSaveRef.current) { skipFirstSaveRef.current = false; return }
     if (workerNote === lastSavedNoteRef.current) return
     setWorkerNoteSaveStatus('saving')
-    const t = setTimeout(() => {
+    debounceTimerRef.current = setTimeout(() => {
       const trimmed = workerNote.trim()
       updateOrder(id, { workerNote: trimmed || null })
       lastSavedNoteRef.current = workerNote
       setWorkerNoteSaveStatus('saved')
     }, 1500)
-    return () => clearTimeout(t)
+    return () => clearTimeout(debounceTimerRef.current)
   }, [workerNote, id, updateOrder])
   const [transferScreenshot, setTransferScreenshot] = useState(null)
   const fileInputRef = useRef(null)
@@ -124,44 +125,57 @@ export default function FormPage() {
     deposit,
   })
 
-  function handleSubmit() {
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+
+  async function handleSubmit() {
     if (paymentMethod === 'transfer' && !transferScreenshot) return
-    completeOrder(id, {
-      finalAmount: result?.total,
-      billedHours: billed,
-      paymentMethod,
-      paymentStatus,
-      completedAt: new Date().toISOString(),
-      stairFee: result?.stairsFee || 0,
-      overtimeFee: result?.overtimeFee || 0,
-      heavyFee: result?.heavyFee || 0,
-      // 保留师傅最终确认的结构化重物数据（覆盖客服派单时的预填）
-      heavyItems: heavyItems,
-      fragileEstimatedFee: 0,
-      // Full breakdown fields (saved to dedicated columns in orders)
-      timeFee:        result?.timeFee || 0,
-      returnFee:      Number(returnFee) || 0,
-      highwayFee:     result?.highwayFee || 0,
-      parkingFee:     result?.parkingFee || 0,
-      suppliesFee:    Number(supplies) || 0,
-      // 保留师傅最终确认的物资数量（覆盖客户预订值），让后台能看到现场实际给了多少
-      requestedMaterials: {
-        boxes:           materialCounts.boxes,
-        wrapItems:       materialCounts.wrapItems,
-        mattressCovers:  materialCounts.mattressCovers,
-        packingItems:    materialCounts.packingItems,
-        otherAmount:     Number(otherSupplies) || 0,
-      },
-      fuelFee:        Number(fuel) || 0,
-      discountAmount: result?.discountAmount || 0,
-      gst:            result?.gst || 0,
-      hourlyRate:     v.hourlyRate,
-      workerNote:     workerNote.trim() || null,
-    })
-    setTimerState(null)
-    navigate(`/order/${id}/summary`, {
-      state: { result, order, billed, paymentMethod, paymentStatus, amountOwed, paymentNote, elapsed }
-    })
+    if (submitting) return  // 防重复点击
+    setSubmitting(true)
+    setSubmitError('')
+    // 先 cancel debounce 计时器,避免提交后 1.5s 多写一次旧数据
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+    try {
+      await completeOrder(id, {
+        finalAmount: result?.total,
+        billedHours: billed,
+        paymentMethod,
+        paymentStatus,
+        completedAt: new Date().toISOString(),
+        stairFee: result?.stairsFee || 0,
+        overtimeFee: result?.overtimeFee || 0,
+        heavyFee: result?.heavyFee || 0,
+        // 保留师傅最终确认的结构化重物数据（覆盖客服派单时的预填）
+        heavyItems: heavyItems,
+        fragileEstimatedFee: 0,
+        // Full breakdown fields (saved to dedicated columns in orders)
+        timeFee:        result?.timeFee || 0,
+        returnFee:      Number(returnFee) || 0,
+        highwayFee:     result?.highwayFee || 0,
+        parkingFee:     result?.parkingFee || 0,
+        suppliesFee:    Number(supplies) || 0,
+        // 保留师傅最终确认的物资数量（覆盖客户预订值），让后台能看到现场实际给了多少
+        requestedMaterials: {
+          boxes:           materialCounts.boxes,
+          wrapItems:       materialCounts.wrapItems,
+          mattressCovers:  materialCounts.mattressCovers,
+          packingItems:    materialCounts.packingItems,
+          otherAmount:     Number(otherSupplies) || 0,
+        },
+        fuelFee:        Number(fuel) || 0,
+        discountAmount: result?.discountAmount || 0,
+        gst:            result?.gst || 0,
+        hourlyRate:     v.hourlyRate,
+        workerNote:     workerNote.trim() || null,
+      })
+      setTimerState(null)
+      navigate(`/order/${id}/summary`, {
+        state: { result, order, billed, paymentMethod, paymentStatus, amountOwed, paymentNote, elapsed }
+      })
+    } catch (err) {
+      setSubmitError(err.message || '提交失败,数据未保存,请截图联系客服')
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -549,13 +563,18 @@ export default function FormPage() {
           {paymentMethod === 'transfer' && !transferScreenshot && (
             <p className="text-red-500 text-xs text-center mb-2">请先上传转账截图</p>
           )}
+          {submitError && (
+            <div className="mb-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">
+              ⚠️ {submitError}
+            </div>
+          )}
           <button
             onClick={handleSubmit}
-            disabled={paymentMethod === 'transfer' && !transferScreenshot}
+            disabled={(paymentMethod === 'transfer' && !transferScreenshot) || submitting}
             className="w-full text-white py-4 rounded-xl font-bold text-base active:opacity-90 disabled:opacity-40"
             style={{ background: 'linear-gradient(135deg, #8B1A1A, #c0392b)' }}
           >
-            确认提交
+            {submitting ? '提交中…' : '确认提交'}
           </button>
         </div>
       )}

@@ -391,7 +391,7 @@ export default function NewOrder() {
         ...basePayload,
         distanceKm: km || null,
         remoteSurcharge: remote.total || null,
-        stairsFee,
+        stairFee: stairsFee,
         heavyFee: heavyFeeNum,
         heavyItems: form.heavyItems || {},
         heavyDescription: form.heavyDescription || null,
