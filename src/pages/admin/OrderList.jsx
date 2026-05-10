@@ -477,7 +477,8 @@ export default function OrderList() {
 
 function OrderCard({ order, onClick, onCancel }) {
   const workerName = order.assignedTo ? (WORKER_NAMES[order.assignedTo] || order.assignedTo) : null
-  const canCancel = !['已完成', '已取消'].includes(order.status)
+  // 已完成订单也允许取消（事后退款 / 清理测试单），仅排除已取消单本身
+  const canCancel = order.status !== '已取消'
   const isStorage = order.serviceType === '寄存' || (order.id || '').startsWith('STG-')
   const isIkea    = order.serviceType === 'IKEA'
 
