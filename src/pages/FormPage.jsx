@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { calcTotal, billedHours, formatDuration } from '../utils/pricing'
@@ -77,6 +77,23 @@ export default function FormPage() {
   const [amountOwed, setAmountOwed] = useState('')
   const [paymentNote, setPaymentNote] = useState('')
   const [workerNote, setWorkerNote] = useState(order?.workerNote || '')
+  const [workerNoteSaveStatus, setWorkerNoteSaveStatus] = useState('idle') // 'idle' | 'saving' | 'saved'
+  const lastSavedNoteRef = useRef(order?.workerNote || '')
+  const skipFirstSaveRef = useRef(true)
+
+  // 备注 debounce 自动保存：输入停 1.5 秒后写库，不依赖失焦
+  useEffect(() => {
+    if (skipFirstSaveRef.current) { skipFirstSaveRef.current = false; return }
+    if (workerNote === lastSavedNoteRef.current) return
+    setWorkerNoteSaveStatus('saving')
+    const t = setTimeout(() => {
+      const trimmed = workerNote.trim()
+      updateOrder(id, { workerNote: trimmed || null })
+      lastSavedNoteRef.current = workerNote
+      setWorkerNoteSaveStatus('saved')
+    }, 1500)
+    return () => clearTimeout(t)
+  }, [workerNote, id, updateOrder])
   const [transferScreenshot, setTransferScreenshot] = useState(null)
   const fileInputRef = useRef(null)
 
@@ -492,22 +509,24 @@ export default function FormPage() {
           )}
         </Section>
 
-        {/* 师傅备注（特殊情况说明）— 失焦即实时保存，无需等"确认提交" */}
+        {/* 师傅备注（特殊情况说明）— debounce 1.5s 自动保存，不依赖失焦 */}
         <Section title="备注（可选）">
           <textarea
             value={workerNote}
             onChange={e => setWorkerNote(e.target.value)}
-            onBlur={() => {
-              const trimmed = workerNote.trim()
-              if (trimmed !== (order?.workerNote || '')) {
-                updateOrder(id, { workerNote: trimmed || null })
-              }
-            }}
             placeholder="特殊情况说明，例如：客户临时加点、楼下不能停车、家具拆装超时等"
             rows={3}
             className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
           />
-          <p className="text-xs text-gray-400 mt-1">💡 离开输入框时自动保存，客服立即可见</p>
+          <div className="flex items-center justify-between mt-1.5 min-h-[18px]">
+            <p className="text-xs text-gray-400">💡 输入停 1.5 秒自动保存，客服立即可见</p>
+            {workerNoteSaveStatus === 'saving' && (
+              <span className="text-xs text-blue-500">保存中…</span>
+            )}
+            {workerNoteSaveStatus === 'saved' && (
+              <span className="text-xs text-green-600">✓ 已保存</span>
+            )}
+          </div>
         </Section>
 
       </div>
