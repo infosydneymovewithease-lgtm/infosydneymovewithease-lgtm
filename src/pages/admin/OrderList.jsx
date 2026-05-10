@@ -184,6 +184,14 @@ export default function OrderList() {
   // Cancelled orders live on a separate page — never appear here.
   const finalOrders = filtered.filter(o => o.status !== '已取消')
 
+  // 当日全部订单数（不受 status tab 过滤）— 用于"明明有却看不到"的提示横幅
+  const totalOnDate = selectedDate
+    ? serviceFiltered.filter(o => o.date === selectedDate && o.status !== '已取消').length
+    : 0
+  const hiddenByTab = selectedDate && activeTab !== 'all' && totalOnDate > finalOrders.length
+    ? totalOnDate - finalOrders.length
+    : 0
+
   const tabCounts = {}
   dateScoped.forEach(o => {
     tabCounts[o.status] = (tabCounts[o.status] || 0) + 1
@@ -415,6 +423,22 @@ export default function OrderList() {
         {selectedMonth && !selectedDate && <span className="text-red-600 font-semibold mr-1.5">{formatMonth(selectedMonth)}</span>}
         {finalOrders.length} 条订单
       </p>
+
+      {/* 提示：当日有订单但当前 tab 看不到 */}
+      {hiddenByTab > 0 && (
+        <div className="mb-3 flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
+          <p className="text-sm text-amber-800">
+            <span className="font-semibold">该日共 {totalOnDate} 条订单</span>，当前「{activeTabDef?.label || activeTab}」tab 只显示 {finalOrders.length} 条，还有 {hiddenByTab} 条在其他状态。
+          </p>
+          <button
+            onClick={() => switchTab('all')}
+            className="flex-shrink-0 text-xs font-semibold text-white px-3 py-1.5 rounded-lg whitespace-nowrap"
+            style={{ background: 'linear-gradient(135deg, #6b1414, #c0392b)' }}
+          >
+            查看当日全部
+          </button>
+        </div>
+      )}
 
       {/* Order cards */}
       {finalOrders.length === 0 ? (
