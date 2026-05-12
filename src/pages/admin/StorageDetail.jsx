@@ -134,8 +134,6 @@ export default function StorageDetail() {
   const totalFee = weeklyFee * weeks
   const isDone = !!order.actualMoveOutDate
   const isPending = order.status === '待确认'
-  const isConfirmed = order.status === '已确认'
-  const isDispatched = order.status === '已派单'
   const isStoring = order.status === '寄存中' || (!['待确认','已确认','已派单'].includes(order.status) && !isDone)
   const canConfirm = !!(
     (checks.called || checks.wechat || checks.replied) &&
@@ -452,8 +450,8 @@ export default function StorageDetail() {
         </button>
       </>}
 
-      {/* Dispatch — shown after confirmed */}
-      {isConfirmed && (
+      {/* Dispatch — show whenever order isn't done and has no worker yet */}
+      {!order.assignedTo && !isDone && (
         <button
           onClick={() => setShowDispatch(true)}
           className="w-full py-3.5 rounded-xl text-white font-semibold text-sm shadow-sm"
@@ -462,14 +460,24 @@ export default function StorageDetail() {
         </button>
       )}
 
-      {isDispatched && (
-        <div className="bg-purple-50 border border-purple-100 rounded-xl px-4 py-3">
-          <p className="text-purple-700 text-sm font-semibold mb-0.5">已派单</p>
-          <p className="text-purple-600 text-xs">
-            {(order.assignedWorkers || [order.assignedTo]).map(wid =>
-              staff.find(s => s.id === wid)?.name || wid
-            ).join('、')}
-          </p>
+      {order.assignedTo && !isDone && (
+        <div className="bg-purple-50 border border-purple-100 rounded-xl px-4 py-3 flex items-start gap-3">
+          <div className="flex-1">
+            <p className="text-purple-700 text-sm font-semibold mb-0.5">已派单</p>
+            <p className="text-purple-600 text-xs">
+              {(order.assignedWorkers || [order.assignedTo]).map(wid =>
+                staff.find(s => s.id === wid)?.name || wid
+              ).join('、')}
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setSelectedWorkers(order.assignedWorkers || (order.assignedTo ? [order.assignedTo] : []))
+              setShowDispatch(true)
+            }}
+            className="text-xs text-purple-700 bg-white border border-purple-200 px-2.5 py-1.5 rounded-lg hover:bg-purple-50 flex-shrink-0 font-medium">
+            🔄 改派
+          </button>
         </div>
       )}
 
