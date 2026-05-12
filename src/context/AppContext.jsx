@@ -25,6 +25,8 @@ const ORDER_COLUMNS = new Set([
   // 师傅交单时写入的费用明细 + 工时（5/7 加列，但白名单一直没收录，导致 completeOrder 走 pickOrder 后这些字段被过滤）
   'billedHours','overtimeFee','timeFee','returnFee','highwayFee','parkingFee',
   'suppliesFee','fuelFee','discountAmount','gst','hourlyRate',
+  // 客服端编辑已完成订单的审计字段
+  'editedAt','editedBy','editReason',
 ])
 
 const STORAGE_COLUMNS = new Set([
