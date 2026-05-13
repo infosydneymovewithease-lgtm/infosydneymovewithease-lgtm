@@ -122,15 +122,18 @@ export default function Home() {
           </div>
         )}
 
-        {/* 待处理订单 */}
+        {/* 待处理订单（搬家 + 寄存合并） */}
         <div>
-          <SectionHeader label="待处理订单" count={active.length} accent />
-          {active.length === 0 ? (
+          <SectionHeader label="待处理订单" count={active.length + activeStorage.length} accent />
+          {(active.length + activeStorage.length) === 0 ? (
             <div className="bg-white rounded-xl p-8 text-center text-gray-400 text-sm shadow-sm">
               暂无待处理订单
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {activeStorage.map(order => (
+                <StorageCard key={order.id} order={order} onClick={() => navigate(`/storage/${order.id}`)} />
+              ))}
               {active.map(order => (
                 <OrderCard key={order.id} order={order}
                   onClick={() => navigate(`/order/${order.id}`)}
@@ -140,11 +143,14 @@ export default function Home() {
           )}
         </div>
 
-        {/* 已完成订单（最近 7 天）*/}
-        {done.length > 0 && (
+        {/* 已完成订单（最近 7 天，搬家 + 寄存合并）*/}
+        {(done.length + doneStorage.length) > 0 && (
           <div>
-            <SectionHeader label="已完成订单（最近 7 天）" count={done.length} />
+            <SectionHeader label="已完成订单（最近 7 天）" count={done.length + doneStorage.length} />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {doneStorage.map(order => (
+                <StorageCard key={order.id} order={order} onClick={() => navigate(`/storage/${order.id}`)} />
+              ))}
               {done.map(order => (
                 <OrderCard key={order.id} order={order}
                   onClick={() => navigate(`/order/${order.id}`)} />
@@ -164,28 +170,6 @@ export default function Home() {
           </span>
           <ChevronRight size={18} className="text-gray-300" />
         </button>
-
-        {/* 寄存任务 */}
-        {activeStorage.length > 0 && (
-          <div>
-            <SectionHeader label="寄存任务" count={activeStorage.length} accent />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {activeStorage.map(order => (
-                <StorageCard key={order.id} order={order} onClick={() => navigate(`/storage/${order.id}`)} />
-              ))}
-            </div>
-          </div>
-        )}
-        {doneStorage.length > 0 && (
-          <div>
-            <SectionHeader label="已完成寄存（最近 7 天）" count={doneStorage.length} />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {doneStorage.map(order => (
-                <StorageCard key={order.id} order={order} onClick={() => navigate(`/storage/${order.id}`)} />
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
