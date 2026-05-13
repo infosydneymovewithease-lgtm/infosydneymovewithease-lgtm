@@ -51,6 +51,17 @@ export default function WorkerStorageDetail() {
   const [discountAmount, setDiscountAmount] = useState(() => String(order?.discountAmount ?? 0))
   const [paymentMethod,  setPaymentMethod]  = useState(() => order?.paymentMethod ?? 'cash')
 
+  // 定金默认值：order 里存了就用；没存但客户上传过定金截图，按业务标准 $30 预填；都没有就 0
+  const defaultDeposit = (() => {
+    if (Number(order?.deposit) > 0) return String(order.deposit)
+    const looksPaid = order?.depositPaid
+      || order?.depositStatus === '已上传截图'
+      || order?.paymentStatus === '定金'
+      || order?.paymentStatus === '已付'
+    return looksPaid ? '30' : '0'
+  })()
+  const [depositAmount, setDepositAmount] = useState(defaultDeposit)
+
   const photoInputRef = useRef(null)
   const videoInputRef = useRef(null)
   const videoUrlRef = useRef(null)
@@ -166,12 +177,8 @@ export default function WorkerStorageDetail() {
   const gstAmount = paymentMethod === 'transfer'
     ? Math.round(subtotalAll * 0.1 * 100) / 100
     : 0
-  // 客人是否已付定金：用 depositStatus / paymentStatus 综合判断，金额默认按 $30 标准
-  const depositPaid = order.depositPaid
-    || order.depositStatus === '已上传截图'
-    || order.paymentStatus === '定金'
-    || order.paymentStatus === '已付'
-  const depositSub = depositPaid ? (Number(order.deposit) > 0 ? Number(order.deposit) : 30) : 0
+  // 师傅手填的定金金额（可改成 0 表示没收定金）
+  const depositSub = Math.max(0, num(depositAmount))
   const finalAmount = Math.round((subtotalAll + gstAmount - depositSub) * 100) / 100
 
   async function handleSubmit() {
@@ -194,6 +201,7 @@ export default function WorkerStorageDetail() {
         discountAmount: num(discountAmount),
         gst:            gstAmount,
         paymentMethod,
+        deposit:        depositSub,
         finalAmount,
         // 旧字段保留向后兼容，存运输小计
         movingFee:      transportSubtotal,
@@ -466,6 +474,12 @@ export default function WorkerStorageDetail() {
                       <span className="text-gray-600">寄存费</span>
                       <span className="text-gray-900 font-semibold">${storageFee}</span>
                     </div>
+                  </div>
+
+                  {/* 已收定金 — 师傅手填，没收就填 0 */}
+                  <div className="pt-2 border-t border-gray-100">
+                    <FeeInput label="已收定金" value={depositAmount} onChange={setDepositAmount} />
+                    <p className="text-xs text-gray-400 mt-1">客户已付定金的填实际金额，没付填 0</p>
                   </div>
 
                   {/* 支付方式 */}

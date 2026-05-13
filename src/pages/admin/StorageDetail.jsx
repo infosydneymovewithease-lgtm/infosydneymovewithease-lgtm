@@ -330,11 +330,7 @@ export default function StorageDetail() {
           </>
         )}
         {(() => {
-          const depositPaid = order.depositPaid
-            || order.depositStatus === '已上传截图'
-            || order.paymentStatus === '定金'
-            || order.paymentStatus === '已付'
-          const depositAmt = depositPaid ? (Number(order.deposit) > 0 ? Number(order.deposit) : 30) : 0
+          const depositAmt = Number(order.deposit) || 0
           const subtotalBeforeDeposit = Number(order.movingFee || 0) + Number(totalFee) + Number(order.gst || 0)
           const finalPay = order.finalAmount != null
             ? Number(order.finalAmount)
@@ -926,11 +922,7 @@ function EditStorageBillModal({ order, storageFee, onClose, onSave }) {
   const gst = order.paymentMethod === 'transfer'
     ? Math.round(subtotalAll * 0.1 * 100) / 100
     : 0
-  const depositPaid = order.depositPaid
-    || order.depositStatus === '已上传截图'
-    || order.paymentStatus === '定金'
-    || order.paymentStatus === '已付'
-  const depositSub = depositPaid ? (Number(order.deposit) > 0 ? Number(order.deposit) : 30) : 0
+  const depositSub = Number(order.deposit) || 0
   const finalAmount = Math.round((subtotalAll + gst - depositSub) * 100) / 100
 
   const finalReason = reasonPreset === '其他' ? reason.trim() : reasonPreset
