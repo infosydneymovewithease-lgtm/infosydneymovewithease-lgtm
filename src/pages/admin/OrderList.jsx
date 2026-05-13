@@ -504,7 +504,13 @@ function OrderCard({ order, onClick, onCancel }) {
             {!order.assignedTo && !isStorage && !['已完成','已取消'].includes(order.status) && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-500 font-medium">未派单</span>
             )}
-            {order.deposit > 0 && !order.depositPaid && (
+            {order.deposit > 0 && !(
+              order.depositPaid
+              || order.depositStatus === '已上传截图'
+              || !!order.depositScreenshot
+              || order.paymentStatus === '定金'
+              || order.paymentStatus === '已付'
+            ) && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 font-medium">定金未收</span>
             )}
             {order.source && order.source !== '官网自助预约' && (
