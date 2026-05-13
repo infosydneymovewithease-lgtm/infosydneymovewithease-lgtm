@@ -253,8 +253,23 @@ export default function WorkerStorageDetail() {
                 className="text-sm font-medium text-gray-800 text-right bg-transparent border-b border-gray-200 focus:border-red-300 focus:outline-none"
               />
             </div>
-            <Row label="纸箱">{order.boxes} 件</Row>
-            {order.furniture > 0 && <Row label="家具">{order.furniture} 件</Row>}
+
+            {/* 物资 — 现场可加，寄存费自动跟着 boxes/furniture 重算 */}
+            <div className="border-t border-gray-100 pt-2 mt-1">
+              <p className="text-xs text-gray-400 mb-1.5 font-semibold uppercase tracking-wide">物资</p>
+              <CountInput
+                label="纸箱"
+                value={order.boxes || 0}
+                onChange={n => updateStorageOrder(id, { boxes: n })}
+              />
+              <CountInput
+                label="家具"
+                value={order.furniture || 0}
+                onChange={n => updateStorageOrder(id, { furniture: n })}
+              />
+              <p className="text-xs text-gray-400 mt-1">客户现场加件时直接改数字，寄存费会自动重算</p>
+            </div>
+
             {order.items && <Row label="物品描述">{order.items}</Row>}
             {order.location && <Row label="仓位">{order.location}</Row>}
             {order.notes && <p className="text-xs text-gray-400 pt-1">{order.notes}</p>}
@@ -533,6 +548,33 @@ function Row({ label, children }) {
     <div className="flex items-center justify-between py-0.5">
       <span className="text-gray-500 text-sm">{label}</span>
       <span className="text-gray-800 text-sm font-medium">{children}</span>
+    </div>
+  )
+}
+
+function CountInput({ label, value, onChange }) {
+  const num = Number(value) || 0
+  return (
+    <div className="flex items-center justify-between py-0.5">
+      <span className="text-gray-500 text-sm">{label}</span>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onChange(Math.max(0, num - 1))}
+          className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center"
+        >−</button>
+        <input
+          type="number"
+          min="0"
+          value={num}
+          onChange={e => onChange(Number(e.target.value) || 0)}
+          className="w-14 px-2 py-1 border border-gray-200 rounded-md text-sm text-center focus:outline-none focus:ring-2 focus:ring-red-200"
+        />
+        <button
+          onClick={() => onChange(num + 1)}
+          className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center"
+        >+</button>
+        <span className="text-gray-400 text-xs ml-1">件</span>
+      </div>
     </div>
   )
 }
