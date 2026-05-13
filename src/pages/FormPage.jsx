@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
-import { calcTotal, billedHours, formatDuration } from '../utils/pricing'
+import { calcTotal, billedHours, formatDuration, computeElapsed } from '../utils/pricing'
 import { VEHICLES, STAIRS_FEE } from '../data/vehicles'
 import { HEAVY_ITEM_OPTIONS, calcHeavyTotal } from '../data/heavyItems'
 import { ArrowLeft, Upload, X } from 'lucide-react'
@@ -13,7 +13,8 @@ export default function FormPage() {
   const order = orders.find(o => o.id === id)
   const v = VEHICLES[order?.vehicle]
 
-  const elapsed = timerState?.elapsed || 0
+  // 用墙上时钟时间差算，免疫手机锁屏 JS 暂停 bug
+  const elapsed = computeElapsed(timerState)
   const startTime = timerState?.startTime
   const endTime = timerState?.endTime
 

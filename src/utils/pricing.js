@@ -1,5 +1,23 @@
 import { VEHICLES, STAIRS_FEE, VAN_PROMO_DISCOUNT } from '../data/vehicles'
 
+// 由 timer 状态算实际工时（墙上时钟为准，免疫手机锁屏 JS 暂停）
+// timerState 形状：{ status, startTime, endTime, accumulatedSec, runStartedAt }
+//   - accumulatedSec: 已累积的秒数（暂停之前的所有时间）
+//   - runStartedAt:   当前正在跑的这一段从什么时候开始（暂停时为 null）
+export function computeElapsed(timerState) {
+  if (!timerState) return 0
+  // 兼容旧字段（已记 elapsed 的老 timerState）
+  if (timerState.accumulatedSec == null && timerState.runStartedAt == null) {
+    return Number(timerState.elapsed) || 0
+  }
+  const acc = Number(timerState.accumulatedSec) || 0
+  if (timerState.runStartedAt) {
+    const runningSec = (Date.now() - new Date(timerState.runStartedAt).getTime()) / 1000
+    return acc + Math.max(0, runningSec)
+  }
+  return acc
+}
+
 // 超10分钟算半小时（满10分钟进位）
 export function roundToHalfHour(totalSeconds) {
   const totalMinutes = totalSeconds / 60

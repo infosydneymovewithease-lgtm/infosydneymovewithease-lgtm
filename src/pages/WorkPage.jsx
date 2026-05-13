@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
-import { calcTotal, formatDuration, billedHours } from '../utils/pricing'
+import { calcTotal, formatDuration, billedHours, computeElapsed } from '../utils/pricing'
 import { VEHICLES, VAN_PROMO_DISCOUNT } from '../data/vehicles'
 import { ArrowLeft, Play, Pause, StopCircle, Clock } from 'lucide-react'
 
@@ -10,33 +10,70 @@ export default function WorkPage() {
   const navigate = useNavigate()
   const { orders, timerState, setTimerState } = useApp()
   const order = orders.find(o => o.id === id)
-  const intervalRef = useRef(null)
 
-  const [status, setStatus]     = useState(timerState?.status || 'idle')
-  const [elapsed, setElapsed]   = useState(timerState?.elapsed || 0)
-  const [startTime, setStartTime] = useState(timerState?.startTime || null)
-  const [endTime, setEndTime]   = useState(timerState?.endTime || null)
+  // Timer 状态：用墙上时钟时间差计算，免疫手机锁屏 JS 暂停 bug
+  const [status, setStatus]                 = useState(timerState?.status || 'idle')
+  const [startTime, setStartTime]           = useState(timerState?.startTime || null)
+  const [endTime, setEndTime]               = useState(timerState?.endTime || null)
+  const [accumulatedSec, setAccumulatedSec] = useState(Number(timerState?.accumulatedSec) || 0)
+  const [runStartedAt, setRunStartedAt]     = useState(timerState?.runStartedAt || null)
+
+  // tick 用于触发 re-render 让显示的秒数更新（实际时间从墙上时钟算）
+  const [, setTick] = useState(0)
 
   const vehicle = order?.vehicle
   const v = VEHICLES[vehicle]
 
+  // 派生：当前真实工时（墙上时钟）
+  const elapsed = computeElapsed({ accumulatedSec, runStartedAt })
+
+  // 跑动时：每秒触发 re-render；屏幕从锁定状态恢复时立刻 re-render
   useEffect(() => {
-    if (status === 'running') {
-      intervalRef.current = setInterval(() => setElapsed(prev => prev + 1), 1000)
-    } else {
-      clearInterval(intervalRef.current)
+    if (status !== 'running') return
+    const id = setInterval(() => setTick(t => t + 1), 1000)
+    const onVisible = () => { if (!document.hidden) setTick(t => t + 1) }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
     }
-    return () => clearInterval(intervalRef.current)
   }, [status])
 
+  // 持久化 timer 状态（页面切换/刷新后能恢复）
   useEffect(() => {
-    setTimerState({ status, elapsed, startTime, endTime })
-  }, [status, elapsed, startTime, endTime])
+    setTimerState({ status, startTime, endTime, accumulatedSec, runStartedAt })
+  }, [status, startTime, endTime, accumulatedSec, runStartedAt])
 
-  function handleStart()  { setStartTime(new Date().toISOString()); setStatus('running') }
-  function handlePause()  { setStatus('paused') }
-  function handleResume() { setStatus('running') }
-  function handleStop()   { setStatus('stopped'); setEndTime(new Date().toISOString()) }
+  function handleStart() {
+    const now = new Date().toISOString()
+    setStartTime(now)
+    setAccumulatedSec(0)
+    setRunStartedAt(now)
+    setStatus('running')
+  }
+  function handlePause() {
+    // 把当前这一段已跑时间累加到 accumulatedSec，停止本段
+    if (runStartedAt) {
+      const runningSec = (Date.now() - new Date(runStartedAt).getTime()) / 1000
+      setAccumulatedSec(prev => prev + Math.max(0, runningSec))
+    }
+    setRunStartedAt(null)
+    setStatus('paused')
+  }
+  function handleResume() {
+    setRunStartedAt(new Date().toISOString())
+    setStatus('running')
+  }
+  function handleStop() {
+    // 同样把最后一段累加进去
+    if (runStartedAt) {
+      const runningSec = (Date.now() - new Date(runStartedAt).getTime()) / 1000
+      setAccumulatedSec(prev => prev + Math.max(0, runningSec))
+    }
+    setRunStartedAt(null)
+    setEndTime(new Date().toISOString())
+    setStatus('stopped')
+  }
   function handleGoForm() { navigate(`/order/${id}/form`) }
 
   if (!order || !v) return null
