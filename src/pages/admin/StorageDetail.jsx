@@ -366,13 +366,17 @@ export default function StorageDetail() {
         <div className="flex items-center justify-between py-1">
           <span className="text-gray-500 text-sm">付款状态</span>
           <div className="flex items-center gap-2">
-            <span className={`text-sm font-semibold ${
-              order.paymentStatus === '已付' ? 'text-green-600' :
-              (order.paymentStatus === '定金' || (!order.paymentStatus && order.depositStatus === '已上传截图')) ? 'text-amber-600' : 'text-red-500'
-            }`}>
-              {order.paymentStatus === '已付' ? '✅ 已付清' :
-               (order.paymentStatus === '定金' || (!order.paymentStatus && order.depositStatus === '已上传截图')) ? '⏳ 仅付定金' : '❌ 未付款'}
-            </span>
+            {(() => {
+              // 只要看到 depositScreenshot 上传过 / depositStatus 标记已上传 / paymentStatus='定金'
+              // 都视为「至少付了定金」。已付清以 paymentStatus='已付' 为准。
+              const isFullyPaid = order.paymentStatus === '已付'
+              const hasDeposit = order.paymentStatus === '定金'
+                || order.depositStatus === '已上传截图'
+                || !!order.depositScreenshot
+              const label = isFullyPaid ? '✅ 已付清' : hasDeposit ? '⏳ 仅付定金' : '❌ 未付款'
+              const color = isFullyPaid ? 'text-green-600' : hasDeposit ? 'text-amber-600' : 'text-red-500'
+              return <span className={`text-sm font-semibold ${color}`}>{label}</span>
+            })()}
             <button onClick={() => setEditPayment(true)}
               className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-0.5">
               <Edit3 size={11} /> 修改

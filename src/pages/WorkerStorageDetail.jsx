@@ -284,6 +284,39 @@ export default function WorkerStorageDetail() {
           </div>
         </div>
 
+        {/* 客户物资需求 — 师傅要带去给客户 */}
+        {order.requestedMaterials && (Number(order.requestedMaterials.boxes) > 0 || Number(order.requestedMaterials.wrapItems) > 0) && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <p className="text-blue-700 font-semibold text-sm mb-2">📦 客户物资需求（请带过去）</p>
+            <div className="space-y-1 text-sm">
+              {Number(order.requestedMaterials.boxes) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-700">纸箱</span>
+                  <span className="text-blue-700 font-semibold">{order.requestedMaterials.boxes} 个</span>
+                </div>
+              )}
+              {Number(order.requestedMaterials.wrapItems) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-700">胶带 / 打包膜</span>
+                  <span className="text-blue-700 font-semibold">{order.requestedMaterials.wrapItems} 卷</span>
+                </div>
+              )}
+              {Number(order.requestedMaterials.mattressCovers) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-700">床垫套</span>
+                  <span className="text-blue-700 font-semibold">{order.requestedMaterials.mattressCovers} 个</span>
+                </div>
+              )}
+              {Number(order.requestedMaterials.packingItems) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-700">打包用品</span>
+                  <span className="text-blue-700 font-semibold">{order.requestedMaterials.packingItems} 个</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {isDone ? (
           /* Completed view */
           <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-4 space-y-2">
