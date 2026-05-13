@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
-import { ArrowLeft, Phone, AlertTriangle, CheckCircle, Edit3, Camera, Video } from 'lucide-react'
+import { ArrowLeft, Phone, AlertTriangle, CheckCircle, Edit3, Camera, Video, X, Trash2 } from 'lucide-react'
 import dayjs from 'dayjs'
 import { useState, useRef, useEffect } from 'react'
 import { saveVideo, getVideo, deleteVideo } from '../../utils/mediaDB'
@@ -19,7 +19,7 @@ function getStorageStatus(order) {
 export default function StorageDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { storageOrders, updateStorageOrder, staff } = useApp()
+  const { storageOrders, updateStorageOrder, deleteOrder, staff } = useApp()
 
   const order = storageOrders.find(o => o.id === id)
   const [editPayment, setEditPayment] = useState(false)
@@ -27,6 +27,8 @@ export default function StorageDetail() {
   const [newMoveOut, setNewMoveOut] = useState('')
   const [showDispatch, setShowDispatch] = useState(false)
   const [selectedWorkers, setSelectedWorkers] = useState([])
+  const [showEdit, setShowEdit] = useState(false)
+  const [showCancel, setShowCancel] = useState(false)
 
   const [checks, setChecks] = useState(() => order?.confirmChecks || {})
   const [csNote, setCsNote] = useState(() => order?.csNote || '')
@@ -192,6 +194,24 @@ export default function StorageDetail() {
             <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${status.color}`}>{status.label}</span>
           </div>
           <p className="text-gray-400 text-xs mt-0.5">{order.id}</p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setShowEdit(true)}
+            className="px-2.5 py-1.5 text-xs text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg flex items-center gap-1 font-medium"
+            title="编辑订单"
+          >
+            <Edit3 size={12} /> 编辑
+          </button>
+          {order.status !== '已取消' && (
+            <button
+              onClick={() => setShowCancel(true)}
+              className="px-2.5 py-1.5 text-xs text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg flex items-center gap-1 font-medium"
+              title="取消订单"
+            >
+              <X size={12} /> 取消
+            </button>
+          )}
         </div>
       </div>
 
@@ -568,6 +588,35 @@ export default function StorageDetail() {
           </button>
         </Modal>
       )}
+
+      {/* Edit */}
+      {showEdit && (
+        <EditStorageModal
+          order={order}
+          onClose={() => setShowEdit(false)}
+          onSave={(updates) => {
+            updateStorageOrder(id, updates)
+            setShowEdit(false)
+          }}
+        />
+      )}
+
+      {/* Cancel */}
+      {showCancel && (
+        <CancelStorageModal
+          order={order}
+          onClose={() => setShowCancel(false)}
+          onConfirm={(reason, hardDelete) => {
+            if (hardDelete) {
+              deleteOrder(id)
+              navigate('/admin/orders')
+            } else {
+              updateStorageOrder(id, { status: '已取消', csNote: reason ? `[取消] ${reason}` : order.csNote })
+              setShowCancel(false)
+            }
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -601,6 +650,136 @@ function Modal({ title, onClose, children }) {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
         </div>
         <div className="px-5 py-4">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+const EDIT_STORAGE_FIELDS = [
+  { key: 'customerName',  label: '客户姓名', type: 'text' },
+  { key: 'customerPhone', label: '电话',     type: 'text' },
+  { key: 'wechat',        label: '微信',     type: 'text' },
+  { key: 'moveInDate',    label: '入库日期', type: 'date' },
+  { key: 'moveOutDate',   label: '预计取件', type: 'date' },
+  { key: 'boxes',         label: '纸箱数',   type: 'number' },
+  { key: 'furniture',     label: '家具数',   type: 'number' },
+  { key: 'location',      label: '仓位编号', type: 'text' },
+  { key: 'notes',         label: '备注',     type: 'textarea' },
+]
+
+function EditStorageModal({ order, onClose, onSave }) {
+  const [form, setForm] = useState(() =>
+    Object.fromEntries(EDIT_STORAGE_FIELDS.map(f => [f.key, order[f.key] ?? '']))
+  )
+
+  function handleSave() {
+    const updates = {}
+    for (const f of EDIT_STORAGE_FIELDS) {
+      const v = form[f.key]
+      updates[f.key] = f.type === 'number' ? (Number(v) || 0) : v
+    }
+    onSave(updates)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
+      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <h3 className="font-bold text-gray-900">编辑寄存订单</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+
+        <div className="px-5 py-4 overflow-y-auto flex-1 space-y-3">
+          {EDIT_STORAGE_FIELDS.map(f => (
+            <div key={f.key}>
+              <label className="block text-xs text-gray-500 mb-1">{f.label}</label>
+              {f.type === 'textarea' ? (
+                <textarea
+                  value={form[f.key]}
+                  onChange={e => setForm({ ...form, [f.key]: e.target.value })}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-200"
+                />
+              ) : (
+                <input
+                  type={f.type}
+                  value={form[f.key]}
+                  onChange={e => setForm({ ...form, [f.key]: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-200"
+                />
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="px-5 py-3 border-t border-gray-100 flex gap-2 flex-shrink-0">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200">
+            取消
+          </button>
+          <button onClick={handleSave} className="flex-1 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600">
+            保存修改
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CancelStorageModal({ order, onClose, onConfirm }) {
+  const [reason, setReason] = useState('')
+  const [hardDelete, setHardDelete] = useState(false)
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
+      <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h3 className="font-bold text-gray-900">取消寄存订单</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+        </div>
+
+        <div className="px-5 py-4 space-y-3">
+          <p className="text-sm text-gray-600">
+            确认取消「<span className="font-semibold text-gray-900">{order.customerName}</span>」的寄存订单？
+          </p>
+
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">取消原因（可选）</label>
+            <textarea
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              rows={2}
+              placeholder="例如：误建、客户取消、重复单…"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-200"
+            />
+          </div>
+
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={hardDelete}
+              onChange={e => setHardDelete(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span className="text-xs text-gray-700">
+              <span className="font-semibold text-red-600">彻底删除</span>（不可恢复）
+              <span className="block text-gray-400 mt-0.5">默认仅标记为「已取消」，可在取消历史里找回。误建测试单建议勾选此项。</span>
+            </span>
+          </label>
+        </div>
+
+        <div className="px-5 py-3 border-t border-gray-100 flex gap-2">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200">
+            返回
+          </button>
+          <button
+            onClick={() => onConfirm(reason.trim(), hardDelete)}
+            className={`flex-1 py-2.5 rounded-xl text-white text-sm font-semibold ${
+              hardDelete ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-500 hover:bg-orange-600'
+            }`}
+          >
+            {hardDelete ? '彻底删除' : '确认取消'}
+          </button>
+        </div>
       </div>
     </div>
   )
