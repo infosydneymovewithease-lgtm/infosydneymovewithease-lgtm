@@ -35,6 +35,10 @@ const STORAGE_COLUMNS = new Set([
   'depositScreenshot','paymentStatus','notes','requestedMaterials','photos','hasVideo',
   'assignedTo','assignedWorkers','dispatchedAt','confirmedAt','confirmChecks','csNote',
   'workerStatus','arrivedAt','movingFee','completedAt','createdAt',
+  // 取件信息 — 占用同一时段容量池，slot 函数会读这几列
+  'vehicle','date','startTime','endTime','fromAddress','deliveryAddress',
+  'needsPickup','needsReturn','source','createdBy','createdByName',
+  'weeklyFee','totalFee','weeks',
 ])
 
 function pickOrder(obj) {

@@ -104,7 +104,22 @@ CREATE TABLE IF NOT EXISTS storage_orders (
   "workerStatus"       text,
   "arrivedAt"          text,
   "movingFee"          numeric DEFAULT 0,
-  "completedAt"        text
+  "completedAt"        text,
+  -- 取件信息（占用同一时段容量池）
+  vehicle              text,
+  date                 text,
+  "startTime"          text,
+  "endTime"            text,
+  "fromAddress"        text,
+  "deliveryAddress"    text,
+  "needsPickup"        boolean DEFAULT true,
+  "needsReturn"        boolean DEFAULT false,
+  source               text,
+  "createdBy"          text,
+  "createdByName"      text,
+  "weeklyFee"          numeric,
+  "totalFee"           numeric,
+  weeks                integer
 );
 
 -- ── Realtime ─────────────────────────────────────────────────────────────────

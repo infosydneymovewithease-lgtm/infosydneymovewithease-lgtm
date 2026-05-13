@@ -32,13 +32,19 @@ BEGIN
   END IF;
 
   FOREACH v_slot IN ARRAY p_slots LOOP
-    SELECT COUNT(*)
-      INTO v_booked
-      FROM orders
-     WHERE date          = p_date
-       AND "startTime"   = v_slot
-       AND vehicle       = ANY(v_vehicle_keys)
-       AND status NOT IN ('已取消', '已完成');
+    SELECT
+      (SELECT COUNT(*) FROM orders
+        WHERE date        = p_date
+          AND "startTime" = v_slot
+          AND vehicle     = ANY(v_vehicle_keys)
+          AND status NOT IN ('已取消', '已完成'))
+      +
+      (SELECT COUNT(*) FROM storage_orders
+        WHERE date        = p_date
+          AND "startTime" = v_slot
+          AND vehicle     = ANY(v_vehicle_keys)
+          AND status NOT IN ('已取消', '已完成'))
+    INTO v_booked;
 
     v_result := v_result || jsonb_build_array(jsonb_build_object(
       'slot',      v_slot,
@@ -97,14 +103,20 @@ BEGIN
     hashtext(v_vehicle_group || '::' || v_date || '::' || v_slot)::bigint
   );
 
-  -- Re-count inside the lock
-  SELECT COUNT(*)
-    INTO v_booked
-    FROM orders
-   WHERE date          = v_date
-     AND "startTime"   = v_slot
-     AND vehicle       = ANY(v_vehicle_keys)
-     AND status NOT IN ('已取消', '已完成');
+  -- Re-count inside the lock (orders + storage_orders share the slot pool)
+  SELECT
+    (SELECT COUNT(*) FROM orders
+      WHERE date        = v_date
+        AND "startTime" = v_slot
+        AND vehicle     = ANY(v_vehicle_keys)
+        AND status NOT IN ('已取消', '已完成'))
+    +
+    (SELECT COUNT(*) FROM storage_orders
+      WHERE date        = v_date
+        AND "startTime" = v_slot
+        AND vehicle     = ANY(v_vehicle_keys)
+        AND status NOT IN ('已取消', '已完成'))
+  INTO v_booked;
 
   IF v_booked >= v_capacity THEN
     RETURN jsonb_build_object(
