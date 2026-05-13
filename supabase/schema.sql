@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE TABLE IF NOT EXISTS storage_orders (
   id                   text PRIMARY KEY,
   created_at           timestamptz DEFAULT now(),
+  "createdAt"          text,
   status               text DEFAULT '待确认',
   "customerName"       text,
   "customerPhone"      text,
