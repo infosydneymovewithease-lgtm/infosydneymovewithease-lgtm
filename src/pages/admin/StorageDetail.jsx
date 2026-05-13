@@ -8,12 +8,15 @@ import { saveVideo, getVideo, deleteVideo } from '../../utils/mediaDB'
 function getStorageStatus(order) {
   if (order.status === '待确认') return { label: '待确认', color: 'bg-yellow-100 text-yellow-700' }
   if (order.status === '已确认') return { label: '已确认', color: 'bg-blue-100 text-blue-700' }
-  if (order.status === '已派单') return { label: '已派单', color: 'bg-purple-100 text-purple-700' }
+  if (order.status === '已派单' && order.workerStatus !== 'done')
+    return { label: '已派单', color: 'bg-purple-100 text-purple-700' }
   if (order.actualMoveOutDate) return { label: '已完成', color: 'bg-gray-100 text-gray-500' }
   const daysLeft = dayjs(order.moveOutDate).diff(dayjs(), 'day')
-  if (daysLeft < 0)  return { label: '已逾期', color: 'bg-red-100 text-red-600', daysLeft }
-  if (daysLeft <= 7) return { label: `${daysLeft}天后到期`, color: 'bg-amber-100 text-amber-700', daysLeft }
-  return { label: '寄存中', color: 'bg-green-100 text-green-700', daysLeft }
+  // 师傅已交单 → 加「已入库」前缀
+  const storedPrefix = order.workerStatus === 'done' ? '✅ 已入库 · ' : ''
+  if (daysLeft < 0)  return { label: `${storedPrefix}已逾期`, color: 'bg-red-100 text-red-600', daysLeft }
+  if (daysLeft <= 7) return { label: `${storedPrefix}${daysLeft}天后到期`, color: 'bg-amber-100 text-amber-700', daysLeft }
+  return { label: `${storedPrefix}寄存中`, color: 'bg-green-100 text-green-700', daysLeft }
 }
 
 export default function StorageDetail() {
