@@ -10,7 +10,6 @@ import { roundToHalfHour } from '../utils/pricing'
 const STEPS = [
   { key: 'confirmed', label: '确认收单',     desc: '确认已收到本次寄存任务' },
   { key: 'arrived',   label: '到达取货地址', desc: '已到达客户地址，开始计时' },
-  { key: 'loaded',    label: '装车出发',     desc: '物品已装车，前往仓库' },
   { key: 'stored',    label: '到达仓库入库', desc: '物品已搬入仓库，准备拍摄凭证' },
 ]
 const STEP_ORDER = STEPS.map(s => s.key)
@@ -167,7 +166,12 @@ export default function WorkerStorageDetail() {
   const gstAmount = paymentMethod === 'transfer'
     ? Math.round(subtotalAll * 0.1 * 100) / 100
     : 0
-  const depositSub = order.depositPaid ? (Number(order.deposit) || 0) : 0
+  // 客人是否已付定金：用 depositStatus / paymentStatus 综合判断，金额默认按 $30 标准
+  const depositPaid = order.depositPaid
+    || order.depositStatus === '已上传截图'
+    || order.paymentStatus === '定金'
+    || order.paymentStatus === '已付'
+  const depositSub = depositPaid ? (Number(order.deposit) > 0 ? Number(order.deposit) : 30) : 0
   const finalAmount = Math.round((subtotalAll + gstAmount - depositSub) * 100) / 100
 
   async function handleSubmit() {
@@ -240,7 +244,15 @@ export default function WorkerStorageDetail() {
           </div>
           <div className="border-t border-gray-100 pt-2 space-y-1">
             <Row label="入库日期">{order.moveInDate}</Row>
-            <Row label="预计取件">{order.moveOutDate}</Row>
+            <div className="flex items-center justify-between py-0.5">
+              <span className="text-gray-500 text-sm">预计取件</span>
+              <input
+                type="date"
+                value={order.moveOutDate || ''}
+                onChange={e => updateStorageOrder(id, { moveOutDate: e.target.value })}
+                className="text-sm font-medium text-gray-800 text-right bg-transparent border-b border-gray-200 focus:border-red-300 focus:outline-none"
+              />
+            </div>
             <Row label="纸箱">{order.boxes} 件</Row>
             {order.furniture > 0 && <Row label="家具">{order.furniture} 件</Row>}
             {order.items && <Row label="物品描述">{order.items}</Row>}
@@ -321,7 +333,7 @@ export default function WorkerStorageDetail() {
             })}
 
             {/* Upload section — unlocks after step 4 (stored) */}
-            {currentStepIdx >= 3 && (
+            {currentStepIdx >= 2 && (
               <>
                 <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                   <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100">

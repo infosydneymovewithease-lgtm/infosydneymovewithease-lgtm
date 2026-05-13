@@ -322,21 +322,39 @@ export default function StorageDetail() {
         <Row label="寄存期">× {weeks} 周</Row>
         <Row label="寄存费"><span className="font-semibold">${totalFee}</span></Row>
 
-        {/* GST + 合计 */}
+        {/* GST + 减定金 + 合计 */}
         {Number(order.gst) > 0 && (
           <>
             <div className="border-t border-gray-100 my-2"></div>
             <Row label="GST (转账 +10%)">${Number(order.gst).toFixed(2)}</Row>
           </>
         )}
-        <div className="border-t border-gray-100 pt-2 mt-1 flex justify-between items-center">
-          <span className="text-gray-700 font-semibold">
-            {order.finalAmount != null ? '客户应付' : '合计'}
-          </span>
-          <span className="text-green-600 font-bold text-xl">
-            ${Number(order.finalAmount ?? totalFee).toFixed(2)}
-          </span>
-        </div>
+        {(() => {
+          const depositPaid = order.depositPaid
+            || order.depositStatus === '已上传截图'
+            || order.paymentStatus === '定金'
+            || order.paymentStatus === '已付'
+          const depositAmt = depositPaid ? (Number(order.deposit) > 0 ? Number(order.deposit) : 30) : 0
+          const subtotalBeforeDeposit = Number(order.movingFee || 0) + Number(totalFee) + Number(order.gst || 0)
+          const finalPay = order.finalAmount != null
+            ? Number(order.finalAmount)
+            : Math.round((subtotalBeforeDeposit - depositAmt) * 100) / 100
+          return (
+            <>
+              {depositAmt > 0 && (
+                <Row label="减定金（已收）">
+                  <span className="text-orange-600">-${depositAmt.toFixed(2)}</span>
+                </Row>
+              )}
+              <div className="border-t border-gray-100 pt-2 mt-1 flex justify-between items-center">
+                <span className="text-gray-700 font-semibold">客户应付</span>
+                <span className="text-green-600 font-bold text-xl">
+                  ${finalPay.toFixed(2)}
+                </span>
+              </div>
+            </>
+          )
+        })()}
 
         {/* 编辑账单按钮（已派单后才显示，方便客服改师傅忘记的工时/费用） */}
         {order.status !== '已取消' && order.assignedTo && (
@@ -349,7 +367,6 @@ export default function StorageDetail() {
           </button>
         )}
 
-        {order.deposit > 0 && <Row label="已付定金"><span className="text-green-600">${order.deposit}</span></Row>}
         <div className="flex items-center justify-between py-1">
           <span className="text-gray-500 text-sm">付款状态</span>
           <div className="flex items-center gap-2">
@@ -909,7 +926,11 @@ function EditStorageBillModal({ order, storageFee, onClose, onSave }) {
   const gst = order.paymentMethod === 'transfer'
     ? Math.round(subtotalAll * 0.1 * 100) / 100
     : 0
-  const depositSub = order.depositPaid ? (Number(order.deposit) || 0) : 0
+  const depositPaid = order.depositPaid
+    || order.depositStatus === '已上传截图'
+    || order.paymentStatus === '定金'
+    || order.paymentStatus === '已付'
+  const depositSub = depositPaid ? (Number(order.deposit) > 0 ? Number(order.deposit) : 30) : 0
   const finalAmount = Math.round((subtotalAll + gst - depositSub) * 100) / 100
 
   const finalReason = reasonPreset === '其他' ? reason.trim() : reasonPreset
