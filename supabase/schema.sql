@@ -119,7 +119,29 @@ CREATE TABLE IF NOT EXISTS storage_orders (
   "createdByName"      text,
   "weeklyFee"          numeric,
   "totalFee"           numeric,
-  weeks                integer
+  weeks                integer,
+  -- 运输部分账单（师傅交单时填，和 orders 表对齐）
+  "billedHours"        numeric,
+  "timeFee"            numeric DEFAULT 0,
+  "returnFee"          numeric DEFAULT 0,
+  "stairFee"           numeric DEFAULT 0,
+  "overtimeFee"        numeric DEFAULT 0,
+  "heavyFee"           numeric DEFAULT 0,
+  "heavyItems"         jsonb,
+  "highwayFee"         numeric DEFAULT 0,
+  "parkingFee"         numeric DEFAULT 0,
+  "suppliesFee"        numeric DEFAULT 0,
+  "fuelFee"            numeric DEFAULT 0,
+  "discountAmount"     numeric DEFAULT 0,
+  gst                  numeric DEFAULT 0,
+  "hourlyRate"         numeric,
+  "finalAmount"        numeric,
+  "paymentMethod"      text,
+  "workerNote"         text,
+  -- 客服端「编辑账单」审计
+  "editedAt"           timestamptz,
+  "editedBy"           text,
+  "editReason"         text
 );
 
 -- ── Realtime ─────────────────────────────────────────────────────────────────

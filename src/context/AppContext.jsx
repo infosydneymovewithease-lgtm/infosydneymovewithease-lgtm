@@ -39,6 +39,12 @@ const STORAGE_COLUMNS = new Set([
   'vehicle','date','startTime','endTime','fromAddress','deliveryAddress',
   'needsPickup','needsReturn','source','createdBy','createdByName',
   'weeklyFee','totalFee','weeks',
+  // 师傅交单时写入的运输部分账单（结构和 orders 表完全对齐）
+  'billedHours','timeFee','returnFee','stairFee','overtimeFee','heavyFee','heavyItems',
+  'highwayFee','parkingFee','suppliesFee','fuelFee','discountAmount','gst',
+  'hourlyRate','finalAmount','paymentMethod','workerNote',
+  // 客服端「编辑账单」审计字段
+  'editedAt','editedBy','editReason',
 ])
 
 function pickOrder(obj) {
@@ -200,6 +206,17 @@ export function AppProvider({ children }) {
     const { error } = await supabase.from('orders').update(pickOrder(updates)).eq('id', orderId)
     if (error) {
       console.error('[Supabase] completeOrder failed:', error)
+      throw new Error(error.message || '提交失败,请重试')
+    }
+  }
+
+  // 寄存订单师傅交单：状态进入「寄存中」（不是「已完成」—— 寄存中是物品仍在库的状态）
+  async function completeStorageOrder(orderId, result) {
+    const updates = { status: '寄存中', workerStatus: 'done', completedAt: new Date().toISOString(), ...result }
+    setStorageOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o))
+    const { error } = await supabase.from('storage_orders').update(pickStorage(updates)).eq('id', orderId)
+    if (error) {
+      console.error('[Supabase] completeStorageOrder failed:', error)
       throw new Error(error.message || '提交失败,请重试')
     }
   }
@@ -471,7 +488,7 @@ export function AppProvider({ children }) {
       orders, confirmOrder, completeOrder, getMyOrders,
       createOrder, createOrderWithSlotCheck,
       updateOrder, dispatchOrder, updateOrderStatus,
-      storageOrders, createStorageOrder, updateStorageOrder, deleteOrder,
+      storageOrders, createStorageOrder, updateStorageOrder, completeStorageOrder, deleteOrder,
       secondhandItems, createSecondhandItem, updateSecondhandItem,
       secondhandLeads, createSecondhandLead, updateSecondhandLead,
       secondhandListings, createSecondhandListing, updateSecondhandListing, deleteSecondhandListing,

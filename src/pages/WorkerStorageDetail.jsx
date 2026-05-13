@@ -4,6 +4,8 @@ import { ArrowLeft, Phone, Camera, Video, CheckCircle } from 'lucide-react'
 import dayjs from 'dayjs'
 import { useState, useRef, useEffect } from 'react'
 import { saveVideo, getVideo, deleteVideo } from '../utils/mediaDB'
+import { VEHICLES } from '../data/vehicles'
+import { roundToHalfHour } from '../utils/pricing'
 
 const STEPS = [
   { key: 'confirmed', label: '确认收单',     desc: '确认已收到本次寄存任务' },
@@ -16,15 +18,39 @@ const STEP_ORDER = STEPS.map(s => s.key)
 export default function WorkerStorageDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { storageOrders, updateStorageOrder } = useApp()
+  const { storageOrders, updateStorageOrder, completeStorageOrder } = useApp()
 
   const order = storageOrders.find(o => o.id === id)
 
   const [photos, setPhotos] = useState(() => order?.photos || [])
   const [videoUrl, setVideoUrl] = useState(null)
   const [videoLoading, setVideoLoading] = useState(false)
-  const [movingFee, setMovingFee] = useState(() => order?.movingFee ?? '')
   const [lightbox, setLightbox] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+
+  // 车型配置（用于计算工时费、起步价）
+  const v = VEHICLES[order?.vehicle] || { hourlyRate: 0, minHours: 0, returnFee: 0 }
+
+  // 自动从「到达取货」时间推算工时（可手动调整）
+  const autoBilledHours = (() => {
+    if (!order?.arrivedAt) return 0
+    const elapsedSec = Math.max(0, (Date.now() - new Date(order.arrivedAt).getTime()) / 1000)
+    return Math.max(roundToHalfHour(elapsedSec), v.minHours || 0)
+  })()
+
+  // 账单字段（默认从订单回填，没回填用计算值）
+  const [billed,         setBilled]         = useState(() => String(order?.billedHours ?? autoBilledHours ?? 0))
+  const [returnFee,      setReturnFee]      = useState(() => String(order?.returnFee ?? v.returnFee ?? 0))
+  const [stairFee,       setStairFee]       = useState(() => String(order?.stairFee ?? 0))
+  const [overtimeFee,    setOvertimeFee]    = useState(() => String(order?.overtimeFee ?? 0))
+  const [heavyFee,       setHeavyFee]       = useState(() => String(order?.heavyFee ?? 0))
+  const [highwayFee,     setHighwayFee]     = useState(() => String(order?.highwayFee ?? 0))
+  const [parkingFee,     setParkingFee]     = useState(() => String(order?.parkingFee ?? 0))
+  const [suppliesFee,    setSuppliesFee]    = useState(() => String(order?.suppliesFee ?? 0))
+  const [fuelFee,        setFuelFee]        = useState(() => String(order?.fuelFee ?? 0))
+  const [discountAmount, setDiscountAmount] = useState(() => String(order?.discountAmount ?? 0))
+  const [paymentMethod,  setPaymentMethod]  = useState(() => order?.paymentMethod ?? 'cash')
 
   const photoInputRef = useRef(null)
   const videoInputRef = useRef(null)
@@ -128,13 +154,50 @@ export default function WorkerStorageDetail() {
     updateStorageOrder(id, { hasVideo: false })
   }
 
-  function handleSubmit() {
-    updateStorageOrder(id, {
-      status: '寄存中',
-      workerStatus: 'done',
-      movingFee: Number(movingFee) || 0,
-      completedAt: new Date().toISOString(),
-    })
+  // 实时账单计算
+  const num = s => Number(s) || 0
+  const billedNum = num(billed)
+  const hourlyRate = v.hourlyRate
+  const timeFee = Math.round(billedNum * hourlyRate * 100) / 100
+  const transportSubtotal = Math.round((timeFee
+    + num(returnFee) + num(stairFee) + num(overtimeFee) + num(heavyFee)
+    + num(highwayFee) + num(parkingFee) + num(suppliesFee) + num(fuelFee)
+    - num(discountAmount)) * 100) / 100
+  const subtotalAll = transportSubtotal + storageFee
+  const gstAmount = paymentMethod === 'transfer'
+    ? Math.round(subtotalAll * 0.1 * 100) / 100
+    : 0
+  const depositSub = order.depositPaid ? (Number(order.deposit) || 0) : 0
+  const finalAmount = Math.round((subtotalAll + gstAmount - depositSub) * 100) / 100
+
+  async function handleSubmit() {
+    if (!canSubmit || submitting) return
+    setSubmitting(true)
+    setSubmitError('')
+    try {
+      await completeStorageOrder(id, {
+        billedHours:    billedNum,
+        timeFee,
+        hourlyRate,
+        returnFee:      num(returnFee),
+        stairFee:       num(stairFee),
+        overtimeFee:    num(overtimeFee),
+        heavyFee:       num(heavyFee),
+        highwayFee:     num(highwayFee),
+        parkingFee:     num(parkingFee),
+        suppliesFee:    num(suppliesFee),
+        fuelFee:        num(fuelFee),
+        discountAmount: num(discountAmount),
+        gst:            gstAmount,
+        paymentMethod,
+        finalAmount,
+        // 旧字段保留向后兼容，存运输小计
+        movingFee:      transportSubtotal,
+      })
+    } catch (err) {
+      setSubmitError(err.message || '提交失败，请重试')
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -193,12 +256,15 @@ export default function WorkerStorageDetail() {
               <CheckCircle size={20} className="text-green-500" />
               <p className="text-green-700 font-bold">入库完成</p>
             </div>
-            <div className="space-y-1">
-              <Row label="搬运费">${order.movingFee || 0}</Row>
+            <div className="space-y-1 text-sm">
+              {order.billedHours != null && <Row label="工时">{order.billedHours} 小时</Row>}
+              {order.timeFee != null && <Row label="工时费">${Number(order.timeFee).toFixed(2)}</Row>}
+              <Row label="运输小计">${Number(order.movingFee || 0).toFixed(2)}</Row>
               <Row label="寄存费">${storageFee}</Row>
+              {Number(order.gst) > 0 && <Row label="GST">${Number(order.gst).toFixed(2)}</Row>}
               <div className="border-t border-green-200 pt-1 flex justify-between">
-                <span className="text-green-700 font-semibold">合计</span>
-                <span className="text-green-700 font-bold">${(order.movingFee || 0) + storageFee}</span>
+                <span className="text-green-700 font-semibold">客户应付</span>
+                <span className="text-green-700 font-bold">${Number(order.finalAmount ?? (Number(order.movingFee || 0) + storageFee)).toFixed(2)}</span>
               </div>
             </div>
             {photos.length > 0 && (
@@ -333,38 +399,105 @@ export default function WorkerStorageDetail() {
 
                 {/* Fee + submit */}
                 <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
-                  <h3 className="font-semibold text-gray-800">费用结算（一次性收费）</h3>
-                  <Row label="寄存费">${storageFee}</Row>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500 text-sm">搬运费</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-gray-500 text-sm">$</span>
-                      <input
-                        type="number"
-                        value={movingFee}
-                        onChange={e => setMovingFee(e.target.value)}
-                        placeholder="0"
-                        className="w-28 px-3 py-1.5 border border-gray-200 rounded-xl text-sm text-right focus:outline-none focus:ring-2 focus:ring-red-200"
-                      />
+                  <h3 className="font-semibold text-gray-800">费用结算</h3>
+
+                  {/* 运输部分 */}
+                  <div className="space-y-2 pb-3 border-b border-gray-100">
+                    <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">运输部分</p>
+                    <Row label="到达时间">
+                      {order.arrivedAt ? dayjs(order.arrivedAt).format('HH:mm') : '—'}
+                    </Row>
+                    <FeeInput label="工时（小时）" value={billed} onChange={setBilled} step="0.5" unit="h" />
+                    <Row label="时薪">${hourlyRate}/小时</Row>
+                    <Row label="工时费">${timeFee.toFixed(2)}</Row>
+
+                    <FeeInput label="返程费"     value={returnFee}      onChange={setReturnFee} />
+                    <FeeInput label="楼梯费"     value={stairFee}       onChange={setStairFee} />
+                    <FeeInput label="超时费"     value={overtimeFee}    onChange={setOvertimeFee} />
+                    <FeeInput label="重物费"     value={heavyFee}       onChange={setHeavyFee} />
+                    <FeeInput label="高速费"     value={highwayFee}     onChange={setHighwayFee} />
+                    <FeeInput label="停车违规费" value={parkingFee}     onChange={setParkingFee} />
+                    <FeeInput label="物资费"     value={suppliesFee}    onChange={setSuppliesFee} />
+                    <FeeInput label="油费"       value={fuelFee}        onChange={setFuelFee} />
+                    <FeeInput label="折扣（减）" value={discountAmount} onChange={setDiscountAmount} />
+
+                    <div className="flex justify-between text-sm pt-1.5 border-t border-gray-100">
+                      <span className="text-gray-600 font-medium">运输小计</span>
+                      <span className="text-gray-900 font-semibold">${transportSubtotal.toFixed(2)}</span>
                     </div>
                   </div>
-                  <div className="border-t border-gray-100 pt-2 flex justify-between items-center">
-                    <span className="font-semibold text-gray-700">合计</span>
-                    <span className="text-green-600 font-bold text-xl">
-                      ${storageFee + (Number(movingFee) || 0)}
-                    </span>
+
+                  {/* 寄存部分 */}
+                  <div className="space-y-1 pb-3 border-b border-gray-100">
+                    <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">寄存部分（只读）</p>
+                    <p className="text-xs text-gray-400">
+                      {order.boxes} 箱 × ${boxRate}/周
+                      {order.furniture > 0 && ` + ${order.furniture} 家具 × $${furRate}/周`}
+                      {' '}× {weeks} 周
+                    </p>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">寄存费</span>
+                      <span className="text-gray-900 font-semibold">${storageFee}</span>
+                    </div>
                   </div>
+
+                  {/* 支付方式 */}
+                  <div>
+                    <p className="text-xs text-gray-500 mb-2">支付方式</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setPaymentMethod('cash')}
+                        className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-colors ${
+                          paymentMethod === 'cash'
+                            ? 'bg-green-500 text-white border-green-500'
+                            : 'bg-white text-gray-600 border-gray-200'
+                        }`}>
+                        💵 现金
+                      </button>
+                      <button
+                        onClick={() => setPaymentMethod('transfer')}
+                        className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-colors ${
+                          paymentMethod === 'transfer'
+                            ? 'bg-blue-500 text-white border-blue-500'
+                            : 'bg-white text-gray-600 border-gray-200'
+                        }`}>
+                        🏦 转账 +10% GST
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 汇总 */}
+                  <div className="bg-amber-50 rounded-xl p-3 space-y-1 text-sm border border-amber-100">
+                    <Row label="运输小计">${transportSubtotal.toFixed(2)}</Row>
+                    <Row label="寄存费">${storageFee}</Row>
+                    {gstAmount > 0 && <Row label="GST (转账)">${gstAmount.toFixed(2)}</Row>}
+                    {depositSub > 0 && (
+                      <div className="flex justify-between text-orange-600">
+                        <span>减定金</span><span>-${depositSub.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="border-t border-amber-200 pt-1.5 flex justify-between font-bold">
+                      <span className="text-gray-800">📥 客户应付</span>
+                      <span className="text-green-600 text-lg">${finalAmount.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  {submitError && (
+                    <p className="text-red-500 text-xs text-center">{submitError}</p>
+                  )}
 
                   <button
                     onClick={handleSubmit}
-                    disabled={!canSubmit}
+                    disabled={!canSubmit || submitting}
                     className={`w-full py-4 rounded-xl font-bold text-base transition-all ${
-                      canSubmit ? 'text-white shadow-sm' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      (canSubmit && !submitting) ? 'text-white shadow-sm' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     }`}
-                    style={canSubmit ? { background: 'linear-gradient(135deg, #166534, #16a34a)' } : {}}>
-                    {canSubmit
-                      ? '✅ 提交完成'
-                      : `还需上传 ${3 - photos.length > 0 ? `${3 - photos.length}张照片` : ''}${(!videoUrl && !order.hasVideo) ? (photos.length < 3 ? ' + 视频' : '视频') : ''}`}
+                    style={(canSubmit && !submitting) ? { background: 'linear-gradient(135deg, #166534, #16a34a)' } : {}}>
+                    {submitting
+                      ? '提交中…'
+                      : canSubmit
+                        ? '✅ 提交账单'
+                        : `还需上传 ${3 - photos.length > 0 ? `${3 - photos.length}张照片` : ''}${(!videoUrl && !order.hasVideo) ? (photos.length < 3 ? ' + 视频' : '视频') : ''}`}
                   </button>
                 </div>
               </>
@@ -388,6 +521,26 @@ function Row({ label, children }) {
     <div className="flex items-center justify-between py-0.5">
       <span className="text-gray-500 text-sm">{label}</span>
       <span className="text-gray-800 text-sm font-medium">{children}</span>
+    </div>
+  )
+}
+
+function FeeInput({ label, value, onChange, step, unit }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-gray-500 text-sm">{label}</span>
+      <div className="flex items-center gap-1">
+        {!unit && <span className="text-gray-400 text-sm">$</span>}
+        <input
+          type="number"
+          step={step || 1}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder="0"
+          className="w-24 px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-red-200"
+        />
+        {unit && <span className="text-gray-400 text-xs">{unit}</span>}
+      </div>
     </div>
   )
 }

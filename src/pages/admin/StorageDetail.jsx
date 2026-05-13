@@ -19,7 +19,7 @@ function getStorageStatus(order) {
 export default function StorageDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { storageOrders, updateStorageOrder, deleteOrder, staff } = useApp()
+  const { storageOrders, updateStorageOrder, deleteOrder, staff, user } = useApp()
 
   const order = storageOrders.find(o => o.id === id)
   const [editPayment, setEditPayment] = useState(false)
@@ -29,6 +29,7 @@ export default function StorageDetail() {
   const [selectedWorkers, setSelectedWorkers] = useState([])
   const [showEdit, setShowEdit] = useState(false)
   const [showCancel, setShowCancel] = useState(false)
+  const [showEditBill, setShowEditBill] = useState(false)
 
   const [checks, setChecks] = useState(() => order?.confirmChecks || {})
   const [csNote, setCsNote] = useState(() => order?.csNote || '')
@@ -215,6 +216,25 @@ export default function StorageDetail() {
         </div>
       </div>
 
+      {/* 账单已修改横幅 */}
+      {order.editedAt && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3">
+          <Edit3 size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 text-sm">
+            <p className="text-amber-800">
+              <span className="font-semibold">此账单已被修改</span>
+              <span className="text-amber-700">
+                {' · '}{new Date(order.editedAt).toLocaleString('zh-CN', { hour12: false })}
+                {order.editedBy ? ` · ${order.editedBy}` : ''}
+              </span>
+            </p>
+            {order.editReason && (
+              <p className="text-amber-700 text-xs mt-0.5">原因：{order.editReason}</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Alerts */}
       {!isDone && status.daysLeft < 0 && (
         <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-3">
@@ -269,14 +289,66 @@ export default function StorageDetail() {
         </Card>
       )}
 
-      {/* Fees */}
+      {/* Fees — 分「运输部分」和「寄存部分」两块 */}
       <Card title="费用">
+        {/* 运输部分（师傅交单后显示） */}
+        {order.billedHours != null && (
+          <>
+            <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-1">运输部分</p>
+            <Row label={`工时费 (${order.billedHours}h × $${order.hourlyRate || 0})`}>
+              ${Number(order.timeFee || 0).toFixed(2)}
+            </Row>
+            {Number(order.returnFee)   > 0 && <Row label="返程费">${Number(order.returnFee).toFixed(2)}</Row>}
+            {Number(order.stairFee)    > 0 && <Row label="楼梯费">${Number(order.stairFee).toFixed(2)}</Row>}
+            {Number(order.overtimeFee) > 0 && <Row label="超时费">${Number(order.overtimeFee).toFixed(2)}</Row>}
+            {Number(order.heavyFee)    > 0 && <Row label="重物费">${Number(order.heavyFee).toFixed(2)}</Row>}
+            {Number(order.highwayFee)  > 0 && <Row label="高速费">${Number(order.highwayFee).toFixed(2)}</Row>}
+            {Number(order.parkingFee)  > 0 && <Row label="停车违规费">${Number(order.parkingFee).toFixed(2)}</Row>}
+            {Number(order.suppliesFee) > 0 && <Row label="物资费">${Number(order.suppliesFee).toFixed(2)}</Row>}
+            {Number(order.fuelFee)     > 0 && <Row label="油费">${Number(order.fuelFee).toFixed(2)}</Row>}
+            {Number(order.discountAmount) > 0 && (
+              <Row label="折扣"><span className="text-orange-600">-${Number(order.discountAmount).toFixed(2)}</span></Row>
+            )}
+            <Row label="运输小计">
+              <span className="font-semibold">${Number(order.movingFee || 0).toFixed(2)}</span>
+            </Row>
+            <div className="border-t border-gray-100 my-2"></div>
+          </>
+        )}
+
+        {/* 寄存部分 */}
+        <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-1">寄存部分</p>
         <Row label="周费">${weeklyFee}/周</Row>
         <Row label="寄存期">× {weeks} 周</Row>
+        <Row label="寄存费"><span className="font-semibold">${totalFee}</span></Row>
+
+        {/* GST + 合计 */}
+        {Number(order.gst) > 0 && (
+          <>
+            <div className="border-t border-gray-100 my-2"></div>
+            <Row label="GST (转账 +10%)">${Number(order.gst).toFixed(2)}</Row>
+          </>
+        )}
         <div className="border-t border-gray-100 pt-2 mt-1 flex justify-between items-center">
-          <span className="text-gray-700 font-semibold">合计</span>
-          <span className="text-green-600 font-bold text-xl">${totalFee}</span>
+          <span className="text-gray-700 font-semibold">
+            {order.finalAmount != null ? '客户应付' : '合计'}
+          </span>
+          <span className="text-green-600 font-bold text-xl">
+            ${Number(order.finalAmount ?? totalFee).toFixed(2)}
+          </span>
         </div>
+
+        {/* 编辑账单按钮（已派单后才显示，方便客服改师傅忘记的工时/费用） */}
+        {order.status !== '已取消' && order.assignedTo && (
+          <button
+            onClick={() => setShowEditBill(true)}
+            className="mt-2 w-full text-xs text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg py-2 font-medium flex items-center justify-center gap-1.5"
+          >
+            <Edit3 size={12} />
+            编辑账单（工时/费用）
+          </button>
+        )}
+
         {order.deposit > 0 && <Row label="已付定金"><span className="text-green-600">${order.deposit}</span></Row>}
         <div className="flex items-center justify-between py-1">
           <span className="text-gray-500 text-sm">付款状态</span>
@@ -601,6 +673,24 @@ export default function StorageDetail() {
         />
       )}
 
+      {/* Edit Bill — 编辑运输部分账单 */}
+      {showEditBill && (
+        <EditStorageBillModal
+          order={order}
+          storageFee={totalFee}
+          onClose={() => setShowEditBill(false)}
+          onSave={(updates, reason) => {
+            updateStorageOrder(id, {
+              ...updates,
+              editedAt: new Date().toISOString(),
+              editedBy: user?.name || user?.role || '客服',
+              editReason: reason,
+            })
+            setShowEditBill(false)
+          }}
+        />
+      )}
+
       {/* Cancel */}
       {showCancel && (
         <CancelStorageModal
@@ -778,6 +868,190 @@ function CancelStorageModal({ order, onClose, onConfirm }) {
             }`}
           >
             {hardDelete ? '彻底删除' : '确认取消'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const BILL_REASON_PRESETS = ['师傅忘点开始', '师傅忘点结束', '价格算错', '其他']
+
+const BILL_EDIT_FIELDS = [
+  { key: 'billedHours',    label: '工时（小时）', step: 0.5 },
+  { key: 'returnFee',      label: '返程费' },
+  { key: 'stairFee',       label: '楼梯费' },
+  { key: 'overtimeFee',    label: '超时费' },
+  { key: 'heavyFee',       label: '重物费' },
+  { key: 'highwayFee',     label: '高速费' },
+  { key: 'parkingFee',     label: '停车违规费' },
+  { key: 'suppliesFee',    label: '物资费' },
+  { key: 'fuelFee',        label: '油费' },
+  { key: 'discountAmount', label: '折扣（减）' },
+]
+
+function EditStorageBillModal({ order, storageFee, onClose, onSave }) {
+  const initial = Object.fromEntries(
+    BILL_EDIT_FIELDS.map(f => [f.key, String(order[f.key] ?? 0)])
+  )
+  const [form, setForm] = useState(initial)
+  const [reason, setReason] = useState('')
+  const [reasonPreset, setReasonPreset] = useState('')
+
+  const num = k => Number(form[k]) || 0
+  const hourlyRate = Number(order.hourlyRate) || 0
+  const timeFee = Math.round(num('billedHours') * hourlyRate * 100) / 100
+  const transportSubtotal = Math.round((timeFee
+    + num('returnFee') + num('stairFee') + num('overtimeFee') + num('heavyFee')
+    + num('highwayFee') + num('parkingFee') + num('suppliesFee') + num('fuelFee')
+    - num('discountAmount')) * 100) / 100
+  const subtotalAll = transportSubtotal + (Number(storageFee) || 0)
+  const gst = order.paymentMethod === 'transfer'
+    ? Math.round(subtotalAll * 0.1 * 100) / 100
+    : 0
+  const depositSub = order.depositPaid ? (Number(order.deposit) || 0) : 0
+  const finalAmount = Math.round((subtotalAll + gst - depositSub) * 100) / 100
+
+  const finalReason = reasonPreset === '其他' ? reason.trim() : reasonPreset
+  const canSave = !!finalReason
+
+  function handleSave() {
+    if (!canSave) return
+    onSave({
+      billedHours:    num('billedHours'),
+      timeFee,
+      returnFee:      num('returnFee'),
+      stairFee:       num('stairFee'),
+      overtimeFee:    num('overtimeFee'),
+      heavyFee:       num('heavyFee'),
+      highwayFee:     num('highwayFee'),
+      parkingFee:     num('parkingFee'),
+      suppliesFee:    num('suppliesFee'),
+      fuelFee:        num('fuelFee'),
+      discountAmount: num('discountAmount'),
+      gst,
+      movingFee:      transportSubtotal,
+      finalAmount,
+    }, finalReason)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
+      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <h3 className="font-bold text-gray-900">编辑账单（运输部分）</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+
+        <div className="px-5 py-4 overflow-y-auto flex-1">
+          <p className="text-xs text-gray-500 mb-3">
+            只能改运输部分。寄存费按订单建立时锁定，不变。师傅工资按工时自动跟着调。
+          </p>
+
+          <div className="space-y-2">
+            {BILL_EDIT_FIELDS.map(f => (
+              <div key={f.key} className="flex items-center gap-3">
+                <label className="text-sm text-gray-600 w-28 flex-shrink-0">{f.label}</label>
+                <div className="flex-1 flex items-center gap-1">
+                  {f.key !== 'billedHours' && <span className="text-gray-400 text-sm">$</span>}
+                  <input
+                    type="number"
+                    step={f.step || 1}
+                    value={form[f.key]}
+                    onChange={e => setForm({ ...form, [f.key]: e.target.value })}
+                    className="flex-1 px-3 py-1.5 border border-gray-200 rounded-md text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-200"
+                  />
+                  {f.key === 'billedHours' && <span className="text-gray-400 text-xs">小时</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 重算预览 */}
+          <div className="mt-4 rounded-xl bg-gray-50 p-3 border border-gray-200">
+            <p className="text-xs font-semibold text-gray-600 mb-2">重算预览</p>
+            <div className="space-y-1 text-xs">
+              <div className="flex justify-between text-gray-600">
+                <span>工时费 ({num('billedHours')} × ${hourlyRate})</span>
+                <span>${timeFee.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-gray-700">
+                <span className="font-medium">运输小计</span>
+                <span className="font-medium">${transportSubtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-gray-600">
+                <span>寄存费</span>
+                <span>${Number(storageFee).toFixed(2)}</span>
+              </div>
+              {gst > 0 && (
+                <div className="flex justify-between text-gray-600">
+                  <span>GST (转账 +10%)</span>
+                  <span>${gst.toFixed(2)}</span>
+                </div>
+              )}
+              {depositSub > 0 && (
+                <div className="flex justify-between text-orange-600">
+                  <span>减定金</span>
+                  <span>-${depositSub.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="h-px bg-gray-300 my-1.5" />
+              <div className="flex justify-between font-bold text-sm">
+                <span className="text-gray-700">新客户应付</span>
+                <span className="text-green-600">${finalAmount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-xs text-gray-400">
+                <span>原客户应付</span>
+                <span>${Number(order.finalAmount || 0).toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 修改原因 */}
+          <div className="mt-4">
+            <p className="text-sm font-semibold text-gray-700 mb-2">
+              修改原因 <span className="text-red-500">*</span>
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {BILL_REASON_PRESETS.map(p => (
+                <button
+                  key={p}
+                  onClick={() => { setReasonPreset(p); if (p !== '其他') setReason('') }}
+                  className={`text-sm py-2 rounded-lg border transition-colors ${
+                    reasonPreset === p
+                      ? 'bg-amber-500 text-white border-amber-500'
+                      : 'bg-white text-gray-700 border-gray-200 hover:border-amber-300'
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+            {reasonPreset === '其他' && (
+              <textarea
+                value={reason}
+                onChange={e => setReason(e.target.value)}
+                placeholder="请说明具体原因…"
+                rows={2}
+                className="w-full mt-2 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-200"
+              />
+            )}
+          </div>
+        </div>
+
+        <div className="px-5 py-3 border-t border-gray-100 flex gap-2 flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200"
+          >
+            取消
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!canSave}
+            className="flex-1 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+          >
+            保存修改
           </button>
         </div>
       </div>
