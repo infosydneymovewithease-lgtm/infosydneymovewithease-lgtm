@@ -1,11 +1,13 @@
 import { useApp } from '../../context/AppContext'
 import { useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
 dayjs.locale('zh-cn')
 import {
   AlertTriangle, CheckCircle, Clock, DollarSign,
-  Truck, UserX, FileX, CreditCard, PlusCircle, ArrowRight
+  Truck, UserX, FileX, CreditCard, PlusCircle, ArrowRight,
+  Bell, BellOff, Sparkles, Package, CalendarClock,
 } from 'lucide-react'
 
 const STATUS_COLOR = {
@@ -23,7 +25,7 @@ const STATUS_COLOR = {
 }
 
 export default function Dashboard() {
-  const { orders, user } = useApp()
+  const { orders, storageOrders, user } = useApp()
   const navigate = useNavigate()
   const today = dayjs().format('YYYY-MM-DD')
 
@@ -36,41 +38,120 @@ export default function Dashboard() {
     .filter(o => o.date && o.date >= sevenDaysAgo && o.date < today)
     .sort((a, b) => b.date.localeCompare(a.date) || (a.startTime || '').localeCompare(b.startTime || ''))
 
-  const unassigned = orders.filter(o => !o.assignedTo && !['已完成','已取消'].includes(o.status))
+  // 综合判断「已收定金」— 用 5 个字段任意为真都算（避免散落 state 不一致）
+  const hasReceivedDeposit = o => !!(
+    o.depositPaid
+    || o.depositStatus === '已上传截图'
+    || o.depositScreenshot
+    || o.paymentStatus === '定金'
+    || o.paymentStatus === '已付'
+  )
+
+  // 合并订单（搬家 + 寄存）用于待确认/当日未派单等检测
+  const allActive = [...orders, ...(storageOrders || [])]
+  const isActive = o => !['已完成','已取消'].includes(o.status)
+
+  // 各类待办
+  const pendingConfirm = allActive.filter(o => o.status === '待确认')
+  const todayUnassigned = allActive.filter(o =>
+    (o.date === today) && !o.assignedTo && isActive(o)
+  )
+  const unassigned = orders.filter(o => !o.assignedTo && isActive(o))
   const pendingBill = orders.filter(o => o.status === '未提交账单')
   const unpaid = orders.filter(o => o.status === '客户未付款')
-  const noDeposit = orders.filter(o => o.deposit > 0 && !o.depositPaid && !['已完成','已取消'].includes(o.status))
+  const noDeposit = orders.filter(o => o.deposit > 0 && !hasReceivedDeposit(o) && isActive(o))
+
+  // 寄存到期 / 逾期
+  const storageExpiring = (storageOrders || []).filter(o => {
+    if (o.actualMoveOutDate || o.status === '已取消' || !o.moveOutDate) return false
+    const daysLeft = dayjs(o.moveOutDate).diff(dayjs(), 'day')
+    return daysLeft >= 0 && daysLeft <= 7
+  })
+  const storageOverdue = (storageOrders || []).filter(o => {
+    if (o.actualMoveOutDate || o.status === '已取消' || !o.moveOutDate) return false
+    return dayjs(o.moveOutDate).diff(dayjs(), 'day') < 0
+  })
 
   const todayRevenue = orders
     .filter(o => o.date === today && o.finalAmount)
     .reduce((sum, o) => sum + (o.finalAmount || 0), 0)
 
+  // 待办列表 — type 是稳定 key（声音用于检测新增）
   const alerts = [
+    pendingConfirm.length > 0 && {
+      type: 'pendingConfirm', urgent: true,
+      level: 'red', icon: Sparkles,
+      text: `${pendingConfirm.length} 单待确认（新订单）`,
+      action: () => navigate('/admin/orders'),
+    },
+    todayUnassigned.length > 0 && {
+      type: 'todayUnassigned', urgent: true,
+      level: 'red', icon: Truck,
+      text: `${todayUnassigned.length} 单今日未派单`,
+      action: () => navigate('/admin/orders'),
+    },
+    storageOverdue.length > 0 && {
+      type: 'storageOverdue', urgent: false,
+      level: 'red', icon: CalendarClock,
+      text: `${storageOverdue.length} 单寄存已逾期`,
+      action: () => navigate('/admin/orders'),
+    },
     unassigned.length > 0 && {
-      level: 'red',
-      icon: Truck,
-      text: `${unassigned.length} 单未派单`,
+      type: 'unassigned', urgent: false,
+      level: 'red', icon: Truck,
+      text: `${unassigned.length} 单未派单（全部）`,
       action: () => navigate('/admin/orders'),
     },
     pendingBill.length > 0 && {
-      level: 'red',
-      icon: FileX,
+      type: 'pendingBill', urgent: false,
+      level: 'red', icon: FileX,
       text: `${pendingBill.length} 位师傅未提交账单`,
       action: () => navigate('/admin/orders'),
     },
     unpaid.length > 0 && {
-      level: 'red',
-      icon: CreditCard,
+      type: 'unpaid', urgent: false,
+      level: 'red', icon: CreditCard,
       text: `${unpaid.length} 单客户未付款`,
       action: () => navigate('/admin/orders'),
     },
+    storageExpiring.length > 0 && {
+      type: 'storageExpiring', urgent: false,
+      level: 'yellow', icon: Package,
+      text: `${storageExpiring.length} 单寄存 7 天内到期`,
+      action: () => navigate('/admin/orders'),
+    },
     noDeposit.length > 0 && {
-      level: 'yellow',
-      icon: DollarSign,
+      type: 'noDeposit', urgent: false,
+      level: 'yellow', icon: DollarSign,
       text: `${noDeposit.length} 单定金未收`,
       action: () => navigate('/admin/orders'),
     },
   ].filter(Boolean)
+
+  // 声音 + 静音切换（偏好存 localStorage）
+  const [muted, setMuted] = useState(() => localStorage.getItem('admin_inbox_muted') === '1')
+  useEffect(() => {
+    localStorage.setItem('admin_inbox_muted', muted ? '1' : '0')
+  }, [muted])
+
+  // 检测「新增的紧急事件」— 比 count 上次更大就响一次
+  const prevCountsRef = useRef({})
+  useEffect(() => {
+    const next = {}
+    alerts.filter(a => a.urgent).forEach(a => {
+      // 用 text 里的数字提取 count（简单粗暴但稳定）
+      const m = a.text.match(/(\d+)/)
+      next[a.type] = m ? Number(m[1]) : 0
+    })
+    let increased = false
+    Object.keys(next).forEach(type => {
+      if ((next[type] || 0) > (prevCountsRef.current[type] || 0)) increased = true
+    })
+    if (increased && !muted && prevCountsRef.current._initialized) {
+      playDing()
+    }
+    prevCountsRef.current = { ...next, _initialized: true }
+  }, [alerts.map(a => `${a.type}:${a.text}`).join('|'), muted])
 
   return (
     <div className="p-5 max-w-5xl mx-auto space-y-5">
@@ -109,9 +190,16 @@ export default function Dashboard() {
           <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
             <AlertTriangle size={16} className="text-red-500" />
             <h2 className="font-semibold text-gray-800 text-sm">需要处理</h2>
-            <span className="ml-auto bg-red-100 text-red-600 text-xs font-bold px-2 py-0.5 rounded-full">
+            <span className="bg-red-100 text-red-600 text-xs font-bold px-2 py-0.5 rounded-full">
               {alerts.length}
             </span>
+            <button
+              onClick={() => setMuted(!muted)}
+              className="ml-auto p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"
+              title={muted ? '声音已关（点击开启）' : '声音已开（点击静音）'}
+            >
+              {muted ? <BellOff size={14} /> : <Bell size={14} className="text-amber-500" />}
+            </button>
           </div>
           <div className="divide-y divide-gray-50">
             {alerts.map((a, i) => (
@@ -203,6 +291,33 @@ export default function Dashboard() {
       </div>
     </div>
   )
+}
+
+// 用 Web Audio API 合成一个简短的 ding（不需要音频文件）
+let _audioCtx = null
+function playDing() {
+  try {
+    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+    const ctx = _audioCtx
+    // 两个相邻音构成「ding-dong」
+    const playTone = (freq, startOffset, dur = 0.18, vol = 0.25) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.value = freq
+      osc.connect(gain).connect(ctx.destination)
+      const t = ctx.currentTime + startOffset
+      gain.gain.setValueAtTime(0, t)
+      gain.gain.linearRampToValueAtTime(vol, t + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.001, t + dur)
+      osc.start(t)
+      osc.stop(t + dur)
+    }
+    playTone(880, 0)
+    playTone(660, 0.18)
+  } catch (e) {
+    console.warn('[ding] play failed (浏览器可能需要用户先交互)', e)
+  }
 }
 
 function groupByDate(orders) {
