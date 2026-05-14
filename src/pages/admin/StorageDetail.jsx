@@ -4,6 +4,7 @@ import { ArrowLeft, Phone, AlertTriangle, CheckCircle, Edit3, Camera, Video, X, 
 import dayjs from 'dayjs'
 import { useState, useRef, useEffect } from 'react'
 import { saveVideo, getVideo, deleteVideo } from '../../utils/mediaDB'
+import { isDepositPaid } from '../../utils/orderHelpers'
 
 function getStorageStatus(order) {
   if (order.status === '待确认') return { label: '待确认', color: 'bg-yellow-100 text-yellow-700' }
@@ -370,12 +371,9 @@ export default function StorageDetail() {
           <span className="text-gray-500 text-sm">付款状态</span>
           <div className="flex items-center gap-2">
             {(() => {
-              // 只要看到 depositScreenshot 上传过 / depositStatus 标记已上传 / paymentStatus='定金'
-              // 都视为「至少付了定金」。已付清以 paymentStatus='已付' 为准。
+              // 已付清以 paymentStatus='已付' 为准；其余看 isDepositPaid util
               const isFullyPaid = order.paymentStatus === '已付'
-              const hasDeposit = order.paymentStatus === '定金'
-                || order.depositStatus === '已上传截图'
-                || !!order.depositScreenshot
+              const hasDeposit = isDepositPaid(order) && !isFullyPaid
               const label = isFullyPaid ? '✅ 已付清' : hasDeposit ? '⏳ 仅付定金' : '❌ 未付款'
               const color = isFullyPaid ? 'text-green-600' : hasDeposit ? 'text-amber-600' : 'text-red-500'
               return <span className={`text-sm font-semibold ${color}`}>{label}</span>

@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from 'react'
 import { saveVideo, getVideo, deleteVideo } from '../utils/mediaDB'
 import { VEHICLES } from '../data/vehicles'
 import { roundToHalfHour } from '../utils/pricing'
+import { isDepositPaid } from '../utils/orderHelpers'
 
 const STEPS = [
   { key: 'confirmed', label: '确认收单',     desc: '确认已收到本次寄存任务' },
@@ -51,14 +52,10 @@ export default function WorkerStorageDetail() {
   const [discountAmount, setDiscountAmount] = useState(() => String(order?.discountAmount ?? 0))
   const [paymentMethod,  setPaymentMethod]  = useState(() => order?.paymentMethod ?? 'cash')
 
-  // 定金默认值：order 里存了就用；没存但客户上传过定金截图，按业务标准 $30 预填；都没有就 0
+  // 定金默认值：order 里存了就用；没存但 isDepositPaid 判断已收的，按业务标准 $30 预填；都没有就 0
   const defaultDeposit = (() => {
     if (Number(order?.deposit) > 0) return String(order.deposit)
-    const looksPaid = order?.depositPaid
-      || order?.depositStatus === '已上传截图'
-      || order?.paymentStatus === '定金'
-      || order?.paymentStatus === '已付'
-    return looksPaid ? '30' : '0'
+    return isDepositPaid(order) ? '30' : '0'
   })()
   const [depositAmount, setDepositAmount] = useState(defaultDeposit)
 

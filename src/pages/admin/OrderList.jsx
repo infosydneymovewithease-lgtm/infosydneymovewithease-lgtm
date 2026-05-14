@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { Search, PlusCircle, Download, ClipboardList, Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
 import { SLOT_CONFIG } from '../../utils/slotAvailability'
+import { isDepositPaid } from '../../utils/orderHelpers'
 
 // 车型 → 时段配置组（与 NewOrder.jsx 保持一致）
 const VEHICLE_TO_GROUP = {
@@ -463,7 +464,8 @@ export default function OrderList() {
                   ? null
                   : () => {
                       if (window.confirm(`确认取消「${order.customerName}」的订单？`)) {
-                        updateOrderStatus(order.id, '已取消')
+                        try { updateOrderStatus(order.id, '已取消') }
+                        catch (err) { alert(err.message || '取消失败') }
                       }
                     }
               }
@@ -504,13 +506,7 @@ function OrderCard({ order, onClick, onCancel }) {
             {!order.assignedTo && !isStorage && !['已完成','已取消'].includes(order.status) && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-500 font-medium">未派单</span>
             )}
-            {order.deposit > 0 && !(
-              order.depositPaid
-              || order.depositStatus === '已上传截图'
-              || !!order.depositScreenshot
-              || order.paymentStatus === '定金'
-              || order.paymentStatus === '已付'
-            ) && (
+            {order.deposit > 0 && !isDepositPaid(order) && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 font-medium">定金未收</span>
             )}
             {order.source && order.source !== '官网自助预约' && (

@@ -3,16 +3,15 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { VEHICLES, VAN_PROMO_DISCOUNT } from '../../data/vehicles'
 import { HEAVY_ITEM_OPTIONS, calcHeavyTotal } from '../../data/heavyItems'
+import { ORDER_STATUSES } from '../../data/orderStatus'
 import {
   ArrowLeft, Phone, MapPin, Package, MessageSquare,
   DollarSign, Calendar, Truck, CheckCircle, User,
   AlertTriangle, Edit3
 } from 'lucide-react'
 
-const STATUS_FLOW = [
-  '待确认', '已报价', '已收定金', '已派单', '师傅已确认',
-  '进行中', '未提交账单', '师傅已提交账单', '已完成', '客户未付款', '已取消',
-]
+// 从单一真相源导入 — 之前散在这里的 hardcoded 数组已迁移到 src/data/orderStatus.js
+const STATUS_FLOW = ORDER_STATUSES
 
 // ── Cleaning pricing model ──
 const CLEAN_BASE = { studio: 140, '1b': 160, '2b': 190, '3b': 270 }
@@ -190,8 +189,12 @@ export default function AdminOrderDetail() {
   }
 
   function handleStatusChange(status) {
-    updateOrderStatus(id, status)
-    setShowStatusChange(false)
+    try {
+      updateOrderStatus(id, status)
+      setShowStatusChange(false)
+    } catch (err) {
+      alert(err.message || '状态转换失败')
+    }
   }
 
   function handleDepositToggle() {
@@ -234,7 +237,8 @@ export default function AdminOrderDetail() {
 
   function handleConfirmOrder() {
     if (!canConfirmOrder) return
-    updateOrderStatus(id, '已报价')
+    try { updateOrderStatus(id, '已报价') }
+    catch (err) { alert(err.message || '状态更新失败') }
   }
 
   return (

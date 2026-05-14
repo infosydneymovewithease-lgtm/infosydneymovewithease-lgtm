@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { MOCK_B2B_CUSTOMERS, generateOrderId } from '../data/mockData'
 import { supabase } from '../lib/supabase'
+import { isLegalOrderTransition } from '../data/orderStatus'
+import { isDepositPaid } from '../utils/orderHelpers'
 
 const AppContext = createContext(null)
 
@@ -159,7 +161,8 @@ export function AppProvider({ children }) {
         const [ordersRes, storageRes, staffRes] = await Promise.all([
           supabase.from('orders').select('*').order('created_at', { ascending: false }),
           supabase.from('storage_orders').select('*').order('created_at', { ascending: false }),
-          supabase.from('staff').select('*'),
+          // S1-D: staff 表已锁，必须通过 list_staff RPC 读取（不含密码）
+          supabase.rpc('list_staff'),
         ])
         if (ordersRes.data) setOrders(ordersRes.data)
         if (storageRes.data) setStorageOrders(storageRes.data)
@@ -203,15 +206,18 @@ export function AppProvider({ children }) {
   const worker = user?.role === 'worker' ? user : null
   const workers = staff.filter(s => s.role === 'worker')
 
+  // S1-D: 登录走 RPC，不再让前端能直接 SELECT staff 表
+  // RPC 用 SECURITY DEFINER 在数据库内部验证密码 + 返回不含密码字段的用户对象
   async function login(username, password) {
-    const { data } = await supabase
-      .from('staff')
-      .select('*')
-      .eq('username', username)
-      .eq('password', password)
-      .eq('active', true)
-      .maybeSingle()
-    if (!data) return false
+    const { data, error } = await supabase.rpc('login_staff', {
+      p_username: username,
+      p_password: password,
+    })
+    if (error) {
+      console.error('[Supabase] login_staff failed:', error)
+      return false
+    }
+    if (!data) return false  // 用户名或密码错误，RPC 返回 null
     setUser(data)
     if (data.role !== 'worker') {
       const today = new Date().toISOString().slice(0, 10)
@@ -240,22 +246,40 @@ export function AppProvider({ children }) {
   }
 
   // async + throw 版：调用方必须 await + try/catch，失败能给用户明确反馈
-  // 之前 fire-and-forget 导致师傅看到「提交成功」但 DB 实际没写（5/7-5/10 潜伏 bug）
-  async function completeOrder(orderId, result) {
+  // M8: 加 expectedVersion 参数做乐观锁
+  //   - 师傅进 FormPage 时记下当时的 version
+  //   - 提交时带上这个 version，DB 端如果不匹配（说明客服在期间改过）就拒绝写入
+  //   - count 为 0 表示有人抢先改了，提示师傅刷新重试
+  async function completeOrder(orderId, result, expectedVersion) {
     const updates = { status: '已完成', ...result }
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o))
-    const { error } = await supabase.from('orders').update(pickOrder(updates)).eq('id', orderId)
+    let query = supabase.from('orders').update(pickOrder(updates)).eq('id', orderId)
+    if (typeof expectedVersion === 'number') {
+      query = query.eq('version', expectedVersion)
+    }
+    const { error, count } = await query.select('*', { count: 'exact', head: true })
     if (error) {
       console.error('[Supabase] completeOrder failed:', error)
       throw new Error(error.message || '提交失败,请重试')
     }
+    if (typeof expectedVersion === 'number' && count === 0) {
+      // 版本不匹配 — 说明这单期间被改过，提示用户刷新
+      throw new Error('订单已被他人修改（客服可能调整了金额或状态），请刷新页面后重新提交')
+    }
   }
 
   // 寄存订单师傅交单：状态进入「寄存中」（不是「已完成」—— 寄存中是物品仍在库的状态）
-  async function completeStorageOrder(orderId, result) {
+  async function completeStorageOrder(orderId, result, expectedVersion) {
     const updates = { status: '寄存中', workerStatus: 'done', completedAt: new Date().toISOString(), ...result }
     setStorageOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o))
-    const { error } = await supabase.from('storage_orders').update(pickStorage(updates)).eq('id', orderId)
+    let query = supabase.from('storage_orders').update(pickStorage(updates)).eq('id', orderId)
+    if (typeof expectedVersion === 'number') {
+      query = query.eq('version', expectedVersion)
+    }
+    const { error, count } = await query.select('*', { count: 'exact', head: true })
+    if (typeof expectedVersion === 'number' && count === 0 && !error) {
+      throw new Error('寄存订单已被他人修改，请刷新页面后重新提交')
+    }
     if (error) {
       console.error('[Supabase] completeStorageOrder failed:', error)
       throw new Error(error.message || '提交失败,请重试')
@@ -363,6 +387,12 @@ export function AppProvider({ children }) {
   }
 
   function updateOrderStatus(orderId, status) {
+    // 合法转换校验 — 防止"已完成"被误改回"待确认"等非法转换
+    const current = orders.find(o => o.id === orderId)
+    if (current && !isLegalOrderTransition(current.status, status)) {
+      console.warn(`[orderStatus] illegal transition: ${current.status} -> ${status}`)
+      throw new Error(`状态转换不合法：${current.status} → ${status}`)
+    }
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o))
     bg(supabase.from('orders').update(pickOrder({ status })).eq('id', orderId), '更新订单状态')
   }
@@ -465,15 +495,17 @@ export function AppProvider({ children }) {
     setB2bCustomers(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c))
   }
 
+  // S1-D: staff 表已锁，走 RPC 而不是直接 insert/update
+  // Note: 本地 setStaff 仍是乐观更新；RPC 失败会弹 alert（bg() 包装会处理）
   function addStaffMember(data) {
     const newStaff = { ...data, id: data.username, active: true, stars: 1, isDriver: !!(data.canDrive?.length) }
     setStaff(prev => [...prev, newStaff])
-    bg(supabase.from('staff').insert(newStaff), '添加员工')
+    bg(supabase.rpc('add_staff', { p_data: newStaff }), '添加员工')
   }
 
   function updateStaffMember(id, updates) {
     setStaff(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s))
-    bg(supabase.from('staff').update(updates).eq('id', id), '更新员工信息')
+    bg(supabase.rpc('update_staff', { p_id: id, p_updates: updates }), '更新员工信息')
   }
 
   function updateAppSettings(updates) {
@@ -518,7 +550,7 @@ export function AppProvider({ children }) {
       (o.toAddress || '').replace(/,/g, '，'),
       o.quote || '',
       o.finalAmount || '',
-      o.depositPaid ? '已收' : (o.depositStatus === 'pending' ? '待定' : '未收'),
+      isDepositPaid(o) ? '已收' : (o.depositStatus === 'pending' ? '待定' : '未收'),
       o.paymentMethod === 'cash' ? '现金' : o.paymentMethod === 'transfer' ? '转账' : '',
       o.status || '',
       o.assignedTo ? (staff.find(s => s.id === o.assignedTo)?.name || o.assignedTo) : '',

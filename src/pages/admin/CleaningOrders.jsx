@@ -144,7 +144,10 @@ export default function CleaningOrders() {
           {filtered.map(order => (
             <CleanCard key={order.id} order={order}
               onClick={() => navigate(`/admin/orders/${order.id}`)}
-              onStatusChange={(id, status) => updateOrderStatus(id, status)} />
+              onStatusChange={(oid, status) => {
+                try { updateOrderStatus(oid, status) }
+                catch (err) { alert(err.message || '状态更新失败') }
+              }} />
           ))}
         </div>
       )}
