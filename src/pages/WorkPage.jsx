@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { formatDuration, billedHours, computeElapsed } from '../utils/pricing'
@@ -8,15 +8,19 @@ import { ArrowLeft, Play, Pause, StopCircle, Clock, CheckCircle } from 'lucide-r
 export default function WorkPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { orders, timerState, setTimerState } = useApp()
+  const { orders, getTimerState, setTimerState } = useApp()
   const order = orders.find(o => o.id === id)
 
+  // 只读这单的 timer 状态（不会被别的订单污染）
+  // useMemo 保证 init 期间 getTimerState 只调一次
+  const savedTimer = useMemo(() => getTimerState(id), [id])
+
   // Timer 状态：用墙上时钟时间差计算，免疫手机锁屏 JS 暂停 bug
-  const [status, setStatus]                 = useState(timerState?.status || 'idle')
-  const [startTime, setStartTime]           = useState(timerState?.startTime || null)
-  const [endTime, setEndTime]               = useState(timerState?.endTime || null)
-  const [accumulatedSec, setAccumulatedSec] = useState(Number(timerState?.accumulatedSec) || 0)
-  const [runStartedAt, setRunStartedAt]     = useState(timerState?.runStartedAt || null)
+  const [status, setStatus]                 = useState(savedTimer?.status || 'idle')
+  const [startTime, setStartTime]           = useState(savedTimer?.startTime || null)
+  const [endTime, setEndTime]               = useState(savedTimer?.endTime || null)
+  const [accumulatedSec, setAccumulatedSec] = useState(Number(savedTimer?.accumulatedSec) || 0)
+  const [runStartedAt, setRunStartedAt]     = useState(savedTimer?.runStartedAt || null)
 
   // tick 用于触发 re-render 让显示的秒数更新（实际时间从墙上时钟算）
   const [, setTick] = useState(0)
@@ -39,10 +43,10 @@ export default function WorkPage() {
     }
   }, [status])
 
-  // 持久化 timer 状态（页面切换/刷新后能恢复）
+  // 持久化 timer 状态（页面切换/刷新后能恢复），按订单 id 隔离
   useEffect(() => {
-    setTimerState({ status, startTime, endTime, accumulatedSec, runStartedAt })
-  }, [status, startTime, endTime, accumulatedSec, runStartedAt])
+    setTimerState(id, { status, startTime, endTime, accumulatedSec, runStartedAt })
+  }, [id, status, startTime, endTime, accumulatedSec, runStartedAt])
 
   // 后台已完成时：清掉本地 timer，避免再返回这单时看到僵尸计时
   // Why: 客服在后台手动完单后，师傅端本地 timer 仍在跑/暂停状态，下次再点会显示旧数据

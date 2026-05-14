@@ -179,10 +179,14 @@ export default function AdminOrderDetail() {
     )
   }
 
-  function handleDispatch() {
+  async function handleDispatch() {
     if (!selectedWorkers.length) return
-    dispatchOrder(id, selectedWorkers)
-    setShowDispatch(false)
+    try {
+      await dispatchOrder(id, selectedWorkers)
+      setShowDispatch(false)
+    } catch (err) {
+      alert(err.message || '派单失败，请重试')
+    }
   }
 
   function handleStatusChange(status) {

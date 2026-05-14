@@ -326,7 +326,10 @@ export default function OrderDetail() {
             {/* 操作按钮 */}
             {canConfirm && (
               <button
-                onClick={() => confirmOrder(id)}
+                onClick={async () => {
+                  try { await confirmOrder(id) }
+                  catch (err) { alert(err.message || '确认失败，请重试') }
+                }}
                 className="w-full text-white py-4 rounded-xl font-semibold text-base shadow-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
                 style={{ background: 'linear-gradient(135deg, #6b1414, #c0392b)' }}
               >

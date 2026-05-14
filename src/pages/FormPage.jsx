@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { calcTotal, billedHours, formatDuration, computeElapsed } from '../utils/pricing'
@@ -9,9 +9,12 @@ import { ArrowLeft, Upload, X } from 'lucide-react'
 export default function FormPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { orders, timerState, completeOrder, updateOrder, setTimerState } = useApp()
+  const { orders, getTimerState, completeOrder, updateOrder, setTimerState } = useApp()
   const order = orders.find(o => o.id === id)
   const v = VEHICLES[order?.vehicle]
+
+  // 按订单 id 读 timer 状态（不会被别的订单污染）
+  const timerState = useMemo(() => getTimerState(id), [id])
 
   // 用墙上时钟时间差算，免疫手机锁屏 JS 暂停 bug
   const elapsed = computeElapsed(timerState)
@@ -169,7 +172,7 @@ export default function FormPage() {
         hourlyRate:     v.hourlyRate,
         workerNote:     workerNote.trim() || null,
       })
-      setTimerState(null)
+      setTimerState(id, null)  // 提交成功后清掉这单的 timer state
       navigate(`/order/${id}/summary`, {
         state: { result, order, billed, paymentMethod, paymentStatus, amountOwed, paymentNote, elapsed }
       })

@@ -79,11 +79,15 @@ export default function DispatchBoard() {
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     )
   }
-  function handleConfirmDispatch() {
+  async function handleConfirmDispatch() {
     if (!selectedWorkers.length) return
-    dispatchOrder(dispatchTarget.id, selectedWorkers)
-    setDispatchTarget(null)
-    setSelectedWorkers([])
+    try {
+      await dispatchOrder(dispatchTarget.id, selectedWorkers)
+      setDispatchTarget(null)
+      setSelectedWorkers([])
+    } catch (err) {
+      alert(err.message || '派单失败，请重试')
+    }
   }
 
   // ── Render ─────────────────────────────────────────────────

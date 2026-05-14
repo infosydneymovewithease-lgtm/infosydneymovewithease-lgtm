@@ -41,23 +41,29 @@ export default function NewStorage() {
     form.boxes, form.furniture, form.moveInDate, form.moveOutDate
   )
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
     setSubmitted(true)
     if (!form.customerName || !form.customerPhone || !form.moveInDate || !form.moveOutDate) return
     if (!form.paymentStatus) return
     if (form.boxes === 0 && form.furniture === 0) return
 
-    createStorageOrder({
-      ...form,
-      createdBy: user?.id,
-      createdByName: user?.name,
-      weeklyFee,
-      totalFee,
-      weeks,
-      boxRate,
-      furRate,
-    })
+    try {
+      await createStorageOrder({
+        ...form,
+        createdBy: user?.id,
+        createdByName: user?.name,
+        weeklyFee,
+        totalFee,
+        weeks,
+        boxRate,
+        furRate,
+      })
+    } catch (err) {
+      alert(err.message || '创建寄存订单失败，请重试')
+      setSubmitted(false)
+      return
+    }
     setSuccess(true)
     setSubmitted(false)
     setForm({

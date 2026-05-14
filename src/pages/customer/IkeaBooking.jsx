@@ -121,7 +121,7 @@ export default function IkeaBooking() {
     return Object.keys(e).length === 0
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!validate()) return
     const svc = SERVICES.find(s => s.key === selected)
     const quoteParts = [`$${vehicle.rate}×1h + $${vehicle.rate}出车费 = $${baseEstimate}`]
@@ -129,7 +129,9 @@ export default function IkeaBooking() {
     if (needsRubbish) quoteParts.push('+ 垃圾处理（待定）')
     quoteParts.push(`= $${totalEstimate}起`)
 
-    const order = createOrder({
+    let order
+    try {
+      order = await createOrder({
       customerName:  form.name,
       customerPhone: form.phone,
       wechat:        form.wechat,
@@ -153,7 +155,11 @@ export default function IkeaBooking() {
       depositScreenshot:    depositFile || null,
       depositStatus:        depositFile ? '已上传截图' : '待付定金',
       needsRubbishDisposal: needsRubbish,
-    })
+      })
+    } catch (err) {
+      alert(err.message || '订单提交失败，请检查网络后重试')
+      return
+    }
     setOrderId(order.id)
     setSubmitted(true)
   }

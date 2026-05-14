@@ -4,9 +4,26 @@ import { supabase } from '../lib/supabase'
 
 const AppContext = createContext(null)
 
-// Fire-and-forget Supabase write with error logging
-function bg(queryBuilder) {
-  queryBuilder.then(({ error }) => { if (error) console.error('[Supabase]', error) })
+// 写库失败时的去重提示（避免短时间多次失败弹一堆 alert）
+let _lastBgErrorAt = 0
+function notifyBgError(opLabel, error) {
+  console.error(`[Supabase] ${opLabel || 'write'} failed:`, error)
+  const now = Date.now()
+  if (now - _lastBgErrorAt < 3000) return  // 3 秒内只提示一次
+  _lastBgErrorAt = now
+  // Why alert 不是 toast：项目没装 toast 库，alert 至少能阻断让用户立刻看见
+  // How: 关键操作（确认/派单/创单）已经走 async+throw 路径不会到这里；
+  //      这里兜底的是 updateOrder/updateOrderStatus/updateStorageOrder 等次要写
+  if (typeof window !== 'undefined' && window.alert) {
+    window.alert(`⚠️ ${opLabel || '操作'}未保存到服务器\n${error?.message || '网络错误'}\n请刷新页面后重试`)
+  }
+}
+
+// 后台写：UI 已乐观更新，DB 写失败时不静默 — 弹窗提示用户操作未持久化
+function bg(queryBuilder, opLabel) {
+  queryBuilder.then(({ error }) => {
+    if (error) notifyBgError(opLabel, error)
+  })
 }
 
 // Schema-known columns for orders table — strips extra form fields before insert/update
@@ -97,18 +114,41 @@ export function AppProvider({ children }) {
     }
   })
 
-  const [timerState, setTimerState] = useState(() => {
-    const saved = localStorage.getItem('timerState')
-    return saved ? JSON.parse(saved) : null
-  })
+  // Per-order timer state — localStorage key 形如 timerState_<orderId>
+  // Why: 旧版用单个全局 timerState key，会让订单 A 的"已结束"状态污染到订单 B
+  // How to apply: 师傅端进 WorkPage 时只读对应 orderId 的 timer，离开时清掉对应 key
+  function getTimerState(orderId) {
+    if (!orderId) return null
+    try {
+      const raw = localStorage.getItem(`timerState_${orderId}`)
+      return raw ? JSON.parse(raw) : null
+    } catch {
+      return null
+    }
+  }
+  function setTimerState(orderId, state) {
+    if (!orderId) return
+    if (state) localStorage.setItem(`timerState_${orderId}`, JSON.stringify(state))
+    else localStorage.removeItem(`timerState_${orderId}`)
+  }
+  function clearAllTimerStates() {
+    const keys = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k && k.startsWith('timerState_')) keys.push(k)
+    }
+    keys.forEach(k => localStorage.removeItem(k))
+  }
 
-  // One-time cleanup of old localStorage order/staff data (v3 → v4)
+  // One-time cleanup of old localStorage order/staff data (v3 → v4 → v5)
+  // v5: clean up old global timerState key (now per-order)
   useEffect(() => {
-    if (localStorage.getItem('appVersion') !== 'v4') {
+    if (localStorage.getItem('appVersion') !== 'v5') {
       localStorage.removeItem('orders')
       localStorage.removeItem('storageOrders')
       localStorage.removeItem('staff')
-      localStorage.setItem('appVersion', 'v4')
+      localStorage.removeItem('timerState')  // 旧的全局 key，已被 per-order 替换
+      localStorage.setItem('appVersion', 'v5')
     }
   }, [])
 
@@ -159,10 +199,6 @@ export function AppProvider({ children }) {
   useEffect(() => { localStorage.setItem('secondhandLeads', JSON.stringify(secondhandLeads)) }, [secondhandLeads])
   useEffect(() => { localStorage.setItem('secondhandListings', JSON.stringify(secondhandListings)) }, [secondhandListings])
   useEffect(() => { localStorage.setItem('appSettings', JSON.stringify(appSettings)) }, [appSettings])
-  useEffect(() => {
-    if (timerState) localStorage.setItem('timerState', JSON.stringify(timerState))
-    else localStorage.removeItem('timerState')
-  }, [timerState])
 
   const worker = user?.role === 'worker' ? user : null
   const workers = staff.filter(s => s.role === 'worker')
@@ -187,15 +223,20 @@ export function AppProvider({ children }) {
 
   function logout() {
     setUser(null)
-    setTimerState(null)
     localStorage.removeItem('user')
-    localStorage.removeItem('timerState')
+    clearAllTimerStates()  // 切账号时清掉所有 per-order timer，避免下个登录用户继承
   }
 
-  function confirmOrder(orderId) {
+  // 师傅确认派单 — async + throw 版，调用方必须 try/catch
+  // Why: 之前 fire-and-forget 让师傅误以为确认成功，DB 实际没写
+  async function confirmOrder(orderId) {
     const updates = { status: '师傅已确认', confirmedAt: new Date().toISOString() }
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o))
-    bg(supabase.from('orders').update(pickOrder(updates)).eq('id', orderId))
+    const { error } = await supabase.from('orders').update(pickOrder(updates)).eq('id', orderId)
+    if (error) {
+      console.error('[Supabase] confirmOrder failed:', error)
+      throw new Error(error.message || '确认失败，请刷新重试')
+    }
   }
 
   // async + throw 版：调用方必须 await + try/catch，失败能给用户明确反馈
@@ -235,7 +276,9 @@ export function AppProvider({ children }) {
     )
   }
 
-  function createOrder(orderData) {
+  // 创建订单 — async + throw 版
+  // Why: 创单失败必须让用户知道，不能假装成功（之前 IkeaBooking 静默失败一周）
+  async function createOrder(orderData) {
     const newOrder = {
       ...orderData,
       id: generateOrderId(),
@@ -247,7 +290,13 @@ export function AppProvider({ children }) {
       assignedWorkers: [],
     }
     setOrders(prev => [newOrder, ...prev])
-    bg(supabase.from('orders').insert(pickOrder(newOrder)))
+    const { error } = await supabase.from('orders').insert(pickOrder(newOrder))
+    if (error) {
+      console.error('[Supabase] createOrder failed:', error)
+      // 回滚乐观更新，避免本地 state 留个数据库没有的"幽灵单"
+      setOrders(prev => prev.filter(o => o.id !== newOrder.id))
+      throw new Error(error.message || '创建订单失败，请重试')
+    }
     return newOrder
   }
 
@@ -281,7 +330,7 @@ export function AppProvider({ children }) {
 
     // Generate customer archive code and save to DB (fire-and-forget)
     const customerCode = 'C' + Math.floor(100000 + Math.random() * 900000)
-    bg(supabase.from('orders').update({ customer_code: customerCode }).eq('id', data.order_id))
+    bg(supabase.from('orders').update({ customer_code: customerCode }).eq('id', data.order_id), '客户编码生成')
 
     // Build local order object with the server-generated ID
     const newOrder = { ...payload, id: data.order_id, customer_code: customerCode }
@@ -292,10 +341,12 @@ export function AppProvider({ children }) {
 
   function updateOrder(orderId, updates) {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o))
-    bg(supabase.from('orders').update(pickOrder(updates)).eq('id', orderId))
+    bg(supabase.from('orders').update(pickOrder(updates)).eq('id', orderId), '更新订单')
   }
 
-  function dispatchOrder(orderId, workerIds) {
+  // 派单 — async + throw 版
+  // Why: 派单失败不能让客服误以为派出去了，导致漏单
+  async function dispatchOrder(orderId, workerIds) {
     const ids = Array.isArray(workerIds) ? workerIds : [workerIds]
     const updates = {
       assignedTo: ids[0],
@@ -304,40 +355,52 @@ export function AppProvider({ children }) {
       dispatchedAt: new Date().toISOString(),
     }
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o))
-    bg(supabase.from('orders').update(pickOrder(updates)).eq('id', orderId))
+    const { error } = await supabase.from('orders').update(pickOrder(updates)).eq('id', orderId)
+    if (error) {
+      console.error('[Supabase] dispatchOrder failed:', error)
+      throw new Error(error.message || '派单失败，请重试')
+    }
   }
 
   function updateOrderStatus(orderId, status) {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o))
-    bg(supabase.from('orders').update(pickOrder({ status })).eq('id', orderId))
+    bg(supabase.from('orders').update(pickOrder({ status })).eq('id', orderId), '更新订单状态')
   }
 
-  function createStorageOrder(data) {
+  // 创建寄存订单 — async + throw 版
+  // Why: 5/7-5/13 静默漏单一周事故的根因，绝不能再 fire-and-forget
+  async function createStorageOrder(data) {
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '')
     const rand = Math.random().toString(36).slice(2, 6).toUpperCase()
     const newStorage = {
       ...data,
       id: `STG-${dateStr}-${rand}`,
       status: data.status || '待确认',
-      createdAt: new Date().toISOString().slice(0, 10),
+      createdAt: new Date().toISOString(),
     }
     setStorageOrders(prev => [newStorage, ...prev])
-    bg(supabase.from('storage_orders').insert(pickStorage(newStorage)))
+    const { error } = await supabase.from('storage_orders').insert(pickStorage(newStorage))
+    if (error) {
+      console.error('[Supabase] createStorageOrder failed:', error)
+      // 回滚乐观更新
+      setStorageOrders(prev => prev.filter(o => o.id !== newStorage.id))
+      throw new Error(error.message || '创建寄存订单失败，请重试')
+    }
     return newStorage
   }
 
   function updateStorageOrder(id, updates) {
     setStorageOrders(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s))
-    bg(supabase.from('storage_orders').update(pickStorage(updates)).eq('id', id))
+    bg(supabase.from('storage_orders').update(pickStorage(updates)).eq('id', id), '更新寄存订单')
   }
 
   function deleteOrder(id) {
     if ((id || '').startsWith('STG-')) {
       setStorageOrders(prev => prev.filter(o => o.id !== id))
-      bg(supabase.from('storage_orders').delete().eq('id', id))
+      bg(supabase.from('storage_orders').delete().eq('id', id), '删除寄存订单')
     } else {
       setOrders(prev => prev.filter(o => o.id !== id))
-      bg(supabase.from('orders').delete().eq('id', id))
+      bg(supabase.from('orders').delete().eq('id', id), '删除订单')
     }
   }
 
@@ -405,12 +468,12 @@ export function AppProvider({ children }) {
   function addStaffMember(data) {
     const newStaff = { ...data, id: data.username, active: true, stars: 1, isDriver: !!(data.canDrive?.length) }
     setStaff(prev => [...prev, newStaff])
-    bg(supabase.from('staff').insert(newStaff))
+    bg(supabase.from('staff').insert(newStaff), '添加员工')
   }
 
   function updateStaffMember(id, updates) {
     setStaff(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s))
-    bg(supabase.from('staff').update(updates).eq('id', id))
+    bg(supabase.from('staff').update(updates).eq('id', id), '更新员工信息')
   }
 
   function updateAppSettings(updates) {
@@ -498,7 +561,7 @@ export function AppProvider({ children }) {
       getCustomers,
       getMyStorageOrders,
       workers,
-      timerState, setTimerState,
+      getTimerState, setTimerState,
       exportOrdersCSV,
     }}>
       {children}

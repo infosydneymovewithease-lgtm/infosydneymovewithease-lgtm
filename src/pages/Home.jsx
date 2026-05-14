@@ -264,7 +264,10 @@ function OrderCard({ order, onClick, onConfirm }) {
       {/* Right action */}
       {needsConfirm ? (
         <button
-          onClick={() => onConfirm(order.id)}
+          onClick={async () => {
+            try { await onConfirm(order.id) }
+            catch (err) { alert(err.message || '确认失败，请重试') }
+          }}
           className="flex-shrink-0 w-16 flex flex-col items-center justify-center gap-1 text-white text-xs font-bold"
           style={{ background: 'linear-gradient(135deg, #6b1414, #c0392b)' }}>
           <CheckCircle size={18} />
