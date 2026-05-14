@@ -98,6 +98,9 @@ export default function FormPage() {
   }, [workerNote, id, updateOrder])
   const [transferScreenshot, setTransferScreenshot] = useState(null)
   const fileInputRef = useRef(null)
+  // ⚠️ 所有 hooks 必须在 early return 之前，否则触发 React 报错黑屏
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   if (!order || !v) return null
 
@@ -125,9 +128,6 @@ export default function FormPage() {
     paymentMethod,
     deposit,
   })
-
-  const [submitting, setSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState('')
 
   async function handleSubmit() {
     if (paymentMethod === 'transfer' && !transferScreenshot) return

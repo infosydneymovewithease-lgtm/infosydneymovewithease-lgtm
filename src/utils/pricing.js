@@ -131,8 +131,10 @@ export function calcTotal({
 }
 
 export function formatDuration(seconds) {
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = seconds % 60
+  // 永远取整 — elapsed 现在是浮点（墙上时钟差），不取整会显示成 14.345999...
+  const totalSec = Math.max(0, Math.floor(Number(seconds) || 0))
+  const h = Math.floor(totalSec / 3600)
+  const m = Math.floor((totalSec % 3600) / 60)
+  const s = totalSec % 60
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }

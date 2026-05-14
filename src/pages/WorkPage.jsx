@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
-import { calcTotal, formatDuration, billedHours, computeElapsed } from '../utils/pricing'
+import { formatDuration, billedHours, computeElapsed } from '../utils/pricing'
 import { VEHICLES, VAN_PROMO_DISCOUNT } from '../data/vehicles'
-import { ArrowLeft, Play, Pause, StopCircle, Clock } from 'lucide-react'
+import { ArrowLeft, Play, Pause, StopCircle, Clock, CheckCircle } from 'lucide-react'
 
 export default function WorkPage() {
   const { id } = useParams()
@@ -43,6 +43,15 @@ export default function WorkPage() {
   useEffect(() => {
     setTimerState({ status, startTime, endTime, accumulatedSec, runStartedAt })
   }, [status, startTime, endTime, accumulatedSec, runStartedAt])
+
+  // 后台已完成时：清掉本地 timer，避免再返回这单时看到僵尸计时
+  // Why: 客服在后台手动完单后，师傅端本地 timer 仍在跑/暂停状态，下次再点会显示旧数据
+  useEffect(() => {
+    if (order?.status === '已完成' && status !== 'stopped') {
+      setStatus('stopped')
+      setRunStartedAt(null)
+    }
+  }, [order?.status])
 
   function handleStart() {
     const now = new Date().toISOString()
@@ -121,6 +130,26 @@ export default function WorkPage() {
       </div>
 
       <div className="max-w-3xl mx-auto px-4 pt-6">
+
+        {/* 后台已完成提示（admin 通过后台手动完单时显示） */}
+        {order?.status === '已完成' && (
+          <div className="mb-4 bg-green-50 border-2 border-green-300 rounded-xl p-4 flex items-start gap-3">
+            <CheckCircle size={24} className="text-green-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-green-800 font-bold">此订单已由客服完成</p>
+              <p className="text-green-700 text-sm mt-1">
+                账单金额：${Number(order?.finalAmount || 0).toFixed(2)} · 计费 {order?.billedHours || 0} 小时
+              </p>
+              <p className="text-green-600 text-xs mt-1">您不需要再操作此订单</p>
+            </div>
+            <button
+              onClick={() => navigate('/worker', { replace: true })}
+              className="bg-green-600 text-white text-sm px-3 py-1.5 rounded-lg font-semibold whitespace-nowrap"
+            >
+              返回首页
+            </button>
+          </div>
+        )}
 
         {/* Desktop: side by side / Mobile: stacked */}
         <div className="md:grid md:grid-cols-2 md:gap-5">
