@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AppProvider, useApp } from './context/AppContext'
+import ErrorBoundary from './components/ErrorBoundary'
 import Login from './pages/Login'
 import Home from './pages/Home'
 import OrderDetail from './pages/OrderDetail'
@@ -183,7 +184,9 @@ export default function App() {
     <AppProvider>
       <BrowserRouter>
         {!splashDone && <SplashScreen onDone={handleSplashDone} />}
-        <AppRoutes />
+        <ErrorBoundary>
+          <AppRoutes />
+        </ErrorBoundary>
       </BrowserRouter>
     </AppProvider>
   )
