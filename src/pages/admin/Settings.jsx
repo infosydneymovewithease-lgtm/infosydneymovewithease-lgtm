@@ -277,7 +277,7 @@ export default function Settings() {
               </div>
               <div className="px-4 py-2.5 bg-green-50">
                 <p className="text-sm text-green-700">🎁 长期客户权益（&gt;5周）</p>
-                <p className="text-xs text-green-600 mt-0.5">免费送：纸箱 · 胶袋 · 家具保护膜（无数量限制）</p>
+                <p className="text-xs text-green-600 mt-0.5">免费送：纸箱 · 胶带 · 家具保护膜（无数量限制）</p>
               </div>
             </div>
           </div>

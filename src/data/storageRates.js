@@ -3,7 +3,7 @@
 //
 // 规则：
 //   ≤ 5 周：纸箱 $5/件/周，家具 $10/件/周
-//   > 5 周：纸箱 $4/件/周，家具 $8/件/周  + 免费送纸箱/胶袋/家具保护膜
+//   > 5 周：纸箱 $4/件/周，家具 $8/件/周  + 免费送纸箱/胶带/家具保护膜
 // 按订单"最终"总周数判断（短期延长成长期 → 整单按长期价重算）。
 
 export const STORAGE_RATES = {
@@ -11,7 +11,7 @@ export const STORAGE_RATES = {
   long:  { boxRate: 4, furRate: 8  },  // >5 周
 }
 
-export const FREE_SUPPLIES_LABEL = '纸箱 · 胶袋 · 家具保护膜'
+export const FREE_SUPPLIES_LABEL = '纸箱 · 胶带 · 家具保护膜'
 
 export function getStorageRates(weeks) {
   const shortTerm = weeks <= 5
