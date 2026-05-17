@@ -52,7 +52,10 @@ export default function Dashboard() {
   const isActive = o => !['已完成','已取消'].includes(o.status)
 
   // 各类待办
-  const pendingConfirm = allActive.filter(o => o.status === '待确认')
+  // 「待确认」跟 OrderList chip 对齐：包含已报价（报价但未收定金的也算新单待处理）
+  const pendingConfirm = allActive.filter(o =>
+    o.status === '待确认' || o.status === '已报价'
+  )
   const todayUnassigned = allActive.filter(o =>
     (o.date === today) && !o.assignedTo && isActive(o)
   )
@@ -77,54 +80,56 @@ export default function Dashboard() {
     .reduce((sum, o) => sum + (o.finalAmount || 0), 0)
 
   // 待办列表 — type 是稳定 key（声音用于检测新增）
+  // 跳转规则：全部时间维度的提醒带 date=all 让 OrderList 不卡在今天；
+  // 「今日未派单」只看今天所以不传 date。
   const alerts = [
     pendingConfirm.length > 0 && {
       type: 'pendingConfirm', urgent: true,
       level: 'red', icon: Sparkles,
       text: `${pendingConfirm.length} 单待确认（新订单）`,
-      action: () => navigate('/admin/orders'),
+      action: () => navigate('/admin/orders?tab=待确认&date=all'),
     },
     todayUnassigned.length > 0 && {
       type: 'todayUnassigned', urgent: true,
       level: 'red', icon: Truck,
       text: `${todayUnassigned.length} 单今日未派单`,
-      action: () => navigate('/admin/orders'),
+      action: () => navigate('/admin/orders?tab=当日未派单'),
     },
     storageOverdue.length > 0 && {
       type: 'storageOverdue', urgent: false,
       level: 'red', icon: CalendarClock,
       text: `${storageOverdue.length} 单寄存已逾期`,
-      action: () => navigate('/admin/orders'),
+      action: () => navigate('/admin/orders?date=all'),
     },
     unassigned.length > 0 && {
       type: 'unassigned', urgent: false,
       level: 'red', icon: Truck,
       text: `${unassigned.length} 单未派单（全部）`,
-      action: () => navigate('/admin/orders'),
+      action: () => navigate('/admin/orders?date=all'),
     },
     pendingBill.length > 0 && {
       type: 'pendingBill', urgent: false,
       level: 'red', icon: FileX,
       text: `${pendingBill.length} 位师傅未提交账单`,
-      action: () => navigate('/admin/orders'),
+      action: () => navigate('/admin/orders?tab=未提交账单&date=all'),
     },
     unpaid.length > 0 && {
       type: 'unpaid', urgent: false,
       level: 'red', icon: CreditCard,
       text: `${unpaid.length} 单客户未付款`,
-      action: () => navigate('/admin/orders'),
+      action: () => navigate('/admin/orders?tab=客户未付款&date=all'),
     },
     storageExpiring.length > 0 && {
       type: 'storageExpiring', urgent: false,
       level: 'yellow', icon: Package,
       text: `${storageExpiring.length} 单寄存 7 天内到期`,
-      action: () => navigate('/admin/orders'),
+      action: () => navigate('/admin/orders?date=all'),
     },
     noDeposit.length > 0 && {
       type: 'noDeposit', urgent: false,
       level: 'yellow', icon: DollarSign,
       text: `${noDeposit.length} 单定金未收`,
-      action: () => navigate('/admin/orders'),
+      action: () => navigate('/admin/orders?date=all'),
     },
   ].filter(Boolean)
 

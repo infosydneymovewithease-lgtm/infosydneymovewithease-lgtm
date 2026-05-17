@@ -62,7 +62,11 @@ export default function OrderList() {
   const [search, setSearch]             = useState('')
   const [sortBy, setSortBy]             = useState('date-desc')
   const [selectedMonth, setSelectedMonth] = useState('')
-  const [selectedDate, setSelectedDate]   = useState(new Date().toISOString().slice(0, 10))
+  // URL ?date=all 表示初始查看全部日期（用于工作台「全部时间」提醒跳过来时），
+  // 否则默认今天。仅影响初始化，后续用户手动改日期不被 URL 控制。
+  const [selectedDate, setSelectedDate]   = useState(
+    searchParams.get('date') === 'all' ? '' : new Date().toISOString().slice(0, 10)
+  )
 
   function switchTab(tabValue) {
     setSearchParams(prev => {
