@@ -27,6 +27,8 @@ const STATUS_TABS = [
   { label: '全部',         value: 'all',       filter: null },
   { label: '待确认',       value: '待确认',    filter: ['待确认','已报价'] },
   { label: '当日未派单',   value: '当日未派单', filter: null },
+  { label: '未派单',       value: '未派单',    filter: null },
+  { label: '定金未收',     value: '定金未收',   filter: null },
   { label: '已派单',       value: '已派单',    filter: null },
   { label: '师傅已确认',   value: '师傅已确认', filter: null },
   { label: '进行中',       value: '进行中',    filter: null },
@@ -167,6 +169,10 @@ export default function OrderList() {
       matchTab = true
     } else if (activeTab === '当日未派单') {
       matchTab = o.date === todayStr && !o.assignedTo && !['已完成','已取消'].includes(o.status)
+    } else if (activeTab === '未派单') {
+      matchTab = !o.assignedTo && !['已完成','已取消'].includes(o.status)
+    } else if (activeTab === '定金未收') {
+      matchTab = (Number(o.deposit) > 0) && !isDepositPaid(o) && !['已完成','已取消'].includes(o.status)
     } else if (activeTabDef?.filter) {
       matchTab = activeTabDef.filter.includes(o.status)
     } else {
@@ -204,6 +210,12 @@ export default function OrderList() {
   const pendingCount = (tabCounts['待确认'] || 0) + (tabCounts['已报价'] || 0)
   const todayUnassigned = dateScoped.filter(o =>
     o.date === todayStr && !o.assignedTo && !['已完成','已取消'].includes(o.status)
+  ).length
+  const unassignedAll = dateScoped.filter(o =>
+    !o.assignedTo && !['已完成','已取消'].includes(o.status)
+  ).length
+  const noDepositCount = dateScoped.filter(o =>
+    (Number(o.deposit) > 0) && !isDepositPaid(o) && !['已完成','已取消'].includes(o.status)
   ).length
 
   return (
@@ -397,6 +409,8 @@ export default function OrderList() {
           if (tab.value === 'all') count = (serviceFilter ? serviceFiltered : combinedOrders).filter(o => o.status !== '已取消').length
           else if (tab.value === '待确认') count = pendingCount
           else if (tab.value === '当日未派单') count = todayUnassigned
+          else if (tab.value === '未派单') count = unassignedAll
+          else if (tab.value === '定金未收') count = noDepositCount
           else count = tabCounts[tab.value] || 0
           return (
             <button

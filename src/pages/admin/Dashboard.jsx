@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
+import { isDepositPaid } from '../../utils/orderHelpers'
 dayjs.locale('zh-cn')
 import {
   AlertTriangle, CheckCircle, Clock, DollarSign,
@@ -38,15 +39,6 @@ export default function Dashboard() {
     .filter(o => o.date && o.date >= sevenDaysAgo && o.date < today)
     .sort((a, b) => b.date.localeCompare(a.date) || (a.startTime || '').localeCompare(b.startTime || ''))
 
-  // 综合判断「已收定金」— 用 5 个字段任意为真都算（避免散落 state 不一致）
-  const hasReceivedDeposit = o => !!(
-    o.depositPaid
-    || o.depositStatus === '已上传截图'
-    || o.depositScreenshot
-    || o.paymentStatus === '定金'
-    || o.paymentStatus === '已付'
-  )
-
   // 合并订单（搬家 + 寄存）用于待确认/当日未派单等检测
   const allActive = [...orders, ...(storageOrders || [])]
   const isActive = o => !['已完成','已取消'].includes(o.status)
@@ -62,7 +54,8 @@ export default function Dashboard() {
   const unassigned = orders.filter(o => !o.assignedTo && isActive(o))
   const pendingBill = orders.filter(o => o.status === '未提交账单')
   const unpaid = orders.filter(o => o.status === '客户未付款')
-  const noDeposit = orders.filter(o => o.deposit > 0 && !hasReceivedDeposit(o) && isActive(o))
+  // 用 utils/orderHelpers 的 isDepositPaid（项目唯一权威定金判断），跟 OrderList 同源
+  const noDeposit = orders.filter(o => o.deposit > 0 && !isDepositPaid(o) && isActive(o))
 
   // 寄存到期 / 逾期
   const storageExpiring = (storageOrders || []).filter(o => {
@@ -92,7 +85,7 @@ export default function Dashboard() {
     todayUnassigned.length > 0 && {
       type: 'todayUnassigned', urgent: true,
       level: 'red', icon: Truck,
-      text: `${todayUnassigned.length} 单今日未派单`,
+      text: `${todayUnassigned.length} 单当日未派单`,
       action: () => navigate('/admin/orders?tab=当日未派单'),
     },
     storageOverdue.length > 0 && {
@@ -105,7 +98,7 @@ export default function Dashboard() {
       type: 'unassigned', urgent: false,
       level: 'red', icon: Truck,
       text: `${unassigned.length} 单未派单（全部）`,
-      action: () => navigate('/admin/orders?date=all'),
+      action: () => navigate('/admin/orders?tab=未派单&date=all'),
     },
     pendingBill.length > 0 && {
       type: 'pendingBill', urgent: false,
@@ -116,7 +109,7 @@ export default function Dashboard() {
     unpaid.length > 0 && {
       type: 'unpaid', urgent: false,
       level: 'red', icon: CreditCard,
-      text: `${unpaid.length} 单客户未付款`,
+      text: `${unpaid.length} 单未付款`,
       action: () => navigate('/admin/orders?tab=客户未付款&date=all'),
     },
     storageExpiring.length > 0 && {
@@ -129,7 +122,7 @@ export default function Dashboard() {
       type: 'noDeposit', urgent: false,
       level: 'yellow', icon: DollarSign,
       text: `${noDeposit.length} 单定金未收`,
-      action: () => navigate('/admin/orders?date=all'),
+      action: () => navigate('/admin/orders?tab=定金未收&date=all'),
     },
   ].filter(Boolean)
 
