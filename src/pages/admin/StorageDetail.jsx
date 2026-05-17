@@ -5,6 +5,7 @@ import dayjs from 'dayjs'
 import { useState, useRef, useEffect } from 'react'
 import { saveVideo, getVideo, deleteVideo } from '../../utils/mediaDB'
 import { isDepositPaid } from '../../utils/orderHelpers'
+import { getStorageRates, FREE_SUPPLIES_LABEL } from '../../data/storageRates'
 
 function getStorageStatus(order) {
   if (order.status === '待确认') return { label: '待确认', color: 'bg-yellow-100 text-yellow-700' }
@@ -134,9 +135,7 @@ export default function StorageDetail() {
   const status = getStorageStatus(order)
   const days = dayjs(order.moveOutDate).diff(dayjs(order.moveInDate), 'day')
   const weeks = Math.max(1, Math.ceil(days / 7))
-  const shortTerm = weeks <= 5
-  const boxRate = shortTerm ? 5 : 3
-  const furRate = shortTerm ? 10 : 7
+  const { boxRate, furRate, shortTerm, freeSupplies } = getStorageRates(weeks)
   const weeklyFee = order.boxes * boxRate + order.furniture * furRate
   const totalFee = weeklyFee * weeks
   const isDone = !!order.actualMoveOutDate
@@ -279,6 +278,11 @@ export default function StorageDetail() {
           {order.furniture > 0 && <Row label="家具">{order.furniture} 件 × ${furRate}/周</Row>}
           {order.items && <Row label="物品描述"><span className="text-gray-600 text-sm">{order.items}</span></Row>}
         </div>
+        {freeSupplies && (
+          <div className="mt-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+            ✅ 含免费物资（{FREE_SUPPLIES_LABEL}）— 长期客户权益
+          </div>
+        )}
       </Card>
 
       {/* Requested materials */}

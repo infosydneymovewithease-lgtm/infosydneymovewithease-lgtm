@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Phone, CheckCircle, Upload, X } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import dayjs from 'dayjs'
+import { getStorageRates, FREE_SUPPLIES_LABEL } from '../../data/storageRates'
 
 const VEHICLES = [
   { id: 'van',   name: '面包车', rate: 60,  desc: '小件/纸箱为主' },
@@ -15,11 +16,9 @@ const TIME_SLOTS = {
 }
 
 function calcFee(boxes, furniture, weeks) {
-  const short   = weeks <= 5
-  const boxRate = short ? 5 : 3
-  const furRate = short ? 10 : 7
+  const { boxRate, furRate, shortTerm, freeSupplies } = getStorageRates(weeks)
   const weekly  = boxes * boxRate + furniture * furRate
-  return { weekly, total: weekly * weeks, boxRate, furRate, short }
+  return { weekly, total: weekly * weeks, boxRate, furRate, short: shortTerm, freeSupplies }
 }
 
 const GRAD   = 'linear-gradient(135deg, #C03448, #D03C52)'
@@ -230,6 +229,9 @@ export default function StorageBooking() {
               <p className="text-xs" style={{ color: 'rgba(255,255,255,0.7)' }}>家具/大件</p>
             </div>
           </div>
+          <div className="mt-2 rounded-xl px-3 py-2 text-xs" style={{ background: 'rgba(255,255,255,0.18)' }}>
+            🎁 <strong>长期优惠</strong>：寄存 &gt;5 周降至 纸箱 $4 / 家具 $8，且<strong>免费送 {FREE_SUPPLIES_LABEL}</strong>
+          </div>
         </div>
 
         {/* Items */}
@@ -303,6 +305,11 @@ export default function StorageBooking() {
                 <span>存储费参考</span>
                 <span className="text-green-600">${fee.total}</span>
               </div>
+              {fee.freeSupplies && (
+                <p className="text-xs text-green-600 font-semibold pt-0.5">
+                  🎁 含免费物资（{FREE_SUPPLIES_LABEL}）
+                </p>
+              )}
               <p className="text-xs text-gray-400">存储费另计运输费，取回搬运享 <span className="text-green-600 font-semibold">$10 优惠</span></p>
             </div>
           )}

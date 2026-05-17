@@ -7,6 +7,7 @@ import { saveVideo, getVideo, deleteVideo } from '../utils/mediaDB'
 import { VEHICLES } from '../data/vehicles'
 import { roundToHalfHour } from '../utils/pricing'
 import { isDepositPaid } from '../utils/orderHelpers'
+import { getStorageRates, FREE_SUPPLIES_LABEL } from '../data/storageRates'
 
 const STEPS = [
   { key: 'confirmed', label: '确认收单',     desc: '确认已收到本次寄存任务' },
@@ -90,9 +91,7 @@ export default function WorkerStorageDetail() {
 
   const days = dayjs(order.moveOutDate).diff(dayjs(order.moveInDate), 'day')
   const weeks = Math.max(1, Math.ceil(days / 7))
-  const shortTerm = weeks <= 5
-  const boxRate = shortTerm ? 5 : 3
-  const furRate = shortTerm ? 10 : 7
+  const { boxRate, furRate, shortTerm, freeSupplies } = getStorageRates(weeks)
   const storageFee = (order.boxes * boxRate + order.furniture * furRate) * weeks
 
   const workerStatus = order.workerStatus || null
@@ -278,6 +277,12 @@ export default function WorkerStorageDetail() {
             {order.items && <Row label="物品描述">{order.items}</Row>}
             {order.location && <Row label="仓位">{order.location}</Row>}
             {order.notes && <p className="text-xs text-gray-400 pt-1">{order.notes}</p>}
+
+            {freeSupplies && (
+              <div className="mt-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-700">
+                🎁 客户享免费物资（{FREE_SUPPLIES_LABEL}）— 寄存 &gt;5 周长期客户权益
+              </div>
+            )}
           </div>
         </div>
 

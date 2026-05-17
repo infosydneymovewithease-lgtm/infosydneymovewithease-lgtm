@@ -3,15 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { ArrowLeft } from 'lucide-react'
 import dayjs from 'dayjs'
+import { getStorageRates, FREE_SUPPLIES_LABEL } from '../../data/storageRates'
 
 function calcStorageFee(boxes, furniture, moveInDate, moveOutDate) {
   const days = dayjs(moveOutDate).diff(dayjs(moveInDate), 'day')
   const weeks = Math.max(1, Math.ceil(days / 7))
-  const shortTerm = weeks <= 5
-  const boxRate = shortTerm ? 5 : 3
-  const furRate = shortTerm ? 10 : 7
+  const { boxRate, furRate, shortTerm, freeSupplies } = getStorageRates(weeks)
   const weeklyFee = boxes * boxRate + furniture * furRate
-  return { weeks, boxRate, furRate, weeklyFee, total: weeklyFee * weeks, shortTerm }
+  return { weeks, boxRate, furRate, weeklyFee, total: weeklyFee * weeks, shortTerm, freeSupplies }
 }
 
 export default function NewStorage() {
@@ -37,7 +36,7 @@ export default function NewStorage() {
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
-  const { weeks, boxRate, furRate, weeklyFee, total: totalFee, shortTerm } = calcStorageFee(
+  const { weeks, boxRate, furRate, weeklyFee, total: totalFee, shortTerm, freeSupplies } = calcStorageFee(
     form.boxes, form.furniture, form.moveInDate, form.moveOutDate
   )
 
@@ -163,8 +162,13 @@ export default function NewStorage() {
         <Section title="费用估算">
           <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-xs text-gray-500 space-y-0.5">
             <div className="flex justify-between"><span>≤ 5周（短期）</span><span>纸箱 $5/件/周　家具 $10/件/周</span></div>
-            <div className="flex justify-between"><span>&gt; 5周（长期）</span><span>纸箱 $3/件/周　家具 $7/件/周</span></div>
+            <div className="flex justify-between"><span>&gt; 5周（长期）</span><span>纸箱 $4/件/周　家具 $8/件/周　+ 免费物资</span></div>
           </div>
+          {freeSupplies && (form.boxes > 0 || form.furniture > 0) && (
+            <div className="bg-green-50 border border-green-200 rounded-xl px-3 py-2 text-sm text-green-700">
+              ✅ 此订单 &gt;5 周，含免费物资（{FREE_SUPPLIES_LABEL}）
+            </div>
+          )}
 
           {(form.boxes > 0 || form.furniture > 0) && (
             <div className="bg-gray-50 rounded-xl px-4 py-3 space-y-1.5 text-sm">

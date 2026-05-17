@@ -5,6 +5,7 @@ import { VEHICLES, STAIRS_FEE, VAN_PROMO_DISCOUNT } from '../../data/vehicles'
 import { HEAVY_ITEM_OPTIONS, calcHeavyTotal } from '../../data/heavyItems'
 import { calcRemoteSurcharge, getDistanceTier } from '../../utils/remoteFee'
 import { SLOT_CONFIG, fetchSlotsAvailability } from '../../utils/slotAvailability'
+import { getStorageRates, FREE_SUPPLIES_LABEL } from '../../data/storageRates'
 import { supabase } from '../../lib/supabase'
 import { ArrowLeft, MapPin, Package, AlertTriangle, Info, CheckCircle, ExternalLink, Upload, X } from 'lucide-react'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
@@ -177,8 +178,7 @@ export default function NewOrder() {
   const storageWeeks = Math.max(1, Math.ceil(
     dayjs(form.moveOutDate).diff(dayjs(form.date), 'day') / 7
   ))
-  const storageBoxRate = storageWeeks <= 5 ? 5 : 3
-  const storageFurRate = storageWeeks <= 5 ? 10 : 7
+  const { boxRate: storageBoxRate, furRate: storageFurRate, freeSupplies: storageFreeSupplies } = getStorageRates(storageWeeks)
   const storageWeeklyFee = form.storageBoxes * storageBoxRate + form.storageFurniture * storageFurRate
   const storageTotalFee  = storageWeeklyFee * storageWeeks
 
@@ -994,6 +994,11 @@ export default function NewOrder() {
                   <span>总价（{storageWeeks} 周）</span>
                   <span>${storageTotalFee}</span>
                 </div>
+                {storageFreeSupplies && (
+                  <p className="text-xs text-green-700 font-semibold pt-1">
+                    🎁 含免费物资（{FREE_SUPPLIES_LABEL}）
+                  </p>
+                )}
                 <p className="text-xs text-amber-500 mt-1">运输费另计，按取件车型小时数收取</p>
               </div>
             )}

@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext'
 import { PlusCircle, Phone, ChevronRight, AlertTriangle, Clock, CheckCircle } from 'lucide-react'
 import dayjs from 'dayjs'
 import { useState } from 'react'
+import { getStorageRates } from '../../data/storageRates'
 
 function getStorageStatus(order) {
   if (order.actualMoveOutDate) return { label: '已取件', color: 'bg-gray-100 text-gray-500', icon: CheckCircle }
@@ -61,8 +62,7 @@ export default function StorageList() {
     .filter(o => !o.actualMoveOutDate)
     .reduce((s, o) => {
       const w = Math.max(1, Math.ceil(dayjs(o.moveOutDate).diff(dayjs(o.moveInDate), 'day') / 7))
-      const boxRate = w <= 5 ? 5 : 3
-      const furRate = w <= 5 ? 10 : 7
+      const { boxRate, furRate } = getStorageRates(w)
       return s + (o.boxes * boxRate + o.furniture * furRate)
     }, 0)
 
@@ -156,8 +156,7 @@ export default function StorageList() {
 function StorageCard({ order: o, onClick }) {
   const s = o._status
   const weeks = Math.max(1, Math.ceil(dayjs(o.moveOutDate).diff(dayjs(o.moveInDate), 'day') / 7))
-  const boxRate = weeks <= 5 ? 5 : 3
-  const furRate = weeks <= 5 ? 10 : 7
+  const { boxRate, furRate } = getStorageRates(weeks)
   const weeklyFee = o.boxes * boxRate + o.furniture * furRate
   const totalFee = weeklyFee * weeks
 
