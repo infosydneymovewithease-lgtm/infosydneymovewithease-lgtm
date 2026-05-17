@@ -4,6 +4,7 @@ import { ArrowLeft, Phone, CheckCircle, Upload, X } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import dayjs from 'dayjs'
 import { getStorageRates, FREE_SUPPLIES_LABEL } from '../../data/storageRates'
+import AddressAutocomplete from '../../components/AddressAutocomplete'
 
 const VEHICLES = [
   { id: 'van',   name: '面包车', rate: 60,  desc: '小件/纸箱为主' },
@@ -34,7 +35,7 @@ export default function StorageBooking() {
 
   const [vehicleId,    setVehicleId]    = useState('van')
   const [depositFile,  setDepositFile]  = useState(null)
-  const [boxes,        setBoxes]        = useState(5)
+  const [boxes,        setBoxes]        = useState(1)
   const [furniture,    setFurniture]    = useState(0)
   const [needsPickup,  setNeedsPickup]  = useState(true)
   const [needsReturn,  setNeedsReturn]  = useState(true)
@@ -406,9 +407,14 @@ export default function StorageBooking() {
               {/* Pickup address */}
               <div>
                 <label className="block text-xs text-gray-500 mb-1.5">取件地址 *</label>
-                <input value={form.fromAddress} onChange={e => set('fromAddress', e.target.value)}
+                <AddressAutocomplete
+                  value={form.fromAddress}
+                  onChange={v => set('fromAddress', v)}
+                  onSelect={addr => set('fromAddress', addr)}
                   placeholder="Unit/No. Street, Suburb NSW"
-                  className={`w-full px-3 py-2.5 border rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-rose-200 ${errors.fromAddress ? 'border-red-400' : 'border-gray-200'}`} />
+                  className={`w-full px-3 py-2.5 border rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-rose-200 ${errors.fromAddress ? 'border-red-400' : 'border-gray-200'}`}
+                  error={errors.fromAddress}
+                />
                 {errors.fromAddress && <p className="text-red-500 text-xs mt-1">请填写取件地址</p>}
               </div>
             </>
@@ -446,9 +452,13 @@ export default function StorageBooking() {
                 <label className="block text-xs text-gray-500 mb-1.5">
                   送达地址（可选，不确定可留空）
                 </label>
-                <input value={form.deliveryAddress} onChange={e => set('deliveryAddress', e.target.value)}
+                <AddressAutocomplete
+                  value={form.deliveryAddress}
+                  onChange={v => set('deliveryAddress', v)}
+                  onSelect={addr => set('deliveryAddress', addr)}
                   placeholder="取回时的目标地址，暂不确定可不填"
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-rose-200"
+                />
               </div>
             </div>
           ) : (
