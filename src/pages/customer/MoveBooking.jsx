@@ -91,6 +91,7 @@ export default function MoveBooking() {
       gbp:                 'Google Business',
       facebook:            'Facebook',
       instagram:           'Instagram',
+      truck_qr:            '货车 QR 码',
     }
     return map[raw] || (raw ? `自定义: ${raw}` : '官网自助预约')
   })()

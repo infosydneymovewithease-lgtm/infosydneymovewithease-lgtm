@@ -1,39 +1,17 @@
--- ── Vehicle Capacity Management ──────────────────────────────────────────────
--- Run in: Supabase Dashboard → SQL Editor → New query
+-- 2026-05-16: 修复"停用所有车后客户仍能下单"的 bug
+--
+-- 原 bug：get_slots_availability 和 create_order_with_slot_check 两个 RPC
+-- 在 enabled 车辆为 0 时一律回落到硬编码兜底容量，本意是"vehicles 表为空
+-- 时还能跑"，但同时也让"客服主动停用所有车"被误识别成"表为空"，导致：
+--   - 客户端时段照常显示可预约
+--   - create_order_with_slot_check 仍然放过订单
+--
+-- 修复思路：用 COUNT(*) 不带 enabled 过滤，再区分两种情况：
+--   - v_total_count = 0  → 真·空表（首次部署）→ 用兜底
+--   - v_total_count > 0  → 有车但全停用 → 容量保持 0 → 拒绝下单
+--
+-- 在 Supabase SQL Editor 跑一次即可（CREATE OR REPLACE，幂等）。
 
--- ── 1. vehicles table ────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS vehicles (
-  id                 uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  vehicle_name       text NOT NULL,
-  vehicle_type       text NOT NULL CHECK (vehicle_type IN ('van', 'small_truck', 'big_truck')),
-  enabled            boolean NOT NULL DEFAULT true,
-  max_orders_per_day int     NOT NULL DEFAULT 3 CHECK (max_orders_per_day >= 1),
-  notes              text,
-  created_at         timestamptz DEFAULT now()
-);
-
--- Admin can read/write; anon reads via SECURITY DEFINER RPCs only
-ALTER TABLE vehicles ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "authenticated full access on vehicles"
-  ON vehicles FOR ALL TO authenticated
-  USING (true) WITH CHECK (true);
-
--- Seed initial fleet (idempotent)
-INSERT INTO vehicles (vehicle_name, vehicle_type, enabled, max_orders_per_day) VALUES
-  ('面包车1',  'van',         true, 5),
-  ('小卡车1',  'small_truck', true, 3),
-  ('小卡车2',  'small_truck', true, 3),
-  ('大卡车1',  'big_truck',   true, 2)
-ON CONFLICT DO NOTHING;
-
-
--- ── 2. get_slots_availability — dual-layer capacity ──────────────────────────
--- Returns per-slot availability considering BOTH slot cap and daily cap.
---   slot_capacity  = number of enabled vehicles of that type (one job per truck per slot)
---   daily_capacity = SUM(max_orders_per_day) for enabled vehicles of that type
---   available      = LEAST(slot_cap - slot_booked, daily_cap - daily_booked)
--- Falls back to hardcoded values when vehicles table is empty.
 CREATE OR REPLACE FUNCTION get_slots_availability(
   p_vehicle_group text,
   p_date          text,
@@ -55,7 +33,6 @@ DECLARE
   v_available      int;
   v_result         jsonb := '[]'::jsonb;
 BEGIN
-  -- Map group → vehicle_type (vehicles table) + vehicle_keys (orders table)
   IF p_vehicle_group = 'van' THEN
     v_vehicle_type := 'van';
     v_vehicle_keys := ARRAY['面包车'];
@@ -69,22 +46,15 @@ BEGIN
     RETURN '[]'::jsonb;
   END IF;
 
-  -- Count ALL rows of this type (enabled OR disabled) to distinguish
-  -- "table empty / never seeded" from "explicitly all disabled".
   SELECT COUNT(*) INTO v_total_count
     FROM vehicles WHERE vehicle_type = v_vehicle_type;
 
-  -- Layer 2: slot capacity = number of enabled vehicles of this type
   SELECT COUNT(*) INTO v_slot_capacity
     FROM vehicles WHERE vehicle_type = v_vehicle_type AND enabled = true;
 
-  -- Layer 1: daily capacity = sum of max_orders_per_day for enabled vehicles
   SELECT COALESCE(SUM(max_orders_per_day), 0) INTO v_daily_capacity
     FROM vehicles WHERE vehicle_type = v_vehicle_type AND enabled = true;
 
-  -- Fallback ONLY when vehicles table has no rows for this type at all
-  -- (e.g. fresh deployment before seeding). If rows exist but are all
-  -- disabled, keep capacity at 0 so admin's disable action actually blocks.
   IF v_total_count = 0 THEN
     v_slot_capacity := CASE p_vehicle_group
       WHEN 'van'   THEN 1
@@ -98,7 +68,6 @@ BEGIN
       ELSE 3 END;
   END IF;
 
-  -- Daily booked count across all slots for this type today
   SELECT COUNT(*) INTO v_daily_booked
     FROM orders
    WHERE date    = p_date
@@ -113,7 +82,6 @@ BEGIN
        AND vehicle       = ANY(v_vehicle_keys)
        AND status NOT IN ('已取消', '已完成', '已拒绝');
 
-    -- Effective available = tighter of the two limits
     v_available := GREATEST(0,
       LEAST(
         v_slot_capacity  - v_slot_booked,
@@ -136,10 +104,6 @@ END;
 $$;
 
 
--- ── 3. create_order_with_slot_check — dual-layer atomic check ─────────────────
--- Advisory lock on (vehicle_type + date) serialises ALL concurrent bookings
--- for the same vehicle type on the same day, preventing both slot-level and
--- day-level race conditions.
 CREATE OR REPLACE FUNCTION create_order_with_slot_check(
   p_order jsonb
 )
@@ -177,27 +141,19 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'order_id', null, 'error', '未知车型');
   END IF;
 
-  -- Broad lock: serialise all bookings of the same type on the same date.
-  -- This covers both slot-level and day-level race conditions in one lock.
   PERFORM pg_advisory_xact_lock(
     hashtext(v_vehicle_type || '::' || v_date)::bigint
   );
 
-  -- Count ALL rows of this type (enabled OR disabled) to distinguish
-  -- "table empty" from "all disabled" — disabled must actually block bookings.
   SELECT COUNT(*) INTO v_total_count
     FROM vehicles WHERE vehicle_type = v_vehicle_type;
 
-  -- Resolve slot capacity
   SELECT COUNT(*) INTO v_slot_capacity
     FROM vehicles WHERE vehicle_type = v_vehicle_type AND enabled = true;
 
-  -- Resolve daily capacity
   SELECT COALESCE(SUM(max_orders_per_day), 0) INTO v_daily_capacity
     FROM vehicles WHERE vehicle_type = v_vehicle_type AND enabled = true;
 
-  -- Fallback ONLY when no rows exist for this type (fresh deployment).
-  -- If rows exist but all disabled, leave capacity at 0 → bookings rejected.
   IF v_total_count = 0 THEN
     v_slot_capacity := CASE v_vehicle_type
       WHEN 'van'         THEN 1
@@ -211,7 +167,6 @@ BEGIN
       ELSE 3 END;
   END IF;
 
-  -- Count inside the lock (authoritative)
   SELECT COUNT(*) INTO v_slot_booked
     FROM orders
    WHERE date          = v_date
@@ -225,17 +180,14 @@ BEGIN
      AND vehicle = ANY(v_vehicle_keys)
      AND status NOT IN ('已取消', '已完成', '已拒绝');
 
-  -- Layer 2 check: slot capacity
   IF v_slot_booked >= v_slot_capacity THEN
     RETURN jsonb_build_object('success', false, 'order_id', null, 'error', 'slot_full');
   END IF;
 
-  -- Layer 1 check: daily capacity
   IF v_daily_booked >= v_daily_capacity THEN
     RETURN jsonb_build_object('success', false, 'order_id', null, 'error', 'day_full');
   END IF;
 
-  -- Generate order ID (Sydney time)
   v_new_id := 'ORD-'
     || to_char(now() AT TIME ZONE 'Australia/Sydney', 'YYYYMMDD')
     || '-'
