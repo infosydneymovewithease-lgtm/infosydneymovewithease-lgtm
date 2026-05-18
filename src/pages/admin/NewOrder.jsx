@@ -156,9 +156,12 @@ export default function NewOrder() {
   const activeB2BList = (b2bCustomers || []).filter(c => c.status === '合作中')
   const b2bPhoneMatch = (() => {
     if (form.customerPhone.length < 8) return null
-    return activeB2BList.find(c =>
-      c.paymentMode === 'b2b_monthly' && c.phone && c.phone.replace(/\s/g, '') === form.customerPhone.replace(/\s/g, '')
-    ) || null
+    return activeB2BList.find(c => {
+      // 旧记录没有 paymentMode 字段也按"月结挂账"处理（兼容旧数据）
+      const isMonthly = !c.paymentMode || c.paymentMode === 'b2b_monthly'
+      if (!isMonthly) return null
+      return c.phone && c.phone.replace(/\s/g, '') === form.customerPhone.replace(/\s/g, '')
+    }) || null
   })()
   const effectiveB2B = b2bManualSelect
     ? activeB2BList.find(c => c.id === b2bManualSelect) || null
