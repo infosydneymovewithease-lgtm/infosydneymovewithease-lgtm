@@ -146,7 +146,6 @@ function AppRoutes() {
         <Route path="wages" element={<WageRecords />} />
         <Route path="dispatch" element={<DispatchBoard />} />
         <Route path="b2b" element={<B2BList />} />
-        <Route path="b2b/new" element={<B2BDetail />} />
         <Route path="b2b/:id" element={<B2BDetail />} />
         <Route path="settings" element={<Settings />} />
         <Route path="storage" element={<StorageList />} />
