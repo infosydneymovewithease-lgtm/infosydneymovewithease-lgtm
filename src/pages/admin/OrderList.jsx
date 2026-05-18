@@ -172,9 +172,10 @@ export default function OrderList() {
     } else if (activeTab === '未派单') {
       matchTab = !o.assignedTo && !['已完成','已取消'].includes(o.status)
     } else if (activeTab === '定金未收') {
-      matchTab = (Number(o.deposit) > 0) && !isDepositPaid(o) && !['已完成','已取消'].includes(o.status)
+      matchTab = !o.isB2BOrder && (Number(o.deposit) > 0) && !isDepositPaid(o) && !['已完成','已取消'].includes(o.status)
     } else if (activeTabDef?.filter) {
-      matchTab = activeTabDef.filter.includes(o.status)
+      // 「待确认」tab 同样过滤掉 b2b 订单（企业月结单不需要确认）
+      matchTab = activeTabDef.filter.includes(o.status) && !(activeTab === '待确认' && o.isB2BOrder)
     } else {
       matchTab = o.status === activeTab
     }
@@ -205,6 +206,8 @@ export default function OrderList() {
 
   const tabCounts = {}
   dateScoped.forEach(o => {
+    // 「待确认/已报价」tab 计数排除 b2b — 跟 Dashboard 待办对齐
+    if (o.isB2BOrder && (o.status === '待确认' || o.status === '已报价')) return
     tabCounts[o.status] = (tabCounts[o.status] || 0) + 1
   })
   const pendingCount = (tabCounts['待确认'] || 0) + (tabCounts['已报价'] || 0)
@@ -215,7 +218,7 @@ export default function OrderList() {
     !o.assignedTo && !['已完成','已取消'].includes(o.status)
   ).length
   const noDepositCount = dateScoped.filter(o =>
-    (Number(o.deposit) > 0) && !isDepositPaid(o) && !['已完成','已取消'].includes(o.status)
+    !o.isB2BOrder && (Number(o.deposit) > 0) && !isDepositPaid(o) && !['已完成','已取消'].includes(o.status)
   ).length
 
   return (
@@ -512,9 +515,16 @@ function OrderCard({ order, onClick, onCancel }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-gray-900 font-semibold">{order.customerName}</span>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[order.status] || 'bg-gray-100 text-gray-500'}`}>
-              {order.status}
-            </span>
+            {/* B2B 单的 status chip 改用绿色"企业月结"展示，覆盖原状态色 */}
+            {order.isB2BOrder ? (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold">
+                🏢 {order.b2bCompanyName || '企业月结'}
+              </span>
+            ) : (
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[order.status] || 'bg-gray-100 text-gray-500'}`}>
+                {order.status}
+              </span>
+            )}
             {isStorage && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-500 font-medium">📦 寄存</span>
             )}
@@ -524,7 +534,7 @@ function OrderCard({ order, onClick, onCancel }) {
             {!order.assignedTo && !isStorage && !['已完成','已取消'].includes(order.status) && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-500 font-medium">未派单</span>
             )}
-            {order.deposit > 0 && !isDepositPaid(order) && (
+            {!order.isB2BOrder && order.deposit > 0 && !isDepositPaid(order) && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 font-medium">定金未收</span>
             )}
             {order.source && order.source !== '官网自助预约' && (

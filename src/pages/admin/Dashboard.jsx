@@ -45,8 +45,9 @@ export default function Dashboard() {
 
   // 各类待办
   // 「待确认」跟 OrderList chip 对齐：包含已报价（报价但未收定金的也算新单待处理）
+  // B2B 企业月结单不参与「待确认」统计 — 这种单不需要收定金，开单即确认
   const pendingConfirm = allActive.filter(o =>
-    o.status === '待确认' || o.status === '已报价'
+    !o.isB2BOrder && (o.status === '待确认' || o.status === '已报价')
   )
   const todayUnassigned = allActive.filter(o =>
     (o.date === today) && !o.assignedTo && isActive(o)
@@ -55,7 +56,8 @@ export default function Dashboard() {
   const pendingBill = orders.filter(o => o.status === '未提交账单')
   const unpaid = orders.filter(o => o.status === '客户未付款')
   // 用 utils/orderHelpers 的 isDepositPaid（项目唯一权威定金判断），跟 OrderList 同源
-  const noDeposit = orders.filter(o => o.deposit > 0 && !isDepositPaid(o) && isActive(o))
+  // B2B 企业月结单天然没有定金，不参与"定金未收"统计
+  const noDeposit = orders.filter(o => !o.isB2BOrder && o.deposit > 0 && !isDepositPaid(o) && isActive(o))
 
   // 寄存到期 / 逾期
   const storageExpiring = (storageOrders || []).filter(o => {

@@ -5,6 +5,10 @@ import { ArrowLeft, Phone, Edit3, Save, X } from 'lucide-react'
 
 const LEVELS = ['A', 'B', 'C']
 const STATUSES = ['合作中', '暂停合作', '已终止']
+const PAYMENT_MODES = [
+  { value: 'b2b_monthly', label: '月结挂账', desc: '订单跳过定金，月底统一对账' },
+  { value: 'cash',        label: '散单结算', desc: '按普通客户流程收定金' },
+]
 
 export default function B2BDetail() {
   const { id } = useParams()
@@ -18,6 +22,7 @@ export default function B2BDetail() {
   const [form, setForm] = useState(existing || {
     companyName: '', contactName: '', phone: '', wechat: '',
     address: '', abn: '', level: 'B', status: '合作中',
+    paymentMode: 'b2b_monthly',
     monthlyOrders: 0, specialPricing: '', notes: '',
   })
 
@@ -144,6 +149,37 @@ export default function B2BDetail() {
               {STATUSES.map(s => <option key={s}>{s}</option>)}
             </select>
           ) : c.status}
+        </Row>
+        <Row label="结算方式" editing={editing}>
+          {editing ? (
+            <div className="space-y-1.5">
+              {PAYMENT_MODES.map(m => (
+                <label key={m.value} className="flex items-start gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50">
+                  <input
+                    type="radio"
+                    checked={form.paymentMode === m.value}
+                    onChange={() => set('paymentMode', m.value)}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-gray-800">{m.label}</div>
+                    <div className="text-xs text-gray-400">{m.desc}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          ) : (
+            (() => {
+              const mode = PAYMENT_MODES.find(m => m.value === (c.paymentMode || 'b2b_monthly'))
+              return (
+                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                  mode?.value === 'b2b_monthly' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {mode?.label || '月结挂账'}
+                </span>
+              )
+            })()
+          )}
         </Row>
         <Row label="月均订单" editing={editing}>
           {editing

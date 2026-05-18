@@ -46,6 +46,8 @@ const ORDER_COLUMNS = new Set([
   'suppliesFee','fuelFee','discountAmount','gst','hourlyRate',
   // 客服端编辑已完成订单的审计字段
   'editedAt','editedBy','editReason',
+  // B2B 企业客户联动（5/18 加）— isB2BOrder 标记企业月结单跳过定金，b2bCompanyId 关联 b2bCustomers
+  'isB2BOrder','b2bCompanyId','b2bCompanyName',
 ])
 
 const STORAGE_COLUMNS = new Set([
@@ -64,6 +66,8 @@ const STORAGE_COLUMNS = new Set([
   'hourlyRate','finalAmount','paymentMethod','workerNote',
   // 客服端「编辑账单」审计字段
   'editedAt','editedBy','editReason',
+  // B2B 企业客户联动（5/18 加）
+  'isB2BOrder','b2bCompanyId','b2bCompanyName',
 ])
 
 function pickOrder(obj) {

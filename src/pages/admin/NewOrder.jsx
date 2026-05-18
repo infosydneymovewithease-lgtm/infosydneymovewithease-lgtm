@@ -85,7 +85,7 @@ const IKEA_STORE_ADDRESSES = {
 
 export default function NewOrder() {
   const navigate = useNavigate()
-  const { createOrder, createStorageOrder, getCustomers, user, orders: allOrders } = useApp()
+  const { createOrder, createStorageOrder, getCustomers, user, orders: allOrders, b2bCustomers } = useApp()
   const customers = getCustomers()
 
   const [form, setForm] = useState({
@@ -147,6 +147,23 @@ export default function NewOrder() {
   const [successOrder, setSuccessOrder] = useState(null)
   const [slotAvailability, setSlotAvailability] = useState({})
   const [slotsLoading, setSlotsLoading] = useState(false)
+
+  // B2B 企业客户联动（5/18）
+  // - b2bPhoneMatch: 手机号自动匹配到的企业客户（仅当对方是月结挂账模式）
+  // - b2bManualSelect: 客服在下拉里手动选的企业客户（覆盖手机号匹配）
+  // effectiveB2B = 手动 > 自动；为 null 时按普通客户流程走
+  const [b2bManualSelect, setB2bManualSelect] = useState(null) // 存 b2bCustomer.id 或 null
+  const activeB2BList = (b2bCustomers || []).filter(c => c.status === '合作中')
+  const b2bPhoneMatch = (() => {
+    if (form.customerPhone.length < 8) return null
+    return activeB2BList.find(c =>
+      c.paymentMode === 'b2b_monthly' && c.phone && c.phone.replace(/\s/g, '') === form.customerPhone.replace(/\s/g, '')
+    ) || null
+  })()
+  const effectiveB2B = b2bManualSelect
+    ? activeB2BList.find(c => c.id === b2bManualSelect) || null
+    : b2bPhoneMatch
+  const isB2B = !!effectiveB2B
 
   // Phone lookup — find existing customer + their customer_code
   useEffect(() => {
@@ -283,8 +300,11 @@ export default function NewOrder() {
     if (slotEnabled && slotGroup && !form.startTime) return  // require slot picked
     if (form.serviceType === '清洁服务' && !form.cleanAddress) return
     if (form.serviceType === '寄存' && form.needsPickup && !form.fromAddress) return
-    if (!form.depositStatus) return
-    if (form.depositStatus === 'unpaid') return  // blocked
+    // 企业月结单跳过定金校验
+    if (!isB2B) {
+      if (!form.depositStatus) return
+      if (form.depositStatus === 'unpaid') return  // blocked
+    }
 
     const autoQuoteNote = v ? [
       `$${v.hourlyRate}×${v.minHours}h + $${v.returnFee}(返程费) = $${baseQuote}`,
@@ -303,9 +323,14 @@ export default function NewOrder() {
     // Build payload — adapt fields based on service type
     const basePayload = {
       ...form,
-      depositPaid: form.depositStatus === 'paid',
-      status: form.depositStatus === 'paid' ? '已收定金' : '待确认',
+      depositPaid: isB2B ? true : form.depositStatus === 'paid',
+      deposit:     isB2B ? 0 : form.deposit,
+      status:      isB2B ? '已收定金' : (form.depositStatus === 'paid' ? '已收定金' : '待确认'),
       customer_code: customerCode,
+      // B2B 企业客户联动字段
+      isB2BOrder:     isB2B,
+      b2bCompanyId:   isB2B ? effectiveB2B.id : null,
+      b2bCompanyName: isB2B ? effectiveB2B.companyName : null,
     }
 
     let payload
@@ -334,14 +359,17 @@ export default function NewOrder() {
         totalFee:          storageTotalFee,
         notes:             form.notes,
         requestedMaterials,
-        depositPaid:       form.depositStatus === 'paid',
-        depositStatus:     form.depositStatus === 'paid' ? '已上传截图' : '待付定金',
-        paymentStatus:     '定金',
+        depositPaid:       isB2B ? true : form.depositStatus === 'paid',
+        depositStatus:     isB2B ? '企业月结' : (form.depositStatus === 'paid' ? '已上传截图' : '待付定金'),
+        paymentStatus:     isB2B ? '月结' : '定金',
         serviceType:       '寄存',
-        status:            form.depositStatus === 'paid' ? '已收定金' : '待确认',
+        status:            isB2B ? '已收定金' : (form.depositStatus === 'paid' ? '已收定金' : '待确认'),
         customer_code:     customerCode,
         createdBy:         user?.id || 'unknown',
         createdByName:     user?.name || '未知',
+        isB2BOrder:        isB2B,
+        b2bCompanyId:      isB2B ? effectiveB2B.id : null,
+        b2bCompanyName:    isB2B ? effectiveB2B.companyName : null,
       })
       setSuccessOrder(order)
       setSubmitted(false)
@@ -574,6 +602,76 @@ export default function NewOrder() {
               className={`${inputCls} ${err('customerPhone') ? errorCls : ''}`}
             />
           </Field>
+
+          {/* B2B 企业客户横幅 — 手机号匹配 / 手动选择都会激活 */}
+          {effectiveB2B && (
+            <div className="bg-emerald-50 border-2 border-emerald-300 rounded-xl px-4 py-3 space-y-2">
+              <div className="flex items-start gap-2">
+                <span className="text-xl flex-shrink-0">🏢</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-emerald-800">{effectiveB2B.companyName}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-800 font-semibold">企业合作</span>
+                    {effectiveB2B.level && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-white text-emerald-700 font-semibold border border-emerald-200">{effectiveB2B.level}级</span>
+                    )}
+                    {b2bManualSelect && (
+                      <button
+                        type="button"
+                        onClick={() => setB2bManualSelect(null)}
+                        className="ml-auto text-xs text-emerald-600 hover:text-emerald-800 underline"
+                      >
+                        清除选择
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-emerald-700 mt-1">
+                    联系人 {effectiveB2B.contactName}{effectiveB2B.phone && ` · ${effectiveB2B.phone}`}
+                  </p>
+                </div>
+              </div>
+              {effectiveB2B.specialPricing && (
+                <div className="bg-white/70 rounded-lg px-3 py-2 text-xs text-emerald-900">
+                  <span className="font-semibold">💰 协议价：</span>{effectiveB2B.specialPricing}
+                </div>
+              )}
+              <p className="text-xs text-emerald-700 flex items-center gap-1">
+                <CheckCircle size={12} /> 月结挂账 · 无需收定金，订单将直接进"未派单"
+              </p>
+            </div>
+          )}
+
+          {/* 手动选择企业客户下拉 — 没有自动匹配上时显示 */}
+          {!b2bPhoneMatch && activeB2BList.length > 0 && (
+            <Field label="或手动选择企业客户">
+              <select
+                value={b2bManualSelect || ''}
+                onChange={e => {
+                  const id = e.target.value || null
+                  setB2bManualSelect(id)
+                  if (id) {
+                    const c = activeB2BList.find(x => x.id === id)
+                    if (c) {
+                      setForm(f => ({
+                        ...f,
+                        customerName: c.contactName || f.customerName,
+                        customerPhone: c.phone || f.customerPhone,
+                        wechat: c.wechat || f.wechat,
+                      }))
+                    }
+                  }
+                }}
+                className={selectCls}
+              >
+                <option value="">— 普通客户（不关联企业）—</option>
+                {activeB2BList.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.companyName}（{c.contactName}{c.phone ? ` · ${c.phone}` : ''}）
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
 
           {existingCustomer && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2.5 flex items-start gap-2">
@@ -1292,18 +1390,31 @@ export default function NewOrder() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="定金金额 $">
-              <input
-                type="number"
-                value={form.deposit}
-                onChange={e => set('deposit', parseFloat(e.target.value) || 0)}
-                className={inputCls}
-              />
-            </Field>
-            <div />
-          </div>
+          {!isB2B && (
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="定金金额 $">
+                <input
+                  type="number"
+                  value={form.deposit}
+                  onChange={e => set('deposit', parseFloat(e.target.value) || 0)}
+                  className={inputCls}
+                />
+              </Field>
+              <div />
+            </div>
+          )}
 
+          {isB2B && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-start gap-2">
+              <CheckCircle size={16} className="text-emerald-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-emerald-800">
+                <p className="font-semibold">企业月结订单 · 无需收定金</p>
+                <p className="text-xs text-emerald-700 mt-0.5">订单将直接进"未派单"，月底跟 {effectiveB2B.companyName} 统一对账</p>
+              </div>
+            </div>
+          )}
+
+          {!isB2B && (
           <Field label="定金状态" required>
             <div className="grid grid-cols-3 gap-2">
               {[
@@ -1334,6 +1445,7 @@ export default function NewOrder() {
               <p className="text-amber-600 text-xs mt-1">⚠️ 提醒：请在服务前督促客户补交定金</p>
             )}
           </Field>
+          )}
         </Section>
         )}
 
