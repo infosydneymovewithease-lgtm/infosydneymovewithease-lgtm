@@ -24,7 +24,7 @@ const STATUS_TABS = [
 ]
 
 export default function StorageList() {
-  const { storageOrders } = useApp()
+  const { storageOrders, updateStorageOrder } = useApp()
   const navigate = useNavigate()
   const [tab, setTab] = useState('all')
   const [search, setSearch] = useState('')
@@ -145,7 +145,16 @@ export default function StorageList() {
       ) : (
         <div className="space-y-2">
           {filtered.map(o => (
-            <StorageCard key={o.id} order={o} onClick={() => navigate(`/admin/storage/${o.id}`)} />
+            <StorageCard
+              key={o.id}
+              order={o}
+              onClick={() => navigate(`/admin/storage/${o.id}`)}
+              onCancel={() => {
+                if (!window.confirm(`确认取消「${o.customerName}」的寄存订单？\n\n（若是测试单需彻底删除，请点进详情勾选"彻底删除"）`)) return
+                try { updateStorageOrder(o.id, { status: '已取消' }) }
+                catch (err) { alert(err.message || '取消失败') }
+              }}
+            />
           ))}
         </div>
       )}
@@ -153,12 +162,13 @@ export default function StorageList() {
   )
 }
 
-function StorageCard({ order: o, onClick }) {
+function StorageCard({ order: o, onClick, onCancel }) {
   const s = o._status
   const weeks = Math.max(1, Math.ceil(dayjs(o.moveOutDate).diff(dayjs(o.moveInDate), 'day') / 7))
   const { boxRate, furRate } = getStorageRates(weeks)
   const weeklyFee = o.boxes * boxRate + o.furniture * furRate
   const totalFee = weeklyFee * weeks
+  const canCancel = o.status !== '已取消' && !o.actualMoveOutDate
 
   return (
     <div onClick={onClick} className="bg-white rounded-xl px-4 py-3.5 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
@@ -187,6 +197,14 @@ function StorageCard({ order: o, onClick }) {
           <p className="text-green-600 font-bold text-sm">${totalFee}/期</p>
           <p className="text-gray-400 text-xs">${weeklyFee}/周</p>
           <p className="text-gray-400 text-xs mt-0.5">到期 {o.moveOutDate}</p>
+          {canCancel && onCancel && (
+            <button
+              onClick={e => { e.stopPropagation(); onCancel() }}
+              className="mt-1 text-xs text-gray-400 hover:text-red-500 px-2 py-0.5 rounded hover:bg-red-50 transition-colors"
+            >
+              取消订单
+            </button>
+          )}
         </div>
         <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />
       </div>

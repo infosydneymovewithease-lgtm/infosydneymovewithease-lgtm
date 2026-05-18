@@ -55,7 +55,7 @@ const WORKER_NAMES = {
 }
 
 export default function OrderList() {
-  const { orders, exportOrdersCSV, updateOrderStatus, storageOrders } = useApp()
+  const { orders, exportOrdersCSV, updateOrderStatus, storageOrders, updateStorageOrder } = useApp()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const serviceFilter = searchParams.get('service') // e.g. 'IKEA'
@@ -477,16 +477,16 @@ export default function OrderList() {
                 const dest = isStorage ? `/admin/storage/${order.id}` : `/admin/orders/${order.id}`
                 navigate(dest, { state: { allowDispatch: activeTab !== 'all' } })
               }}
-              onCancel={
-                (order.serviceType === '寄存' || (order.id || '').startsWith('STG-'))
-                  ? null
-                  : () => {
-                      if (window.confirm(`确认取消「${order.customerName}」的订单？`)) {
-                        try { updateOrderStatus(order.id, '已取消') }
-                        catch (err) { alert(err.message || '取消失败') }
-                      }
-                    }
-              }
+              onCancel={() => {
+                const isStorageOrder = order.serviceType === '寄存' || (order.id || '').startsWith('STG-')
+                if (!window.confirm(`确认取消「${order.customerName}」的${isStorageOrder ? '寄存' : ''}订单？\n\n（若是测试单需彻底删除，请点进订单详情勾选"彻底删除"）`)) return
+                try {
+                  if (isStorageOrder) updateStorageOrder(order.id, { status: '已取消' })
+                  else updateOrderStatus(order.id, '已取消')
+                } catch (err) {
+                  alert(err.message || '取消失败')
+                }
+              }}
             />
           ))}
         </div>
@@ -580,20 +580,18 @@ function OrderCard({ order, onClick, onCancel }) {
           </p>
         ) : <span />}
 
-        {!isStorage && (
-          canCancel ? (
-            onCancel && (
-              <button
-                onClick={e => { e.stopPropagation(); onCancel() }}
-                className="flex-shrink-0 text-xs text-gray-400 hover:text-red-500 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors"
-              >
-                取消订单
-              </button>
-            )
-          ) : order.status === '已取消' ? (
-            <span className="flex-shrink-0 text-xs text-gray-300 px-2 py-1">已取消 ✓</span>
-          ) : null
-        )}
+        {canCancel ? (
+          onCancel && (
+            <button
+              onClick={e => { e.stopPropagation(); onCancel() }}
+              className="flex-shrink-0 text-xs text-gray-400 hover:text-red-500 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors"
+            >
+              取消订单
+            </button>
+          )
+        ) : order.status === '已取消' ? (
+          <span className="flex-shrink-0 text-xs text-gray-300 px-2 py-1">已取消 ✓</span>
+        ) : null}
       </div>
     </div>
   )
