@@ -89,6 +89,8 @@ export default function MoveBooking() {
     const map = {
       xiaohongshu_landing: '小红书落地页',
       xiaohongshu:         '小红书',
+      douyin:              '抖音',
+      tiktok:              'TikTok',
       wechat:              '微信',
       gbp:                 'Google Business',
       facebook:            'Facebook',

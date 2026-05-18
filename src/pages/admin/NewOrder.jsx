@@ -32,7 +32,7 @@ async function uploadImage(file, bucket = 'deposit-screenshots') {
 
 const SERVICE_TYPES = ['搬家', '寄存', 'IKEA 提货', '清洁服务', '二手物品', '其他']
 const VEHICLE_KEYS = Object.keys(VEHICLES)
-const SOURCES = ['官网', '微信', '小红书', '转介绍', '师傅内部介绍', '商业合作', '电话', '其他']
+const SOURCES = ['官网', '微信', '小红书', '抖音', 'TikTok', '转介绍', '师傅内部介绍', '商业合作', '电话', '其他']
 const FRAGILE_OPTIONS = ['大理石桌', '玻璃餐桌', '鱼缸', '镜子', '艺术品', '高端家具', '钢琴', '大电视(65寸+)', '易损柜体', '其他']
 const DISCOUNT_OPTIONS = [
   { label: '无折扣', value: 1 },
