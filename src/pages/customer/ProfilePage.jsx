@@ -75,6 +75,21 @@ export default function ProfilePage() {
             </div>
             <ChevronRight size={16} className="text-gray-300" />
           </a>
+          <a href="sms:0449600666"
+            className="flex items-center justify-between px-4 py-4 active:bg-gray-50"
+            style={{ borderBottom: `1px solid ${BORDER}` }}>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                style={{ background: BG }}>
+                <span className="text-lg">📱</span>
+              </div>
+              <div>
+                <p className="font-semibold text-sm text-gray-800">短信咨询</p>
+                <p className="text-xs text-gray-400">0449 600 666</p>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-gray-300" />
+          </a>
           <div className="flex items-center justify-between px-4 py-4">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl flex items-center justify-center"

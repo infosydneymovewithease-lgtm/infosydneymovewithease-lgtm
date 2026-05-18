@@ -76,7 +76,13 @@ export default function DesktopFooter() {
             <li className="flex items-start gap-2">
               <Phone size={13} className="flex-shrink-0 mt-0.5" style={{ color: BRAND }} />
               <a href="tel:0426033899" className="hover:text-white" style={{ color: '#aaa' }}>
-                0426 033 899
+                电话：0426 033 899
+              </a>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="flex-shrink-0 mt-0.5" style={{ color: BRAND, fontSize: 12 }}>💬</span>
+              <a href="sms:0449600666" className="hover:text-white" style={{ color: '#aaa' }}>
+                短信：0449 600 666
               </a>
             </li>
             <li className="flex items-start gap-2">

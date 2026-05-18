@@ -121,9 +121,14 @@ export default function GuidePage() {
           <p className="text-sm font-semibold text-gray-800 mb-1">还有疑问？直接联系客服</p>
           <p className="text-xs text-gray-400 mb-4">7天服务，营业时间即时接听</p>
           <a href="tel:0426033899"
-            className="w-full flex items-center justify-center gap-2 text-white font-bold py-3.5 rounded-2xl"
+            className="w-full flex items-center justify-center gap-2 text-white font-bold py-3.5 rounded-2xl mb-2"
             style={{ background: GRAD }}>
-            <Phone size={16} /> 0426 033 899
+            <Phone size={16} /> 电话 0426 033 899
+          </a>
+          <a href="sms:0449600666"
+            className="w-full flex items-center justify-center gap-2 font-semibold py-3 rounded-2xl text-sm"
+            style={{ background: BG, color: MID, border: `1px solid ${BORDER}` }}>
+            📱 短信 0449 600 666
           </a>
         </div>
 

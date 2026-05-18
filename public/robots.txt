@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+
+# Block private routes (worker / admin / auth)
+Disallow: /admin
+Disallow: /worker
+Disallow: /login
+Disallow: /order/
+Disallow: /storage/
+Disallow: /my-order
+
+# Sitemap
+Sitemap: https://qianxibanjia.com.au/sitemap.xml

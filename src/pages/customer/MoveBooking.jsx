@@ -80,10 +80,12 @@ export default function MoveBooking() {
   const { createOrderWithSlotCheck } = useApp()
   const fileInputRef = useRef(null)
 
-  // ── Source tracking from URL (?source=xiaohongshu_landing 等) ──
+  // ── Source tracking from URL (?source=xxx) 或 sessionStorage（CustomerHome 入口捕获） ──
+  // URL 优先（直接打开 booking 页带 source），否则读 sessionStorage 兜底
+  // （客户先到首页带 source 再点立即预约的场景）
   const sourceLabel = (() => {
     const sp = new URLSearchParams(location.search)
-    const raw = sp.get('source')
+    const raw = sp.get('source') || sessionStorage.getItem('entry_source')
     const map = {
       xiaohongshu_landing: '小红书落地页',
       xiaohongshu:         '小红书',

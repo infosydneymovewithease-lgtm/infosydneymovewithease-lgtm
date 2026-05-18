@@ -20,6 +20,15 @@ export default function CustomerHome() {
   const [slide, setSlide] = useState(0)
   const [fading, setFading] = useState(false)
 
+  // 入口 source 捕获 — 客户从 ?source=xxx 进站时存进 sessionStorage，
+  // 用于站内导航后下单时仍能追溯渠道（直接进 /book/* 也支持 URL ?source=）。
+  // sessionStorage 而不是 localStorage：新 tab/session 重新归因，不污染未来访问。
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const source = params.get('source')
+    if (source) sessionStorage.setItem('entry_source', source)
+  }, [])
+
   useEffect(() => {
     const timer = setInterval(() => {
       setFading(true)
@@ -517,16 +526,21 @@ export default function CustomerHome() {
           }}>
           <div>
             <h3 className="text-white font-extrabold text-3xl mb-3">不确定费用？</h3>
-            <p className="text-white/85 text-base">电话或微信联系我们，免费为您报价</p>
+            <p className="text-white/85 text-base">电话、短信或微信联系我们，免费为您报价</p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <a href="tel:0426033899"
               className="px-8 py-4 rounded-xl bg-white font-bold text-base flex items-center gap-2"
               style={{ color: BRAND }}>
-              <Phone size={16} /> 电话咨询
+              <Phone size={16} /> 电话 0426 033 899
+            </a>
+            <a href="sms:0449600666"
+              className="px-6 py-4 rounded-xl font-bold text-base text-white flex items-center gap-2"
+              style={{ background: 'rgba(255,255,255,0.15)', border: '1.5px solid rgba(255,255,255,0.5)', backdropFilter: 'blur(8px)' }}>
+              📱 短信 0449 600 666
             </a>
             <a href={`weixin://contacts/profile/${WECHAT}`}
-              className="px-8 py-4 rounded-xl font-bold text-base text-white flex items-center gap-2"
+              className="px-6 py-4 rounded-xl font-bold text-base text-white flex items-center gap-2"
               style={{ background: 'rgba(255,255,255,0.15)', border: '1.5px solid rgba(255,255,255,0.5)', backdropFilter: 'blur(8px)' }}>
               💬 微信咨询
             </a>
