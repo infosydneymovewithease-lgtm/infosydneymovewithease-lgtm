@@ -5,6 +5,7 @@ import { useApp } from '../../context/AppContext'
 import dayjs from 'dayjs'
 import { getStorageRates, FREE_SUPPLIES_LABEL } from '../../data/storageRates'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
+import { normalizeImageFile } from '../../utils/imageUpload'
 
 const VEHICLES = [
   { id: 'van',   name: '面包车', rate: 60,  desc: '小件/纸箱为主' },
@@ -70,9 +71,10 @@ export default function StorageBooking() {
     setForm(f => ({ ...f, timeSlot: TIME_SLOTS[id][0] }))
   }
 
-  function handleDepositUpload(e) {
-    const file = e.target.files[0]
-    if (!file) return
+  async function handleDepositUpload(e) {
+    const raw = e.target.files[0]
+    if (!raw) return
+    const file = await normalizeImageFile(raw)
     const reader = new FileReader()
     reader.onload = ev => {
       setDepositFile({ name: file.name, data: ev.target.result })

@@ -10,6 +10,7 @@ import { getRemoteDistanceKm } from '../../utils/googleMaps'
 import { calcRemoteSurcharge } from '../../utils/remoteFee'
 import { SLOT_CONFIG, fetchSlotsAvailability } from '../../utils/slotAvailability'
 import { VAN_PROMO_DISCOUNT } from '../../data/vehicles'
+import { normalizeImageFile } from '../../utils/imageUpload'
 
 const GRAD   = 'linear-gradient(135deg, #A52535, #C0392B)'
 const BG     = '#F7F7F7'
@@ -189,8 +190,9 @@ export default function MoveBooking() {
   }
 
   async function handleFileUpload(e) {
-    const file = e.target.files[0]
-    if (!file) return
+    const raw = e.target.files[0]
+    if (!raw) return
+    const file = await normalizeImageFile(raw)
     const ext  = (file.name.split('.').pop() || 'jpg').toLowerCase()
     const path = `${dayjs().format('YYYYMMDD')}_${Date.now()}.${ext}`
     const { data: stored, error } = await supabase.storage

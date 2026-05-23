@@ -6,6 +6,7 @@ import dayjs from 'dayjs'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
 import { getRemoteDistanceKm } from '../../utils/googleMaps'
 import { calcRemoteSurcharge } from '../../utils/remoteFee'
+import { normalizeImageFile } from '../../utils/imageUpload'
 
 const SERVICES = [
   { key: 'pickup',   label: 'IKEA 代购提货', desc: '我们前往 IKEA 代为提取您的订单', icon: '🛒' },
@@ -90,17 +91,19 @@ export default function IkeaBooking() {
     setForm(f => ({ ...f, timeSlot: TIME_SLOTS[id][0] }))
   }
 
-  function handleQRUpload(e) {
-    const file = e.target.files[0]
-    if (!file) return
+  async function handleQRUpload(e) {
+    const raw = e.target.files[0]
+    if (!raw) return
+    const file = await normalizeImageFile(raw)
     const reader = new FileReader()
     reader.onload = ev => setQrFile({ name: file.name, data: ev.target.result })
     reader.readAsDataURL(file)
   }
 
-  function handleDepositUpload(e) {
-    const file = e.target.files[0]
-    if (!file) return
+  async function handleDepositUpload(e) {
+    const raw = e.target.files[0]
+    if (!raw) return
+    const file = await normalizeImageFile(raw)
     const reader = new FileReader()
     reader.onload = ev => {
       setDepositFile({ name: file.name, data: ev.target.result })

@@ -10,10 +10,12 @@ import { supabase } from '../../lib/supabase'
 import { ArrowLeft, MapPin, Package, AlertTriangle, Info, CheckCircle, ExternalLink, Upload, X } from 'lucide-react'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
 import { getRemoteDistanceKm } from '../../utils/googleMaps'
+import { normalizeImageFile } from '../../utils/imageUpload'
 import dayjs from 'dayjs'
 
 // Upload an image to Supabase Storage with base64 fallback. Returns { name, url? , data? }.
-async function uploadImage(file, bucket = 'deposit-screenshots') {
+async function uploadImage(rawFile, bucket = 'deposit-screenshots') {
+  const file = await normalizeImageFile(rawFile)
   const ext  = (file.name.split('.').pop() || 'jpg').toLowerCase()
   const path = `${dayjs().format('YYYYMMDD')}_${Date.now()}.${ext}`
   const { data: stored, error } = await supabase.storage
