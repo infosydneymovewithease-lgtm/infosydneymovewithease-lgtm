@@ -9,6 +9,7 @@ dayjs.locale('zh-cn')
 
 const STATUS_CONFIG = {
   '待确认': { color: 'bg-amber-100 text-amber-700', icon: <Clock size={12} /> },
+  '已派单': { color: 'bg-indigo-100 text-indigo-700', icon: <Bell size={12} /> },
   '师傅已确认': { color: 'bg-red-100 text-red-700',    icon: <CheckCircle size={12} /> },
   '进行中': { color: 'bg-green-100 text-green-700', icon: <Loader size={12} /> },
   '已完成': { color: 'bg-gray-100 text-gray-500',   icon: <CheckCircle size={12} /> },
@@ -38,7 +39,7 @@ export default function Home() {
 
   const active = myOrders.filter(o => !['已完成', '已取消'].includes(o.status))
   const done   = myOrders.filter(o => o.status === '已完成' && isRecent(o))
-  const activeStorage = myStorageOrders.filter(o => o.status !== '寄存中')
+  const activeStorage = myStorageOrders.filter(o => !['寄存中', '已取出', '已完成', '已取消'].includes(o.status))
   const doneStorage   = myStorageOrders.filter(o => o.status === '寄存中' && isRecent(o))
   const totalPending = active.length + activeStorage.length
   const totalDone    = done.length + doneStorage.length

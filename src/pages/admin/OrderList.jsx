@@ -173,6 +173,9 @@ export default function OrderList() {
       matchTab = !o.assignedTo && !['已完成','已取消'].includes(o.status)
     } else if (activeTab === '定金未收') {
       matchTab = !o.isB2BOrder && (Number(o.deposit) > 0) && !isDepositPaid(o) && !['已完成','已取消'].includes(o.status)
+    } else if (activeTab === '未提交账单') {
+      // 跟 Dashboard 同款条件：工作日期已过、已派师傅、却还没完成 = 该交单没交
+      matchTab = o.date && o.date < todayStr && o.assignedTo && !['已完成','已取消'].includes(o.status)
     } else if (activeTabDef?.filter) {
       // 「待确认」tab 同样过滤掉 b2b 订单（企业月结单不需要确认）
       matchTab = activeTabDef.filter.includes(o.status) && !(activeTab === '待确认' && o.isB2BOrder)
@@ -219,6 +222,9 @@ export default function OrderList() {
   ).length
   const noDepositCount = dateScoped.filter(o =>
     !o.isB2BOrder && (Number(o.deposit) > 0) && !isDepositPaid(o) && !['已完成','已取消'].includes(o.status)
+  ).length
+  const pendingBillCount = dateScoped.filter(o =>
+    o.date && o.date < todayStr && o.assignedTo && !['已完成','已取消'].includes(o.status)
   ).length
 
   return (
@@ -414,6 +420,7 @@ export default function OrderList() {
           else if (tab.value === '当日未派单') count = todayUnassigned
           else if (tab.value === '未派单') count = unassignedAll
           else if (tab.value === '定金未收') count = noDepositCount
+          else if (tab.value === '未提交账单') count = pendingBillCount
           else count = tabCounts[tab.value] || 0
           return (
             <button

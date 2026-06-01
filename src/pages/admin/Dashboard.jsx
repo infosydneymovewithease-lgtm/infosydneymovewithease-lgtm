@@ -53,7 +53,9 @@ export default function Dashboard() {
     (o.date === today) && !o.assignedTo && isActive(o)
   )
   const unassigned = orders.filter(o => !o.assignedTo && isActive(o))
-  const pendingBill = orders.filter(o => o.status === '未提交账单')
+  // 「未提交账单」状态实际无代码会写入 —— 改用真实条件：工作日期已过、已派师傅、却还没完成的单
+  // = 师傅干完(或该干)了但一直没交账单，正是漏单/残留单的源头
+  const pendingBill = orders.filter(o => o.date && o.date < today && o.assignedTo && isActive(o))
   const unpaid = orders.filter(o => o.status === '客户未付款')
   // 用 utils/orderHelpers 的 isDepositPaid（项目唯一权威定金判断），跟 OrderList 同源
   // B2B 企业月结单天然没有定金，不参与"定金未收"统计
