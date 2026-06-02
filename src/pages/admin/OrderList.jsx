@@ -120,7 +120,8 @@ export default function OrderList() {
     const dayOrders = serviceFiltered.filter(o =>
       o.date === selectedDate &&
       meta.vehicles.includes(o.vehicle) &&
-      o.status !== '已取消'
+      // 跟服务器 slot RPC 一致（slot_functions.sql: NOT IN 已取消/已完成）：完成/取消都不占时段
+      !['已取消', '已完成'].includes(o.status)
     )
     const dailyBooked = dayOrders.length
     const dailyFull = dailyBooked >= meta.dailyCap
