@@ -1,6 +1,6 @@
 import { useApp } from '../../context/AppContext'
 import { useNavigate } from 'react-router-dom'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
 import { isDepositPaid } from '../../utils/orderHelpers'
@@ -135,25 +135,7 @@ export default function Dashboard() {
   useEffect(() => {
     localStorage.setItem('admin_inbox_muted', muted ? '1' : '0')
   }, [muted])
-
-  // 检测「新增的紧急事件」— 比 count 上次更大就响一次
-  const prevCountsRef = useRef({})
-  useEffect(() => {
-    const next = {}
-    alerts.filter(a => a.urgent).forEach(a => {
-      // 用 text 里的数字提取 count（简单粗暴但稳定）
-      const m = a.text.match(/(\d+)/)
-      next[a.type] = m ? Number(m[1]) : 0
-    })
-    let increased = false
-    Object.keys(next).forEach(type => {
-      if ((next[type] || 0) > (prevCountsRef.current[type] || 0)) increased = true
-    })
-    if (increased && !muted && prevCountsRef.current._initialized) {
-      playDing()
-    }
-    prevCountsRef.current = { ...next, _initialized: true }
-  }, [alerts.map(a => `${a.type}:${a.text}`).join('|'), muted])
+  // 新单提示音已上移到 AdminLayout（全局，任何后台页面都响）；这里只保留静音开关 UI
 
   return (
     <div className="p-5 max-w-5xl mx-auto space-y-5">
@@ -293,33 +275,6 @@ export default function Dashboard() {
       </div>
     </div>
   )
-}
-
-// 用 Web Audio API 合成一个简短的 ding（不需要音频文件）
-let _audioCtx = null
-function playDing() {
-  try {
-    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)()
-    const ctx = _audioCtx
-    // 两个相邻音构成「ding-dong」
-    const playTone = (freq, startOffset, dur = 0.18, vol = 0.25) => {
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.type = 'sine'
-      osc.frequency.value = freq
-      osc.connect(gain).connect(ctx.destination)
-      const t = ctx.currentTime + startOffset
-      gain.gain.setValueAtTime(0, t)
-      gain.gain.linearRampToValueAtTime(vol, t + 0.02)
-      gain.gain.exponentialRampToValueAtTime(0.001, t + dur)
-      osc.start(t)
-      osc.stop(t + dur)
-    }
-    playTone(880, 0)
-    playTone(660, 0.18)
-  } catch (e) {
-    console.warn('[ding] play failed (浏览器可能需要用户先交互)', e)
-  }
 }
 
 function groupByDate(orders) {

@@ -1,6 +1,7 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { playDing } from '../../utils/sound'
 import {
   LayoutDashboard, ClipboardList, PlusCircle, Truck,
   Users, Building2, DollarSign, Package, Recycle,
@@ -34,10 +35,26 @@ const NAV_ITEMS = [
 ]
 
 export default function AdminLayout() {
-  const { user, logout } = useApp()
+  const { user, logout, orders } = useApp()
   const navigate = useNavigate()
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // 全局新单提示音：任何后台页面，来新「待确认」单（客户自助下单/新建未确认）都响
+  // Why: 旧版只在「工作台」页面开着时才响，客服停在别的页就漏听
+  // 用 id 集合检测真正"新出现"的待确认单，避免"确认一单+来一单"计数不变而漏响
+  const seenPendingRef = useRef(null)
+  useEffect(() => {
+    const pendingIds = new Set(orders.filter(o => o.status === '待确认').map(o => o.id))
+    if (seenPendingRef.current === null) {
+      seenPendingRef.current = pendingIds  // 首次加载只记录，不响
+      return
+    }
+    let hasNew = false
+    pendingIds.forEach(id => { if (!seenPendingRef.current.has(id)) hasNew = true })
+    if (hasNew && localStorage.getItem('admin_inbox_muted') !== '1') playDing()
+    seenPendingRef.current = pendingIds
+  }, [orders])
 
   function handleLogout() {
     logout()
