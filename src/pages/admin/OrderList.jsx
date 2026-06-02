@@ -187,6 +187,7 @@ export default function OrderList() {
     const matchSearch = !q ||
       o.customerName?.toLowerCase().includes(q) ||
       o.customerPhone?.includes(q) ||
+      o.orderNo?.toLowerCase().includes(q) ||
       o.id?.toLowerCase().includes(q) ||
       o.fromAddress?.toLowerCase().includes(q) ||
       o.toAddress?.toLowerCase().includes(q)
@@ -523,6 +524,9 @@ function OrderCard({ order, onClick, onCancel }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-gray-900 font-semibold">{order.customerName}</span>
+            {order.orderNo && (
+              <span className="text-xs font-mono text-gray-400">{order.orderNo}</span>
+            )}
             {/* B2B 单的 status chip 改用绿色"企业月结"展示，覆盖原状态色 */}
             {order.isB2BOrder ? (
               <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold">

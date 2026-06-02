@@ -197,7 +197,11 @@ export default function StorageDetail() {
             <h1 className="text-xl font-bold text-gray-900">{order.customerName}</h1>
             <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${status.color}`}>{status.label}</span>
           </div>
-          <p className="text-gray-400 text-xs mt-0.5">{order.id}</p>
+          <p className="text-xs mt-0.5">
+            {order.orderNo && <span className="font-mono text-gray-700 font-semibold">{order.orderNo}</span>}
+            {order.orderNo && <span className="mx-1.5 text-gray-300">·</span>}
+            <span className="text-gray-300">{order.id}</span>
+          </p>
         </div>
         <div className="flex items-center gap-1.5">
           <button

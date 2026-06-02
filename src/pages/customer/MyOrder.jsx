@@ -37,7 +37,7 @@ function OrderCard({ order }) {
             <Truck size={16} style={{ color: MID }} />
           </div>
           <div className="min-w-0">
-            <p className="text-xs text-gray-400 truncate">{order.id}</p>
+            <p className="text-xs text-gray-400 truncate font-mono">{order.orderNo || order.id}</p>
             <p className="text-sm font-semibold text-gray-800 truncate">
               {order.vehicleName || order.vehicle || order.serviceType}
             </p>

@@ -255,7 +255,11 @@ export default function AdminOrderDetail() {
               {order.status}
             </span>
           </div>
-          <p className="text-gray-400 text-xs mt-0.5">{order.id}</p>
+          <p className="text-xs mt-0.5">
+            {order.orderNo && <span className="font-mono text-gray-700 font-semibold">{order.orderNo}</span>}
+            {order.orderNo && <span className="mx-1.5 text-gray-300">·</span>}
+            <span className="text-gray-300">{order.id}</span>
+          </p>
         </div>
       </div>
 

@@ -222,7 +222,7 @@ export default function WorkerStorageDetail() {
             <div className="flex-1">
               <p className="text-red-300 text-xs tracking-wide">📦 寄存服务</p>
               <h1 className="text-white text-xl font-bold">{order.customerName}</h1>
-              <p className="text-red-300 text-xs mt-0.5">{order.id}</p>
+              <p className="text-red-300 text-xs mt-0.5 font-mono">{order.orderNo || order.id}</p>
             </div>
             <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
               isDone ? 'bg-green-100 text-green-700' : 'bg-white/20 text-white'

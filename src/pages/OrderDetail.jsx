@@ -69,7 +69,7 @@ export default function OrderDetail() {
             <h1 className="text-white font-bold text-lg flex-1">订单详情</h1>
             <StatusBadge status={order.status} />
           </div>
-          <p className="text-red-300 text-xs ml-2">{order.id}</p>
+          <p className="text-red-300 text-xs ml-2 font-mono">{order.orderNo || order.id}</p>
         </div>
       </div>
 

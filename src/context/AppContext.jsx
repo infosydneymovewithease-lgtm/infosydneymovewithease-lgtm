@@ -43,7 +43,7 @@ const ORDER_COLUMNS = new Set([
   'workStatus','workStartedAt','workEndedAt','workAccumulatedSec','workRunStartedAt',
   'materials','materialsCost',
   'fragileItems','fragileDescription','fragileEstimatedFee',
-  'customer_code','workerNote',
+  'customer_code','workerNote','orderNo',
   // 师傅交单时写入的费用明细 + 工时（5/7 加列，但白名单一直没收录，导致 completeOrder 走 pickOrder 后这些字段被过滤）
   'billedHours','overtimeFee','timeFee','returnFee','highwayFee','parkingFee',
   'suppliesFee','fuelFee','discountAmount','gst','hourlyRate',
@@ -62,7 +62,7 @@ const STORAGE_COLUMNS = new Set([
   // 取件信息 — 占用同一时段容量池，slot 函数会读这几列
   'vehicle','date','startTime','endTime','fromAddress','deliveryAddress',
   'needsPickup','needsReturn','source','createdBy','createdByName',
-  'weeklyFee','totalFee','weeks',
+  'weeklyFee','totalFee','weeks','orderNo',
   // 师傅交单时写入的运输部分账单（结构和 orders 表完全对齐）
   'billedHours','timeFee','returnFee','stairFee','overtimeFee','heavyFee','heavyItems',
   'highwayFee','parkingFee','suppliesFee','fuelFee','discountAmount','gst',
@@ -321,14 +321,16 @@ export function AppProvider({ children }) {
       assignedWorkers: [],
     }
     setOrders(prev => [newOrder, ...prev])
-    const { error } = await supabase.from('orders').insert(pickOrder(newOrder))
+    const { data, error } = await supabase.from('orders').insert(pickOrder(newOrder)).select().single()
     if (error) {
       console.error('[Supabase] createOrder failed:', error)
       // 回滚乐观更新，避免本地 state 留个数据库没有的"幽灵单"
       setOrders(prev => prev.filter(o => o.id !== newOrder.id))
       throw new Error(error.message || '创建订单失败，请重试')
     }
-    return newOrder
+    // 用返回行替换本地乐观行 —— 带上触发器生成的 orderNo
+    if (data) setOrders(prev => prev.map(o => o.id === newOrder.id ? data : o))
+    return data || newOrder
   }
 
   // Atomic slot-checked order creation via Supabase RPC.
@@ -363,8 +365,15 @@ export function AppProvider({ children }) {
     const customerCode = 'C' + Math.floor(100000 + Math.random() * 900000)
     bg(supabase.from('orders').update({ customer_code: customerCode }).eq('id', data.order_id), '客户编码生成')
 
+    // 取回触发器生成的 orderNo（RPC 内部已 INSERT，号已生成）
+    let assignedOrderNo
+    try {
+      const { data: row } = await supabase.from('orders').select('*').eq('id', data.order_id).single()
+      assignedOrderNo = row?.orderNo
+    } catch { /* 取不到不影响下单，realtime 会补 */ }
+
     // Build local order object with the server-generated ID
-    const newOrder = { ...payload, id: data.order_id, customer_code: customerCode }
+    const newOrder = { ...payload, id: data.order_id, customer_code: customerCode, orderNo: assignedOrderNo }
     // Guard against realtime duplicate (subscription will also fire INSERT)
     setOrders(prev => prev.some(x => x.id === newOrder.id) ? prev : [newOrder, ...prev])
     return newOrder
@@ -424,14 +433,16 @@ export function AppProvider({ children }) {
       createdAt: new Date().toISOString(),
     }
     setStorageOrders(prev => [newStorage, ...prev])
-    const { error } = await supabase.from('storage_orders').insert(pickStorage(newStorage))
+    const { data: inserted, error } = await supabase.from('storage_orders').insert(pickStorage(newStorage)).select().single()
     if (error) {
       console.error('[Supabase] createStorageOrder failed:', error)
       // 回滚乐观更新
       setStorageOrders(prev => prev.filter(o => o.id !== newStorage.id))
       throw new Error(error.message || '创建寄存订单失败，请重试')
     }
-    return newStorage
+    // 用返回行替换本地乐观行 —— 带上触发器生成的 orderNo
+    if (inserted) setStorageOrders(prev => prev.map(o => o.id === newStorage.id ? inserted : o))
+    return inserted || newStorage
   }
 
   function updateStorageOrder(id, updates) {
@@ -555,7 +566,7 @@ export function AppProvider({ children }) {
   function exportOrdersCSV() {
     const headers = ['订单号','日期','时间','客户','电话','车型','出发地','目的地','报价','实收','定金状态','付款方式','状态','师傅','登记人','创建时间']
     const rows = orders.map(o => [
-      o.id,
+      o.orderNo || o.id,
       o.date || '',
       o.startTime || '',
       o.customerName || '',

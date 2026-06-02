@@ -216,7 +216,7 @@ function StorageCard({ order, onClick }) {
             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${color}`}>
               📦 {order.status}
             </span>
-            <span className="text-gray-300 text-xs hidden sm:inline">{order.id}</span>
+            <span className="text-gray-300 text-xs hidden sm:inline font-mono">{order.orderNo || order.id}</span>
           </div>
           <p className="text-gray-900 font-bold text-base truncate">{order.customerName}</p>
           <p className="text-gray-400 text-sm mt-0.5">入库：{order.moveInDate}</p>
