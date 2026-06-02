@@ -37,7 +37,8 @@ export default function OrderDetail() {
   )
 
   const canConfirm = order.status === '待确认'
-  const canWork    = order.status === '师傅已确认' || order.status === '已派单'
+  // 含「进行中」：师傅点开始后状态变进行中，仍要能再进计时页（暂停/结束/查看）
+  const canWork    = ['师傅已确认', '已派单', '进行中'].includes(order.status)
   const customerLevel = getCustomerLevel(orders, order.customerPhone)
 
   const rm = order.requestedMaterials
@@ -345,7 +346,7 @@ export default function OrderDetail() {
                 style={{ background: 'linear-gradient(135deg, #8B1A1A, #c0392b)' }}
               >
                 <PlayCircle size={20} />
-                开始工作
+                {order.status === '进行中' ? '进入计时' : '开始工作'}
               </button>
             )}
 
