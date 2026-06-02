@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { formatDuration, billedHours, computeElapsed } from '../utils/pricing'
@@ -8,19 +8,16 @@ import { ArrowLeft, Play, Pause, StopCircle, Clock, CheckCircle } from 'lucide-r
 export default function WorkPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { orders, getTimerState, setTimerState } = useApp()
+  const { orders, updateOrderTimer, updateOrderStatus } = useApp()
   const order = orders.find(o => o.id === id)
 
-  // 只读这单的 timer 状态（不会被别的订单污染）
-  // useMemo 保证 init 期间 getTimerState 只调一次
-  const savedTimer = useMemo(() => getTimerState(id), [id])
-
-  // Timer 状态：用墙上时钟时间差计算，免疫手机锁屏 JS 暂停 bug
-  const [status, setStatus]                 = useState(savedTimer?.status || 'idle')
-  const [startTime, setStartTime]           = useState(savedTimer?.startTime || null)
-  const [endTime, setEndTime]               = useState(savedTimer?.endTime || null)
-  const [accumulatedSec, setAccumulatedSec] = useState(Number(savedTimer?.accumulatedSec) || 0)
-  const [runStartedAt, setRunStartedAt]     = useState(savedTimer?.runStartedAt || null)
+  // 计时状态上云：直接读订单行的 work* 字段，靠 realtime 同步给同组师傅
+  // 用墙上时钟时间差计算，免疫手机锁屏 JS 暂停 bug
+  const rawStatus      = order?.workStatus || 'idle'
+  // 客服后台手动完单后，无论 work 字段是什么都按"已结束"显示，避免僵尸计时
+  const status         = order?.status === '已完成' ? 'stopped' : rawStatus
+  const accumulatedSec = Number(order?.workAccumulatedSec) || 0
+  const runStartedAt   = order?.workRunStartedAt || null
 
   // tick 用于触发 re-render 让显示的秒数更新（实际时间从墙上时钟算）
   const [, setTick] = useState(0)
@@ -34,58 +31,51 @@ export default function WorkPage() {
   // 跑动时：每秒触发 re-render；屏幕从锁定状态恢复时立刻 re-render
   useEffect(() => {
     if (status !== 'running') return
-    const id = setInterval(() => setTick(t => t + 1), 1000)
+    const tid = setInterval(() => setTick(t => t + 1), 1000)
     const onVisible = () => { if (!document.hidden) setTick(t => t + 1) }
     document.addEventListener('visibilitychange', onVisible)
     return () => {
-      clearInterval(id)
+      clearInterval(tid)
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [status])
 
-  // 持久化 timer 状态（页面切换/刷新后能恢复），按订单 id 隔离
-  useEffect(() => {
-    setTimerState(id, { status, startTime, endTime, accumulatedSec, runStartedAt })
-  }, [id, status, startTime, endTime, accumulatedSec, runStartedAt])
-
-  // 后台已完成时：清掉本地 timer，避免再返回这单时看到僵尸计时
-  // Why: 客服在后台手动完单后，师傅端本地 timer 仍在跑/暂停状态，下次再点会显示旧数据
-  useEffect(() => {
-    if (order?.status === '已完成' && status !== 'stopped') {
-      setStatus('stopped')
-      setRunStartedAt(null)
-    }
-  }, [order?.status])
-
   function handleStart() {
     const now = new Date().toISOString()
-    setStartTime(now)
-    setAccumulatedSec(0)
-    setRunStartedAt(now)
-    setStatus('running')
+    updateOrderTimer(id, {
+      workStatus: 'running',
+      workStartedAt: now,
+      workAccumulatedSec: 0,
+      workRunStartedAt: now,
+      workEndedAt: null,
+    })
+    // 顺带把订单状态置「进行中」，客服端能看到师傅在干活（非法转换则忽略，不挡计时）
+    if (order && !['进行中', '已完成', '已取消'].includes(order.status)) {
+      try { updateOrderStatus(id, '进行中') } catch { /* 非法状态转换不影响计时 */ }
+    }
   }
   function handlePause() {
-    // 把当前这一段已跑时间累加到 accumulatedSec，停止本段
-    if (runStartedAt) {
-      const runningSec = (Date.now() - new Date(runStartedAt).getTime()) / 1000
-      setAccumulatedSec(prev => prev + Math.max(0, runningSec))
-    }
-    setRunStartedAt(null)
-    setStatus('paused')
+    // 把当前这一段已跑时间折进 accumulatedSec，停止本段
+    updateOrderTimer(id, {
+      workStatus: 'paused',
+      workAccumulatedSec: computeElapsed({ accumulatedSec, runStartedAt }),
+      workRunStartedAt: null,
+    })
   }
   function handleResume() {
-    setRunStartedAt(new Date().toISOString())
-    setStatus('running')
+    updateOrderTimer(id, {
+      workStatus: 'running',
+      workRunStartedAt: new Date().toISOString(),
+    })
   }
   function handleStop() {
-    // 同样把最后一段累加进去
-    if (runStartedAt) {
-      const runningSec = (Date.now() - new Date(runStartedAt).getTime()) / 1000
-      setAccumulatedSec(prev => prev + Math.max(0, runningSec))
-    }
-    setRunStartedAt(null)
-    setEndTime(new Date().toISOString())
-    setStatus('stopped')
+    // 同样把最后一段折进去，并记录真实收工时间
+    updateOrderTimer(id, {
+      workStatus: 'stopped',
+      workAccumulatedSec: computeElapsed({ accumulatedSec, runStartedAt }),
+      workRunStartedAt: null,
+      workEndedAt: new Date().toISOString(),
+    })
   }
   function handleGoForm() { navigate(`/order/${id}/form`) }
 

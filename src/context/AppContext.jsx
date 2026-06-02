@@ -38,6 +38,9 @@ const ORDER_COLUMNS = new Set([
   'dispatchedAt','confirmedAt','confirmChecks','csNote','createdBy','createdByName',
   'ikeaOrderNo','storeLocation','rubbishDisposal','riskItems','photos','hasVideo',
   'paymentStatus','collectedBy','completedAt',
+  // 师傅端工作计时上云（6/2 加列）— 计时状态存订单行，靠 realtime 同步给同组师傅
+  // workStatus: idle|running|paused|stopped；workStartedAt/EndedAt 是真实开工/收工时间
+  'workStatus','workStartedAt','workEndedAt','workAccumulatedSec','workRunStartedAt',
   'materials','materialsCost',
   'fragileItems','fragileDescription','fragileEstimatedFee',
   'customer_code','workerNote',
@@ -372,6 +375,14 @@ export function AppProvider({ children }) {
     bg(supabase.from('orders').update(pickOrder(updates)).eq('id', orderId), '更新订单')
   }
 
+  // 师傅端工作计时上云 — 把计时状态写到订单行，靠 realtime 同步给同组所有师傅
+  // Why: 旧版计时只存本地 localStorage，导致①同组师傅各跑各的不同步 ②重登录/清缓存丢失
+  // How: 只在按钮（开始/暂停/继续/结束）时调用，不是每秒写；写失败 bg() 会弹窗提示
+  function updateOrderTimer(orderId, patch) {
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...patch } : o))
+    bg(supabase.from('orders').update(pickOrder(patch)).eq('id', orderId), '工作计时同步')
+  }
+
   // 派单 — async + throw 版
   // Why: 派单失败不能让客服误以为派出去了，导致漏单
   async function dispatchOrder(orderId, workerIds) {
@@ -586,7 +597,7 @@ export function AppProvider({ children }) {
       user, worker, login, logout,
       orders, confirmOrder, completeOrder, getMyOrders,
       createOrder, createOrderWithSlotCheck,
-      updateOrder, dispatchOrder, updateOrderStatus,
+      updateOrder, updateOrderTimer, dispatchOrder, updateOrderStatus,
       storageOrders, createStorageOrder, updateStorageOrder, completeStorageOrder, deleteOrder,
       secondhandItems, createSecondhandItem, updateSecondhandItem,
       secondhandLeads, createSecondhandLead, updateSecondhandLead,

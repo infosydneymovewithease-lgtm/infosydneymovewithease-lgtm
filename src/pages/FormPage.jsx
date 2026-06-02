@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { calcTotal, billedHours, formatDuration, computeElapsed } from '../utils/pricing'
@@ -9,7 +9,7 @@ import { ArrowLeft, Upload, X } from 'lucide-react'
 export default function FormPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { orders, getTimerState, completeOrder, updateOrder, setTimerState } = useApp()
+  const { orders, completeOrder, updateOrder } = useApp()
   const order = orders.find(o => o.id === id)
   const v = VEHICLES[order?.vehicle]
 
@@ -18,13 +18,14 @@ export default function FormPage() {
   // 用 effect 锁住第一次可用的 version（mount 时 order 可能还在 loading）
   const initialVersionRef = useRef(null)
 
-  // 按订单 id 读 timer 状态（不会被别的订单污染）
-  const timerState = useMemo(() => getTimerState(id), [id])
-
+  // 工时来源：订单行的 work* 字段（计时已上云，跟 WorkPage 同源）
   // 用墙上时钟时间差算，免疫手机锁屏 JS 暂停 bug
-  const elapsed = computeElapsed(timerState)
-  const startTime = timerState?.startTime
-  const endTime = timerState?.endTime
+  const elapsed = computeElapsed({
+    accumulatedSec: order?.workAccumulatedSec,
+    runStartedAt: order?.workRunStartedAt,
+  })
+  const startTime = order?.workStartedAt
+  const endTime = order?.workEndedAt
 
   // 回程费
   const [returnFee, setReturnFee] = useState(String(v?.returnFee ?? ''))
@@ -184,7 +185,6 @@ export default function FormPage() {
         hourlyRate:     v.hourlyRate,
         workerNote:     workerNote.trim() || null,
       }, initialVersionRef.current)  // M8: 带上进 FormPage 时的 version，并发改时会拒绝
-      setTimerState(id, null)  // 提交成功后清掉这单的 timer state
       navigate(`/order/${id}/summary`, {
         state: { result, order, billed, paymentMethod, paymentStatus, amountOwed, paymentNote, elapsed }
       })
