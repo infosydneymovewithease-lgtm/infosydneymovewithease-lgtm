@@ -4,7 +4,6 @@ import { useApp } from '../../context/AppContext'
 import { VEHICLES, VAN_PROMO_DISCOUNT } from '../../data/vehicles'
 import { HEAVY_ITEM_OPTIONS, calcHeavyTotal } from '../../data/heavyItems'
 import { ORDER_STATUSES } from '../../data/orderStatus'
-import { SLOT_CONFIG, fetchSlotsAvailability } from '../../utils/slotAvailability'
 import {
   ArrowLeft, Phone, MapPin, Package, MessageSquare,
   DollarSign, Calendar, Truck, CheckCircle, User,
@@ -13,14 +12,6 @@ import {
 
 // 从单一真相源导入 — 之前散在这里的 hardcoded 数组已迁移到 src/data/orderStatus.js
 const STATUS_FLOW = ORDER_STATUSES
-
-// 车型 → 时段组（编辑订单选时段用）
-const VEHICLE_TO_GROUP = {
-  '面包车': 'van', '卡车单人': 'van',
-  '小卡车': 'small', '小卡三人': 'small',
-  '大卡车': 'large', '大卡三人': 'large', '双卡车': 'large',
-}
-const MOVING_VEHICLES = Object.keys(VEHICLE_TO_GROUP)
 
 // ── Cleaning pricing model ──
 const CLEAN_BASE = { studio: 140, '1b': 160, '2b': 190, '3b': 270 }
@@ -103,7 +94,6 @@ export default function AdminOrderDetail() {
   const [csNote,  setCsNote]  = useState(() => order?.csNote || '')
   const [heavyItems, setHeavyItemsState] = useState(() => order?.heavyItems || {})
   const [showEditBill, setShowEditBill] = useState(false)
-  const [showEdit, setShowEdit] = useState(false)
 
   // 重新计算订单总报价 + 拆分明细文案
   function rebuildQuote(newHeavyItems) {
@@ -260,26 +250,13 @@ export default function AdminOrderDetail() {
         </button>
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-xl font-bold text-gray-900 font-mono">{order.orderNo || order.customerName}</h1>
+            <h1 className="text-xl font-bold text-gray-900">{order.customerName}</h1>
             <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${STATUS_COLOR[order.status] || 'bg-gray-100 text-gray-500'}`}>
               {order.status}
             </span>
           </div>
-          <p className="text-xs mt-0.5">
-            {order.orderNo && <span className="text-gray-700 font-semibold">{order.customerName}</span>}
-            {order.orderNo && <span className="mx-1.5 text-gray-300">·</span>}
-            <span className="text-gray-300">{order.id}</span>
-          </p>
+          <p className="text-gray-400 text-xs mt-0.5">{order.id}</p>
         </div>
-        {VEHICLE_TO_GROUP[order.vehicle] && (
-          <button
-            onClick={() => setShowEdit(true)}
-            className="flex-shrink-0 px-2.5 py-1.5 text-xs text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg flex items-center gap-1 font-medium"
-            title="编辑订单（日期/时段/地址等）"
-          >
-            <Edit3 size={14} /> 编辑
-          </button>
-        )}
       </div>
 
       {/* 账单已修改横幅 */}
@@ -408,18 +385,9 @@ export default function AdminOrderDetail() {
 
       {/* Customer */}
       <Card title="客户信息">
-        {order.orderNo && (
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs text-gray-400 w-12 flex-shrink-0">订单号</span>
-            <span className="font-mono font-semibold text-gray-900">{order.orderNo}</span>
-          </div>
-        )}
         <div className="flex items-center justify-between mb-3">
           <div>
-            <div className="flex items-center gap-2">
-              {order.orderNo && <span className="text-xs text-gray-400 w-12 flex-shrink-0">姓名</span>}
-              <p className="text-gray-900 font-semibold">{order.customerName}</p>
-            </div>
+            <p className="text-gray-900 font-semibold">{order.customerName}</p>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
                 {custLevel.badge} {custLevel.label}
@@ -1153,23 +1121,6 @@ export default function AdminOrderDetail() {
           </div>
         </Modal>
       )}
-
-      {/* 编辑订单信息（日期/时段/车型/地址/备注）*/}
-      {showEdit && (
-        <EditOrderModal
-          order={order}
-          onClose={() => setShowEdit(false)}
-          onSave={(updates, reason) => {
-            updateOrder(id, {
-              ...updates,
-              editedAt: new Date().toISOString(),
-              editedBy: user?.name || user?.role || '客服',
-              editReason: reason || '修改订单信息',
-            })
-            setShowEdit(false)
-          }}
-        />
-      )}
     </div>
   )
 }
@@ -1435,158 +1386,6 @@ function EditBillModal({ order, onClose, onSave }) {
             disabled={!canSave}
             className="flex-1 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
-            保存修改
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// 编辑搬家订单：日期 / 时段 / 车型 / 地址 / 备注（时段带可用性提示，软提醒不硬拦）
-function EditOrderModal({ order, onClose, onSave }) {
-  const [date, setDate]               = useState(order.date || '')
-  const [vehicle, setVehicle]         = useState(order.vehicle || '')
-  const [startTime, setStartTime]     = useState(order.startTime || '')
-  const [fromAddress, setFromAddress] = useState(order.fromAddress || '')
-  const [toAddress, setToAddress]     = useState(order.toAddress || '')
-  const [note, setNote]               = useState(order.csNote || '')
-  const [reason, setReason]           = useState('')
-  const [slotAvail, setSlotAvail]     = useState({})
-  const [loadingSlots, setLoadingSlots] = useState(false)
-
-  const slotGroup = VEHICLE_TO_GROUP[vehicle] || null
-  const slots = slotGroup ? (SLOT_CONFIG[slotGroup]?.slots || []) : []
-
-  // 查目标日期 + 车型组的时段可用性
-  useEffect(() => {
-    if (!slotGroup || !date) { setSlotAvail({}); return }
-    let alive = true
-    setLoadingSlots(true)
-    fetchSlotsAvailability(slotGroup, date).then(r => {
-      if (!alive) return
-      setSlotAvail(r || {})
-      setLoadingSlots(false)
-    })
-    return () => { alive = false }
-  }, [slotGroup, date])
-
-  // 改车型后若原时段不在新组里，清空让重选
-  useEffect(() => {
-    if (slotGroup && startTime && !slots.includes(startTime)) setStartTime('')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicle])
-
-  const pickedFull = !!(slotAvail[startTime] && slotAvail[startTime].available <= 0)
-  const changed =
-    date !== (order.date || '') || vehicle !== (order.vehicle || '') ||
-    startTime !== (order.startTime || '') || fromAddress !== (order.fromAddress || '') ||
-    toAddress !== (order.toAddress || '') || note !== (order.csNote || '')
-
-  function handleSave() {
-    if (!date || !startTime) return
-    onSave({
-      date, vehicle, startTime, fromAddress, toAddress,
-      csNote: note.trim() || null,
-    }, reason.trim())
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
-      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
-          <h3 className="font-bold text-gray-900">编辑订单</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
-        </div>
-
-        <div className="px-5 py-4 overflow-y-auto flex-1 space-y-4">
-          {/* 日期 */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">服务日期</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-200" />
-          </div>
-
-          {/* 车型 */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">车型</label>
-            <select value={vehicle} onChange={e => setVehicle(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-200">
-              {!MOVING_VEHICLES.includes(vehicle) && vehicle && <option value={vehicle}>{vehicle}</option>}
-              {MOVING_VEHICLES.map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
-            <p className="text-xs text-gray-400 mt-1">改车型不影响最终账单（账单按实际工时计）</p>
-          </div>
-
-          {/* 时段 */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">到达时段</label>
-            {loadingSlots && <p className="text-xs text-gray-400 mb-1">正在查询可用时段…</p>}
-            {slots.length > 0 ? (
-              <div className="grid grid-cols-1 gap-2">
-                {slots.map((slot, idx) => {
-                  const a = slotAvail[slot]
-                  const full = !!(a && a.available <= 0)
-                  const selected = startTime === slot
-                  return (
-                    <button key={slot} type="button"
-                      onClick={() => setStartTime(slot)}
-                      className="w-full px-4 py-2.5 rounded-xl text-sm font-medium text-left flex items-center justify-between border-2 transition-colors"
-                      style={selected
-                        ? { background: '#fef2f2', color: '#991b1b', borderColor: '#dc2626' }
-                        : { background: 'white', color: '#374151', borderColor: '#e5e7eb' }}>
-                      <span>{idx === 0 ? `${slot.split('–')[0]} 准时到达` : slot}</span>
-                      {full
-                        ? <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-gray-200 text-gray-500">已满</span>
-                        : a ? <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-700">剩余 {a.available}</span> : null}
-                    </button>
-                  )
-                })}
-              </div>
-            ) : (
-              <input type="text" value={startTime} onChange={e => setStartTime(e.target.value)}
-                placeholder="如 08:00–10:00"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-200" />
-            )}
-            {pickedFull && (
-              <p className="text-amber-600 text-xs mt-1.5">⚠️ 该时段已满，仍可安排进去（会超出当时段运力，请确认）</p>
-            )}
-          </div>
-
-          {/* 地址 */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">搬出地址</label>
-            <input type="text" value={fromAddress} onChange={e => setFromAddress(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-200" />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">搬入地址</label>
-            <input type="text" value={toAddress} onChange={e => setToAddress(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-200" />
-          </div>
-
-          {/* 备注 */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">客服备注</label>
-            <textarea value={note} onChange={e => setNote(e.target.value)} rows={2}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-200" />
-          </div>
-
-          {/* 修改原因（审计） */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">修改原因（可选，存入记录）</label>
-            <input type="text" value={reason} onChange={e => setReason(e.target.value)}
-              placeholder="例如：客户改期 / 写错时间 / 下雨顺延"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-200" />
-          </div>
-        </div>
-
-        <div className="px-5 py-3 border-t border-gray-100 flex gap-2 flex-shrink-0">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200">
-            取消
-          </button>
-          <button onClick={handleSave} disabled={!date || !startTime || !changed}
-            className="flex-1 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 disabled:opacity-40">
             保存修改
           </button>
         </div>

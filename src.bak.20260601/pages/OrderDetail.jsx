@@ -37,8 +37,7 @@ export default function OrderDetail() {
   )
 
   const canConfirm = order.status === '待确认'
-  // 含「进行中」：师傅点开始后状态变进行中，仍要能再进计时页（暂停/结束/查看）
-  const canWork    = ['师傅已确认', '已派单', '进行中'].includes(order.status)
+  const canWork    = order.status === '师傅已确认' || order.status === '已派单'
   const customerLevel = getCustomerLevel(orders, order.customerPhone)
 
   const rm = order.requestedMaterials
@@ -66,10 +65,10 @@ export default function OrderDetail() {
             <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-red-200">
               <ArrowLeft size={22} />
             </button>
-            <h1 className="text-white font-bold text-lg flex-1 font-mono">{order.orderNo || '订单详情'}</h1>
+            <h1 className="text-white font-bold text-lg flex-1">订单详情</h1>
             <StatusBadge status={order.status} />
           </div>
-          <p className="text-red-300 text-xs ml-2 font-mono">{order.id}</p>
+          <p className="text-red-300 text-xs ml-2">{order.id}</p>
         </div>
       </div>
 
@@ -346,7 +345,7 @@ export default function OrderDetail() {
                 style={{ background: 'linear-gradient(135deg, #8B1A1A, #c0392b)' }}
               >
                 <PlayCircle size={20} />
-                {order.status === '进行中' ? '进入计时' : '开始工作'}
+                开始工作
               </button>
             )}
 
