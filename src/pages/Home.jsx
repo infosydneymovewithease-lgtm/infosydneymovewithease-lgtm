@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { getTodayHoliday } from '../data/holidays'
@@ -37,11 +38,24 @@ export default function Home() {
   const recentCutoff = today.subtract(7, 'day').format('YYYY-MM-DD')
   const isRecent = o => (o.date || '') >= recentCutoff
 
-  const active = myOrders.filter(o => !['已完成', '已取消'].includes(o.status))
-  const done   = myOrders.filter(o => o.status === '已完成' && isRecent(o))
-  const activeStorage = myStorageOrders.filter(o => !['寄存中', '已取出', '已完成', '已取消'].includes(o.status))
-  const doneStorage   = myStorageOrders.filter(o => o.status === '寄存中' && isRecent(o))
-  const totalPending = active.length + activeStorage.length
+  // 三个标签页分桶：未确认 / 进行中(待进行+进行中) / 已完成
+  const unconfirmedOrders  = myOrders.filter(o => ['待确认', '已派单'].includes(o.status))
+  const unconfirmedStorage = myStorageOrders.filter(o => ['待确认', '已派单'].includes(o.status))
+  const ongoingOrders      = myOrders.filter(o => ['师傅已确认', '进行中'].includes(o.status))
+  const ongoingStorage     = myStorageOrders.filter(o => o.status === '已确认')
+  const done               = myOrders.filter(o => o.status === '已完成' && isRecent(o))
+  const doneStorage        = myStorageOrders.filter(o => o.status === '寄存中' && isRecent(o))
+
+  const TABS = [
+    { key: 'unconfirmed', label: '未确认', orders: unconfirmedOrders, storage: unconfirmedStorage },
+    { key: 'ongoing',     label: '进行中', orders: ongoingOrders,     storage: ongoingStorage },
+    { key: 'done',        label: '已完成', orders: done,              storage: doneStorage },
+  ]
+  const [activeTab, setActiveTab] = useState('unconfirmed')
+  const current = TABS.find(t => t.key === activeTab) || TABS[0]
+
+  const totalPending = unconfirmedOrders.length + unconfirmedStorage.length
+    + ongoingOrders.length + ongoingStorage.length
   const totalDone    = done.length + doneStorage.length
 
   return (
@@ -123,40 +137,50 @@ export default function Home() {
           </div>
         )}
 
-        {/* 待处理订单（搬家 + 寄存合并） */}
-        <div>
-          <SectionHeader label="待处理订单" count={active.length + activeStorage.length} accent />
-          {(active.length + activeStorage.length) === 0 ? (
-            <div className="bg-white rounded-xl p-8 text-center text-gray-400 text-sm shadow-sm">
-              暂无待处理订单
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {activeStorage.map(order => (
-                <StorageCard key={order.id} order={order} onClick={() => navigate(`/storage/${order.id}`)} />
-              ))}
-              {active.map(order => (
-                <OrderCard key={order.id} order={order}
-                  onClick={() => navigate(`/order/${order.id}`)}
-                  onConfirm={confirmOrder} />
-              ))}
-            </div>
-          )}
+        {/* 三个标签页：未确认 / 进行中 / 已完成 */}
+        <div className="flex gap-1.5 bg-gray-200/60 p-1 rounded-xl">
+          {TABS.map(t => {
+            const cnt = t.orders.length + t.storage.length
+            const on = activeTab === t.key
+            return (
+              <button
+                key={t.key}
+                onClick={() => setActiveTab(t.key)}
+                className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  on ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'
+                }`}
+                style={on ? { color: '#8B1A1A' } : {}}
+              >
+                {t.label}
+                {cnt > 0 && (
+                  <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-bold ${
+                    on ? 'bg-red-100 text-red-700' : 'bg-gray-300 text-gray-600'
+                  }`}>
+                    {cnt}
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </div>
 
-        {/* 已完成订单（最近 7 天，搬家 + 寄存合并）*/}
-        {(done.length + doneStorage.length) > 0 && (
-          <div>
-            <SectionHeader label="已完成订单（最近 7 天）" count={done.length + doneStorage.length} />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {doneStorage.map(order => (
-                <StorageCard key={order.id} order={order} onClick={() => navigate(`/storage/${order.id}`)} />
-              ))}
-              {done.map(order => (
-                <OrderCard key={order.id} order={order}
-                  onClick={() => navigate(`/order/${order.id}`)} />
-              ))}
-            </div>
+        {/* 当前标签页列表（寄存单排前，搬家单排后）*/}
+        {(current.orders.length + current.storage.length) === 0 ? (
+          <div className="bg-white rounded-xl p-8 text-center text-gray-400 text-sm shadow-sm">
+            {activeTab === 'unconfirmed' ? '暂无未确认订单'
+              : activeTab === 'ongoing' ? '暂无进行中订单'
+              : '最近 7 天暂无已完成订单'}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {current.storage.map(order => (
+              <StorageCard key={order.id} order={order} onClick={() => navigate(`/storage/${order.id}`)} />
+            ))}
+            {current.orders.map(order => (
+              <OrderCard key={order.id} order={order}
+                onClick={() => navigate(`/order/${order.id}`)}
+                onConfirm={activeTab === 'unconfirmed' ? confirmOrder : undefined} />
+            ))}
           </div>
         )}
 
@@ -181,19 +205,6 @@ function Stat({ label, value }) {
     <div className="text-center">
       <p className="text-white text-2xl font-bold">{value}</p>
       <p className="text-red-300 text-xs">{label}</p>
-    </div>
-  )
-}
-
-function SectionHeader({ label, count, accent }) {
-  return (
-    <div className="flex items-center gap-2 mb-3 px-1">
-      <div className={`w-1 h-4 rounded-full ${accent ? '' : 'bg-gray-300'}`}
-        style={accent ? { background: '#8B1A1A' } : {}} />
-      <h2 className={`font-bold text-sm ${accent ? 'text-gray-700' : 'text-gray-400'}`}>{label}</h2>
-      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${accent ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>
-        {count}
-      </span>
     </div>
   )
 }
