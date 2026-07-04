@@ -13,11 +13,6 @@ export default function FormPage() {
   const order = orders.find(o => o.id === id)
   const v = VEHICLES[order?.vehicle]
 
-  // M8 并发保护：记下进入 FormPage 时的订单 version；提交时带上
-  // 如果客服在期间改过这单，DB 会拒绝师傅的写入，提示刷新重新提交
-  // 用 effect 锁住第一次可用的 version（mount 时 order 可能还在 loading）
-  const initialVersionRef = useRef(null)
-
   // 工时来源：订单行的 work* 字段（计时已上云，跟 WorkPage 同源）
   // 用墙上时钟时间差算，免疫手机锁屏 JS 暂停 bug
   const elapsed = computeElapsed({
@@ -91,13 +86,6 @@ export default function FormPage() {
   const lastSavedNoteRef = useRef(order?.workerNote || '')
   const skipFirstSaveRef = useRef(true)
   const debounceTimerRef = useRef(null)
-
-  // M8: order 第一次可用时锁住 version，提交时用
-  useEffect(() => {
-    if (initialVersionRef.current === null && typeof order?.version === 'number') {
-      initialVersionRef.current = order.version
-    }
-  }, [order?.version])
 
   // 备注 debounce 自动保存：输入停 1.5 秒后写库，不依赖失焦
   useEffect(() => {
@@ -184,7 +172,7 @@ export default function FormPage() {
         gst:            result?.gst || 0,
         hourlyRate:     v.hourlyRate,
         workerNote:     workerNote.trim() || null,
-      }, initialVersionRef.current)  // M8: 带上进 FormPage 时的 version，并发改时会拒绝
+      })
       navigate(`/order/${id}/summary`, {
         state: { result, order, billed, paymentMethod, paymentStatus, amountOwed, paymentNote, elapsed }
       })

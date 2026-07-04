@@ -253,25 +253,37 @@ export function AppProvider({ children }) {
   }
 
   // async + throw 版：调用方必须 await + try/catch，失败能给用户明确反馈
-  // M8: 加 expectedVersion 参数做乐观锁
-  //   - 师傅进 FormPage 时记下当时的 version
-  //   - 提交时带上这个 version，DB 端如果不匹配（说明客服在期间改过）就拒绝写入
-  //   - count 为 0 表示有人抢先改了，提示师傅刷新重试
-  async function completeOrder(orderId, result, expectedVersion) {
+  // 师傅交单 = 终态权威写入：不管几个师傅、同一单被按开始/暂停/结束多少次，
+  // 谁提交一次就必须落库。
+  // 【历史坑】旧版用「进 FormPage 时锁的 version」当乐观锁闸门（.eq('version', 旧值)）。
+  // 但 orders 有 bump_version 触发器，师傅自己的备注自动保存 / 计时写入都会把 version +1，
+  // 导致提交时旧 version 对不上 → 匹配 0 行 → 状态和费用一个字都没写进去 → 还停「进行中」，
+  // 要交两次才成（师傅越多越容易中招）。现去掉该闸门。
+  // 仍保留两道安全：① 不覆盖已被客服取消的单；② 写完读回状态确认，写不进去就明确报错（杜绝「假成功」）。
+  async function completeOrder(orderId, result) {
     const updates = { status: '已完成', ...result }
+    const snapshot = orders.find(o => o.id === orderId)  // 失败时回滚用
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o))
-    let query = supabase.from('orders').update(pickOrder(updates)).eq('id', orderId)
-    if (typeof expectedVersion === 'number') {
-      query = query.eq('version', expectedVersion)
-    }
-    const { error, count } = await query.select('*', { count: 'exact', head: true })
+
+    const { error } = await supabase
+      .from('orders')
+      .update(pickOrder(updates))
+      .eq('id', orderId)
+      .neq('status', '已取消')   // 客服若已取消，不覆盖
     if (error) {
       console.error('[Supabase] completeOrder failed:', error)
-      throw new Error(error.message || '提交失败,请重试')
+      if (snapshot) setOrders(prev => prev.map(o => o.id === orderId ? snapshot : o))
+      throw new Error(error.message || '提交失败，请重试')
     }
-    if (typeof expectedVersion === 'number' && count === 0) {
-      // 版本不匹配 — 说明这单期间被改过，提示用户刷新
-      throw new Error('订单已被他人修改（客服可能调整了金额或状态），请刷新页面后重新提交')
+
+    // 读回确认：真的写成「已完成」了才算成功，否则回滚 + 明确报错（不再假装成功）
+    const { data: verify, error: verErr } = await supabase
+      .from('orders').select('status').eq('id', orderId).single()
+    if (!verErr && verify && verify.status !== '已完成') {
+      if (snapshot) setOrders(prev => prev.map(o => o.id === orderId ? snapshot : o))
+      throw new Error(verify.status === '已取消'
+        ? '此单已被客服取消，无法交单，请刷新页面'
+        : '提交未成功，请刷新后重试')
     }
   }
 
