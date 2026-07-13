@@ -84,6 +84,15 @@ function pickStorage(obj) {
   return Object.fromEntries(Object.entries(obj).filter(([k]) => STORAGE_COLUMNS.has(k)))
 }
 
+// 企业客户表列白名单（7/13 迁库）
+const B2B_COLUMNS = new Set([
+  'id','companyName','contactName','phone','wechat','address','abn','level',
+  'paymentMode','monthlyOrders','specialPricing','pricing','status','notes','createdAt',
+])
+function pickB2B(obj) {
+  return Object.fromEntries(Object.entries(obj).filter(([k]) => B2B_COLUMNS.has(k)))
+}
+
 export function AppProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
@@ -98,10 +107,8 @@ export function AppProvider({ children }) {
   const [staff, setStaff] = useState([])
 
   // localStorage-backed state (Phase 2 will migrate these)
-  const [b2bCustomers, setB2bCustomers] = useState(() => {
-    const saved = localStorage.getItem('b2bCustomers')
-    return saved ? JSON.parse(saved) : MOCK_B2B_CUSTOMERS
-  })
+  // 企业客户改由数据库做单一数据源（7/13 迁库）；空数组起步，mount 时从 DB 加载
+  const [b2bCustomers, setB2bCustomers] = useState([])
 
   const [secondhandItems, setSecondhandItems] = useState(() => {
     const saved = localStorage.getItem('secondhandItems')
@@ -168,15 +175,30 @@ export function AppProvider({ children }) {
   useEffect(() => {
     async function init() {
       try {
-        const [ordersRes, storageRes, staffRes] = await Promise.all([
+        const [ordersRes, storageRes, staffRes, b2bRes] = await Promise.all([
           supabase.from('orders').select('*').order('created_at', { ascending: false }),
           supabase.from('storage_orders').select('*').order('created_at', { ascending: false }),
           // S1-D: staff 表已锁，必须通过 list_staff RPC 读取（不含密码）
           supabase.rpc('list_staff'),
+          supabase.from('b2b_customers').select('*').order('created_at', { ascending: false }),
         ])
         if (ordersRes.data) setOrders(ordersRes.data)
         if (storageRes.data) setStorageOrders(storageRes.data)
         if (staffRes.data) setStaff(staffRes.data)
+
+        // 企业客户：DB 为准。DB 空且没报错时，一次性把本地 localStorage 里现有客户搬上云
+        // （不丢老板已录入的合作客户），localStorage 没有则用 MOCK 兜底。
+        if (b2bRes.data && b2bRes.data.length > 0) {
+          setB2bCustomers(b2bRes.data)
+        } else if (!b2bRes.error) {
+          const localRaw = localStorage.getItem('b2bCustomers')
+          const seed = localRaw ? JSON.parse(localRaw) : MOCK_B2B_CUSTOMERS
+          if (Array.isArray(seed) && seed.length > 0) {
+            const { data: inserted } = await supabase.from('b2b_customers')
+              .insert(seed.map(pickB2B)).select()
+            setB2bCustomers(inserted || seed)
+          }
+        }
       } catch (err) {
         console.error('[Supabase] Failed to load initial data', err)
       } finally {
@@ -203,6 +225,11 @@ export function AppProvider({ children }) {
         else if (eventType === 'UPDATE') setStorageOrders(prev => prev.map(x => x.id === n.id ? n : x))
         else if (eventType === 'DELETE') setStorageOrders(prev => prev.filter(x => x.id !== o.id))
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'b2b_customers' }, ({ eventType, new: n, old: o }) => {
+        if (eventType === 'INSERT') setB2bCustomers(prev => prev.some(x => x.id === n.id) ? prev : [n, ...prev])
+        else if (eventType === 'UPDATE') setB2bCustomers(prev => prev.map(x => x.id === n.id ? n : x))
+        else if (eventType === 'DELETE') setB2bCustomers(prev => prev.filter(x => x.id !== o.id))
+      })
       .subscribe()
 
     return () => supabase.removeChannel(channel)
@@ -214,7 +241,8 @@ export function AppProvider({ children }) {
     else localStorage.removeItem('user')
   }, [user])
 
-  useEffect(() => { localStorage.setItem('b2bCustomers', JSON.stringify(b2bCustomers)) }, [b2bCustomers])
+  // 企业客户不再持久化到 localStorage（DB 为单一数据源）。
+  // 特意保留旧 localStorage 值不动，供 init() 首次迁库读取，迁完即弃用。
   useEffect(() => { localStorage.setItem('secondhandItems', JSON.stringify(secondhandItems)) }, [secondhandItems])
   useEffect(() => { localStorage.setItem('secondhandLeads', JSON.stringify(secondhandLeads)) }, [secondhandLeads])
   useEffect(() => { localStorage.setItem('secondhandListings', JSON.stringify(secondhandListings)) }, [secondhandListings])
@@ -578,13 +606,26 @@ export function AppProvider({ children }) {
   }
 
   function createB2BCustomer(data) {
-    const next = { ...data, id: `B2B-${String(b2bCustomers.length + 1).padStart(4,'0')}`, createdAt: new Date().toISOString().slice(0,10), status: '合作中' }
-    setB2bCustomers(prev => [next, ...prev])
+    // 从现有 id 最大编号 +1，避免删除后 length 复用导致主键撞车
+    const maxNum = b2bCustomers.reduce((m, c) => {
+      const n = parseInt(String(c.id).replace(/\D/g, ''), 10)
+      return Number.isFinite(n) && n > m ? n : m
+    }, 0)
+    const next = {
+      ...data,
+      id: `B2B-${String(maxNum + 1).padStart(4, '0')}`,
+      pricing: data.pricing || {},
+      createdAt: new Date().toISOString().slice(0, 10),
+      status: data.status || '合作中',
+    }
+    setB2bCustomers(prev => prev.some(c => c.id === next.id) ? prev : [next, ...prev])
+    bg(supabase.from('b2b_customers').insert(pickB2B(next)), '新增企业客户')
     return next
   }
 
   function updateB2BCustomer(id, updates) {
     setB2bCustomers(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c))
+    bg(supabase.from('b2b_customers').update(pickB2B(updates)).eq('id', id), '更新企业客户')
   }
 
   // S1-D: staff 表已锁，走 RPC 而不是直接 insert/update

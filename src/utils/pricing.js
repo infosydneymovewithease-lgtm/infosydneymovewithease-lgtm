@@ -53,6 +53,7 @@ export function calcOvertimeFee(startTime, endTime, people) {
 
 export function calcTotal({
   vehicle,
+  hourlyRate,      // 可选：合作客户协议时薪（快照）；留空用标准车型时薪
   workSeconds,
   returnFee,
   startTime,
@@ -73,8 +74,12 @@ export function calcTotal({
   const v = VEHICLES[vehicle]
   if (!v) return null
 
+  // 合作价快照优先，否则用标准车型时薪
+  const rate = (hourlyRate != null && hourlyRate !== '' && !Number.isNaN(Number(hourlyRate)))
+    ? Number(hourlyRate) : v.hourlyRate
+
   const billed = billedHours(workSeconds, v.minHours)
-  const timeFee = v.hourlyRate * billed
+  const timeFee = rate * billed
 
   const stairsFee = (!hasElevator && Number(floors) > 0)
     ? (STAIRS_FEE[v.people] || 0) * Number(floors)

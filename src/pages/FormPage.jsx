@@ -13,6 +13,12 @@ export default function FormPage() {
   const order = orders.find(o => o.id === id)
   const v = VEHICLES[order?.vehicle]
 
+  // 合作价快照优先：NewOrder 下单选中企业客户时，把协议单价快照进订单
+  // （order.hourlyRate/returnFee）。没有快照就用标准车型价。
+  const isPartnerPrice = order?.hourlyRate != null
+  const snapHourly = isPartnerPrice ? Number(order.hourlyRate) : v?.hourlyRate
+  const snapReturn = order?.returnFee != null ? Number(order.returnFee) : v?.returnFee
+
   // 工时来源：订单行的 work* 字段（计时已上云，跟 WorkPage 同源）
   // 用墙上时钟时间差算，免疫手机锁屏 JS 暂停 bug
   const elapsed = computeElapsed({
@@ -23,7 +29,7 @@ export default function FormPage() {
   const endTime = order?.workEndedAt
 
   // 回程费
-  const [returnFee, setReturnFee] = useState(String(v?.returnFee ?? ''))
+  const [returnFee, setReturnFee] = useState(String(snapReturn ?? ''))
 
   // 楼梯费 — 同步自客户/客服订单的 stairFee（反算楼层数）
   const orderStairFee = Number(order?.stairFee) || 0
@@ -115,6 +121,7 @@ export default function FormPage() {
 
   const result = calcTotal({
     vehicle: order.vehicle,
+    hourlyRate: snapHourly,
     workSeconds: elapsed,
     returnFee,
     startTime,
@@ -170,7 +177,7 @@ export default function FormPage() {
         fuelFee:        Number(fuel) || 0,
         discountAmount: result?.discountAmount || 0,
         gst:            result?.gst || 0,
-        hourlyRate:     v.hourlyRate,
+        hourlyRate:     snapHourly,
         workerNote:     workerNote.trim() || null,
       })
       navigate(`/order/${id}/summary`, {
@@ -200,6 +207,16 @@ export default function FormPage() {
 
       <div className="max-w-3xl mx-auto px-4 pt-4 space-y-3">
 
+        {/* 合作价提示 —— 这单按企业客户协议单价计算 */}
+        {isPartnerPrice && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 flex items-center gap-2">
+            <span className="text-lg">🤝</span>
+            <p className="text-sm text-emerald-800">
+              企业合作单 · 时薪按合作价 <span className="font-bold">${snapHourly}/小时</span>（已自动套用，无需手动打折）
+            </p>
+          </div>
+        )}
+
         {/* 工时摘要（只读） */}
         <Section title="工时摘要">
           <Row label="实际工作时长">{formatDuration(elapsed)}</Row>
@@ -209,7 +226,10 @@ export default function FormPage() {
               <span className="text-amber-500 text-xs ml-1">(起步 {v.minHours}h)</span>
             )}
           </Row>
-          <Row label="时薪">${v.hourlyRate}/小时</Row>
+          <Row label="时薪">
+            ${snapHourly}/小时
+            {isPartnerPrice && <span className="text-emerald-600 text-xs ml-1 font-semibold">🤝 合作价</span>}
+          </Row>
           <Row label="工时费">
             <span className="font-semibold text-gray-900">${result?.timeFee?.toFixed(2)}</span>
           </Row>

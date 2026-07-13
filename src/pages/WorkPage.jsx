@@ -91,9 +91,11 @@ export default function WorkPage() {
 
   if (!order || !v) return null
 
+  // 合作价快照优先（跟 FormPage 账单同源），否则用标准车型价
+  const estHourly = order?.hourlyRate != null ? Number(order.hourlyRate) : v.hourlyRate
   const billed = billedHours(elapsed, v.minHours)
-  const estimatedTimeFee = v.hourlyRate * billed
-  const returnFeeDefault = v.returnFee
+  const estimatedTimeFee = estHourly * billed
+  const returnFeeDefault = order?.returnFee != null ? Number(order.returnFee) : v.returnFee
   const vanDiscount = vehicle === '面包车' ? VAN_PROMO_DISCOUNT : 0
 
   // 已同步在订单上的附加费（客户下单 / 客服派单时已确认）
@@ -254,7 +256,7 @@ export default function WorkPage() {
               <div className="bg-white rounded-xl p-4 shadow-sm">
                 <h3 className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-3">实时费用预估</h3>
                 <div className="space-y-2">
-                  <FeeRow label={`工时费 ($${v.hourlyRate}/h × ${billed}h)`} value={estimatedTimeFee} />
+                  <FeeRow label={`工时费 ($${estHourly}/h × ${billed}h)`} value={estimatedTimeFee} />
                   <FeeRow label="回程费（默认）" value={returnFeeDefault} muted />
                   {remoteSurcharge > 0 && <FeeRow label="远途附加费" value={remoteSurcharge} />}
                   {stairFee > 0 && <FeeRow label="楼梯费" value={stairFee} />}

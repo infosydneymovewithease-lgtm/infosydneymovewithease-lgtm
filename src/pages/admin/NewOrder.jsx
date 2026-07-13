@@ -6,6 +6,7 @@ import { HEAVY_ITEM_OPTIONS, calcHeavyTotal } from '../../data/heavyItems'
 import { calcRemoteSurcharge, getDistanceTier } from '../../utils/remoteFee'
 import { SLOT_CONFIG, fetchSlotsAvailability } from '../../utils/slotAvailability'
 import { isTimeOutsideSlot } from '../../utils/orderTime'
+import { effectiveVehicleRate } from '../../utils/partnerPricing'
 import { getStorageRates, FREE_SUPPLIES_LABEL } from '../../data/storageRates'
 import { supabase } from '../../lib/supabase'
 import { ArrowLeft, MapPin, Package, AlertTriangle, Info, CheckCircle, ExternalLink, Upload, X } from 'lucide-react'
@@ -278,7 +279,12 @@ export default function NewOrder() {
 
   // Calculations
   const v = VEHICLES[form.vehicle]
-  const baseQuote = v ? v.hourlyRate * v.minHours + v.returnFee : 0
+  // 合作价：选中企业客户且该车型有协议价时，用合作单价算报价并快照进订单
+  const partnerRate = (isB2B && v) ? effectiveVehicleRate(effectiveB2B, form.vehicle) : null
+  const usePartnerPrice = !!partnerRate?.isCustom
+  const effHourly = usePartnerPrice ? partnerRate.hourlyRate : (v?.hourlyRate ?? 0)
+  const effReturn = usePartnerPrice ? partnerRate.returnFee  : (v?.returnFee ?? 0)
+  const baseQuote = v ? effHourly * v.minHours + effReturn : 0
   const km = parseFloat(form.distanceKm) || 0
   const remote = v ? calcRemoteSurcharge(km, form.vehicle) : { total: 0, tier: null }
   const materialsCost =
@@ -339,6 +345,9 @@ export default function NewOrder() {
       isB2BOrder:     isB2B,
       b2bCompanyId:   isB2B ? effectiveB2B.id : null,
       b2bCompanyName: isB2B ? effectiveB2B.companyName : null,
+      // 合作价快照：只在选中企业客户且该车型有协议价时写入，普通单不写
+      // （标准价仍以代码为准，B3）；账单按快照算，日后改协议价不动旧单
+      ...(usePartnerPrice ? { hourlyRate: effHourly, returnFee: effReturn } : {}),
     }
 
     let payload
@@ -659,7 +668,18 @@ export default function NewOrder() {
               </div>
               {effectiveB2B.specialPricing && (
                 <div className="bg-white/70 rounded-lg px-3 py-2 text-xs text-emerald-900">
-                  <span className="font-semibold">💰 协议价：</span>{effectiveB2B.specialPricing}
+                  <span className="font-semibold">💰 定价备注：</span>{effectiveB2B.specialPricing}
+                </div>
+              )}
+              {usePartnerPrice ? (
+                <div className="bg-white/80 rounded-lg px-3 py-2 text-xs text-emerald-900">
+                  <span className="font-semibold">🤝 {v?.label} 合作价：</span>
+                  时薪 ${effHourly}/h · 回程 ${effReturn}
+                  <span className="text-emerald-600 ml-1">（已自动套用，进账单计算）</span>
+                </div>
+              ) : v && (
+                <div className="bg-white/50 rounded-lg px-3 py-2 text-xs text-emerald-700">
+                  {v.label} 该客户未设协议价，按标准价 时薪 ${v.hourlyRate}/h
                 </div>
               )}
               <p className="text-xs text-emerald-700 flex items-center gap-1">

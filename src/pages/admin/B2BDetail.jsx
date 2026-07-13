@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { ArrowLeft, Phone, Edit3, Save, X } from 'lucide-react'
+import { VEHICLES } from '../../data/vehicles'
 
 const LEVELS = ['A', 'B', 'C']
 const STATUSES = ['合作中', '暂停合作', '已终止']
@@ -24,6 +25,7 @@ export default function B2BDetail() {
     address: '', abn: '', level: 'B', status: '合作中',
     paymentMode: 'b2b_monthly',
     monthlyOrders: 0, specialPricing: '', notes: '',
+    pricing: {},
   })
 
   if (!isNew && !existing) return (
@@ -31,6 +33,19 @@ export default function B2BDetail() {
   )
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
+
+  // 车型协议价：只存跟标准价不同的车型；某字段清空则移除，整车型都空则移除该车型
+  function setPricing(vehicle, field, value) {
+    setForm(f => {
+      const pricing = { ...(f.pricing || {}) }
+      const row = { ...(pricing[vehicle] || {}) }
+      if (value === '' || value == null) delete row[field]
+      else row[field] = Number(value)
+      if (Object.keys(row).length === 0) delete pricing[vehicle]
+      else pricing[vehicle] = row
+      return { ...f, pricing }
+    })
+  }
 
   function handleSave() {
     if (!form.companyName || !form.contactName) return
@@ -186,11 +201,54 @@ export default function B2BDetail() {
             ? <input type="number" value={form.monthlyOrders} onChange={e => set('monthlyOrders', Number(e.target.value))} className={inputCls} placeholder="0" />
             : `约 ${c.monthlyOrders || 0} 单/月`}
         </Row>
-        <Row label="特殊定价" editing={editing}>
+        <Row label="定价备注" editing={editing}>
           {editing
-            ? <input value={form.specialPricing} onChange={e => set('specialPricing', e.target.value)} className={inputCls} placeholder="如：大卡车9折，免回程费" />
-            : c.specialPricing ? <span className="text-blue-600">{c.specialPricing}</span> : '按标准价格'}
+            ? <input value={form.specialPricing} onChange={e => set('specialPricing', e.target.value)} className={inputCls} placeholder="文字说明（可选），实际算价以下方车型协议价为准" />
+            : c.specialPricing ? <span className="text-blue-600">{c.specialPricing}</span> : '—'}
         </Row>
+      </Card>
+
+      {/* 车型协议价（合作价）—— 下单选中该客户时自动套用，参与账单计算 */}
+      <Card title="车型协议价（合作价）">
+        <p className="text-xs text-gray-400 mb-3">留空＝用标准价。只填跟标准价不同的车型。下单选中该客户后自动套用、进账单计算。</p>
+        {editing ? (
+          <div className="space-y-2">
+            {Object.entries(VEHICLES).map(([key, v]) => {
+              const p = form.pricing?.[key] || {}
+              return (
+                <div key={key} className="flex items-center gap-2">
+                  <span className="w-28 text-sm text-gray-600 shrink-0">{v.label}</span>
+                  <input type="number" inputMode="decimal" value={p.hourlyRate ?? ''}
+                    onChange={e => setPricing(key, 'hourlyRate', e.target.value)}
+                    placeholder={`时薪 ${v.hourlyRate}`} className={inputCls} />
+                  <input type="number" inputMode="decimal" value={p.returnFee ?? ''}
+                    onChange={e => setPricing(key, 'returnFee', e.target.value)}
+                    placeholder={`回程 ${v.returnFee}`} className={inputCls} />
+                </div>
+              )
+            })}
+            <p className="text-xs text-gray-400 mt-1">两列分别是「时薪」和「回程费」，占位灰字是标准价。</p>
+          </div>
+        ) : (
+          (() => {
+            const entries = Object.entries(c.pricing || {})
+            if (!entries.length) return <span className="text-gray-400 text-sm">全部按标准价格</span>
+            return (
+              <div className="space-y-1.5">
+                {entries.map(([key, p]) => (
+                  <div key={key} className="flex justify-between text-sm">
+                    <span className="text-gray-600">{VEHICLES[key]?.label || key}</span>
+                    <span className="text-emerald-700 font-semibold">
+                      {p.hourlyRate != null && `时薪 $${p.hourlyRate}`}
+                      {p.hourlyRate != null && p.returnFee != null && ' · '}
+                      {p.returnFee != null && `回程 $${p.returnFee}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )
+          })()
+        )}
       </Card>
 
       {/* Notes */}
