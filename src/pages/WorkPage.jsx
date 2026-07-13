@@ -8,8 +8,10 @@ import { ArrowLeft, Play, Pause, StopCircle, Clock, CheckCircle } from 'lucide-r
 export default function WorkPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { orders, updateOrderTimer, updateOrderStatus } = useApp()
+  const { orders, updateOrderTimer, startWork } = useApp()
   const order = orders.find(o => o.id === id)
+  const [startNote, setStartNote] = useState('')
+  const [starting, setStarting] = useState(false)
 
   // 计时状态上云：直接读订单行的 work* 字段，靠 realtime 同步给同组师傅
   // 用墙上时钟时间差计算，免疫手机锁屏 JS 暂停 bug
@@ -40,18 +42,25 @@ export default function WorkPage() {
     }
   }, [status])
 
-  function handleStart() {
-    const now = new Date().toISOString()
-    updateOrderTimer(id, {
-      workStatus: 'running',
-      workStartedAt: now,
-      workAccumulatedSec: 0,
-      workRunStartedAt: now,
-      workEndedAt: null,
-    })
-    // 顺带把订单状态置「进行中」，客服端能看到师傅在干活（非法转换则忽略，不挡计时）
-    if (order && !['进行中', '已完成', '已取消'].includes(order.status)) {
-      try { updateOrderStatus(id, '进行中') } catch { /* 非法状态转换不影响计时 */ }
+  // 并发闸门 7/13：开始计时走原子条件写。一个订单只有一个开始时间，
+  // 抢不到（别人已开始）就加入已在跑的计时，不再另起一个开始时间。
+  async function handleStart() {
+    if (starting) return
+    setStarting(true)
+    setStartNote('')
+    try {
+      const res = await startWork(id)
+      if (res?.alreadyStarted) {
+        setStartNote(res.status === '已完成'
+          ? '此单已由其他师傅完成'
+          : res.status === '已取消'
+          ? '此单已被客服取消'
+          : '此单已有师傅开始，已为你同步计时')
+      }
+    } catch (err) {
+      setStartNote(err.message || '开始失败，请重试')
+    } finally {
+      setStarting(false)
     }
   }
   function handlePause() {
@@ -182,12 +191,19 @@ export default function WorkPage() {
               {status === 'idle' && (
                 <button
                   onClick={handleStart}
-                  className="w-full text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 shadow hover:opacity-90 transition-opacity"
+                  disabled={starting}
+                  className="w-full text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 shadow hover:opacity-90 transition-opacity disabled:opacity-60"
                   style={{ background: 'linear-gradient(135deg, #8B1A1A, #c0392b)' }}
                 >
                   <Play size={24} />
-                  开始计时
+                  {starting ? '开始中…' : '开始计时'}
                 </button>
+              )}
+
+              {startNote && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-800 text-sm text-center">
+                  {startNote}
+                </div>
               )}
 
               {status === 'running' && (

@@ -40,7 +40,8 @@ const ORDER_COLUMNS = new Set([
   'paymentStatus','collectedBy','completedAt',
   // 师傅端工作计时上云（6/2 加列）— 计时状态存订单行，靠 realtime 同步给同组师傅
   // workStatus: idle|running|paused|stopped；workStartedAt/EndedAt 是真实开工/收工时间
-  'workStatus','workStartedAt','workEndedAt','workAccumulatedSec','workRunStartedAt',
+  // workStartedBy: 第一个按开始的师傅 id（并发提示用，7/13 加列）
+  'workStatus','workStartedAt','workEndedAt','workAccumulatedSec','workRunStartedAt','workStartedBy',
   'materials','materialsCost',
   'fragileItems','fragileDescription','fragileEstimatedFee',
   'customer_code','workerNote','orderNo',
@@ -185,7 +186,14 @@ export function AppProvider({ children }) {
     const channel = supabase.channel('app-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, ({ eventType, new: n, old: o }) => {
         if (eventType === 'INSERT') setOrders(prev => prev.some(x => x.id === n.id) ? prev : [n, ...prev])
-        else if (eventType === 'UPDATE') setOrders(prev => prev.map(x => x.id === n.id ? n : x))
+        else if (eventType === 'UPDATE') setOrders(prev => prev.map(x => {
+          if (x.id !== n.id) return x
+          // 并发防护 7/13：已完成/已取消是终态，不被迟到的旧事件顶回进行中等非终态，
+          // 保证同组师傅看到的最终状态一致（满足需求④）
+          const TERMINAL = ['已完成', '已取消']
+          if (TERMINAL.includes(x.status) && !TERMINAL.includes(n.status)) return x
+          return n
+        }))
         else if (eventType === 'DELETE') setOrders(prev => prev.filter(x => x.id !== o.id))
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'storage_orders' }, ({ eventType, new: n, old: o }) => {
@@ -259,32 +267,76 @@ export function AppProvider({ children }) {
   // 但 orders 有 bump_version 触发器，师傅自己的备注自动保存 / 计时写入都会把 version +1，
   // 导致提交时旧 version 对不上 → 匹配 0 行 → 状态和费用一个字都没写进去 → 还停「进行中」，
   // 要交两次才成（师傅越多越容易中招）。现去掉该闸门。
-  // 仍保留两道安全：① 不覆盖已被客服取消的单；② 写完读回状态确认，写不进去就明确报错（杜绝「假成功」）。
+  // 【并发闸门 7/13】提交闸门从「≠已取消」收紧为「status 不在 已完成/已取消」：
+  //   多师傅时，师傅 A 交完 → status 已完成；师傅 B 再交，闸门匹配 0 行 → 不覆盖 A 的账单，
+  //   明确提示「已由他人提交」。旧版只拦已取消，B 会把 A 的账单盖掉且读回仍是已完成 → 静默覆盖。
+  // 不会让「单人交两次」复发：单人第一次提交时 status 还是「进行中」，闸门放行。
+  // 用 .select() 返回的行数判定是否真的写入（0 行 = 被闸门拦下），取代原来的额外读回。
   async function completeOrder(orderId, result) {
     const updates = { status: '已完成', ...result }
     const snapshot = orders.find(o => o.id === orderId)  // 失败时回滚用
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o))
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('orders')
       .update(pickOrder(updates))
       .eq('id', orderId)
-      .neq('status', '已取消')   // 客服若已取消，不覆盖
+      .neq('status', '已完成')   // 已完成不覆盖（防第二个师傅盖掉第一个的账单）
+      .neq('status', '已取消')   // 客服已取消不覆盖
+      .select('id')
     if (error) {
       console.error('[Supabase] completeOrder failed:', error)
       if (snapshot) setOrders(prev => prev.map(o => o.id === orderId ? snapshot : o))
       throw new Error(error.message || '提交失败，请重试')
     }
 
-    // 读回确认：真的写成「已完成」了才算成功，否则回滚 + 明确报错（不再假装成功）
-    const { data: verify, error: verErr } = await supabase
-      .from('orders').select('status').eq('id', orderId).single()
-    if (!verErr && verify && verify.status !== '已完成') {
-      if (snapshot) setOrders(prev => prev.map(o => o.id === orderId ? snapshot : o))
-      throw new Error(verify.status === '已取消'
+    // 匹配 0 行 = 被闸门拦下（单已是 已完成 或 已取消）。拉最新真实行同步本地（不回滚成旧的进行中，
+    // 要反映真实终态：若别人已交完，本地就该显示那份已完成账单），再明确报错。
+    if (!data || data.length === 0) {
+      const { data: cur } = await supabase.from('orders').select('*').eq('id', orderId).single()
+      if (cur) setOrders(prev => prev.map(o => o.id === orderId ? cur : o))
+      throw new Error(cur?.status === '已取消'
         ? '此单已被客服取消，无法交单，请刷新页面'
-        : '提交未成功，请刷新后重试')
+        : '此单已由其他师傅提交完成，无需重复提交')
     }
+  }
+
+  // 【并发闸门 7/13】师傅开始计时 — 条件原子写，保证一个订单只有一个开始时间。
+  // 只有「还没人开始（workStartedAt IS NULL）且未完成/未取消」才抢到第一个开始并置为进行中。
+  // 抢不到（0 行）= 已有人开始 → 拉最新行同步本地，师傅直接加入已在跑的计时（不另起一个开始时间）。
+  // 返回 { alreadyStarted } 供 UI 决定是否提示。
+  async function startWork(orderId) {
+    const now = new Date().toISOString()
+    const patch = {
+      workStatus: 'running',
+      workStartedAt: now,
+      workAccumulatedSec: 0,
+      workRunStartedAt: now,
+      workEndedAt: null,
+      workStartedBy: user?.id || null,
+      status: '进行中',
+    }
+    const { data, error } = await supabase
+      .from('orders')
+      .update(pickOrder(patch))
+      .eq('id', orderId)
+      .is('workStartedAt', null)   // 只有还没人开始才写
+      .neq('status', '已完成')
+      .neq('status', '已取消')
+      .select('*')
+    if (error) {
+      console.error('[Supabase] startWork failed:', error)
+      throw new Error(error.message || '开始失败，请重试')
+    }
+    if (data && data.length > 0) {
+      // 抢到第一个开始 —— 用返回行更新本地
+      setOrders(prev => prev.map(o => o.id === orderId ? data[0] : o))
+      return { alreadyStarted: false }
+    }
+    // 已有人开始（或已完成/已取消）→ 拉最新行同步本地，加入已在跑的计时
+    const { data: cur } = await supabase.from('orders').select('*').eq('id', orderId).single()
+    if (cur) setOrders(prev => prev.map(o => o.id === orderId ? cur : o))
+    return { alreadyStarted: true, status: cur?.status, startedBy: cur?.workStartedBy }
   }
 
   // 寄存订单师傅交单：状态进入「寄存中」（不是「已完成」—— 寄存中是物品仍在库的状态）
@@ -618,7 +670,7 @@ export function AppProvider({ children }) {
   return (
     <AppContext.Provider value={{
       user, worker, login, logout,
-      orders, confirmOrder, completeOrder, getMyOrders,
+      orders, confirmOrder, completeOrder, startWork, getMyOrders,
       createOrder, createOrderWithSlotCheck,
       updateOrder, updateOrderTimer, dispatchOrder, updateOrderStatus,
       storageOrders, createStorageOrder, updateStorageOrder, completeStorageOrder, deleteOrder,
