@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { formatDuration, billedHours, computeElapsed } from '../utils/pricing'
+import { scheduledTimeLabel } from '../utils/orderTime'
 import { VEHICLES, VAN_PROMO_DISCOUNT } from '../data/vehicles'
 import { ArrowLeft, Play, Pause, StopCircle, Clock, CheckCircle } from 'lucide-react'
 
@@ -123,10 +124,14 @@ export default function WorkPage() {
             <h1 className="text-white font-bold text-lg">工作计时</h1>
             <p className="text-red-300 text-xs">{order.customerName} · {order.vehicle}</p>
           </div>
-          {order.startTime && (
+          {scheduledTimeLabel(order).text && (
             <div className="ml-auto text-right">
-              <p className="text-red-300 text-xs">约定时间</p>
-              <p className="text-white font-bold">{order.startTime}</p>
+              <p className="text-red-300 text-xs">
+                {scheduledTimeLabel(order).precise ? '客户约定时间' : '约定时段'}
+              </p>
+              <p className={`font-bold ${scheduledTimeLabel(order).precise ? 'text-amber-300 text-lg' : 'text-white'}`}>
+                {scheduledTimeLabel(order).text}
+              </p>
             </div>
           )}
         </div>

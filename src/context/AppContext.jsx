@@ -32,6 +32,8 @@ function bg(queryBuilder, opLabel) {
 const ORDER_COLUMNS = new Set([
   'id','createdAt','status','serviceType','customerName','customerPhone','wechat',
   'date','startTime','endTime','fromAddress','toAddress','vehicle','quote',
+  // 客服设定的"跟客户约定的实际到场/开工时间"（7/13 加列，区别于时段 startTime 和师傅计时 workStartedAt）
+  'actualStartTime','actualEndTime',
   'finalAmount','paymentMethod','depositPaid','depositStatus','depositScreenshot',
   'deposit','distanceKm','remoteSurcharge','heavyItemFee','heavyFee','heavyItems','heavyDescription','stairFee','quoteNote',
   'requestedMaterials','items','notes','source','assignedTo','assignedWorkers',

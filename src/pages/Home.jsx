@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { getTodayHoliday } from '../data/holidays'
+import { scheduledTimeLabel } from '../utils/orderTime'
 import { MOCK_ANNOUNCEMENTS } from '../data/mockData'
 import { AlertTriangle, Bell, ChevronRight, Clock, CheckCircle, Loader, LogOut, History } from 'lucide-react'
 import dayjs from 'dayjs'
@@ -269,7 +270,9 @@ function OrderCard({ order, onClick, onConfirm }) {
               {order.vehicle}
             </span>
           )}
-          <span className="text-gray-400 text-xs">{order.date} {order.startTime}</span>
+          <span className={`text-xs ${scheduledTimeLabel(order).precise ? 'text-amber-600 font-semibold' : 'text-gray-400'}`}>
+            {order.date} {scheduledTimeLabel(order).text}
+          </span>
         </div>
       </button>
 

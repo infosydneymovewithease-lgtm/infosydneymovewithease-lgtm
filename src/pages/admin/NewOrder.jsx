@@ -5,6 +5,7 @@ import { VEHICLES, STAIRS_FEE, VAN_PROMO_DISCOUNT } from '../../data/vehicles'
 import { HEAVY_ITEM_OPTIONS, calcHeavyTotal } from '../../data/heavyItems'
 import { calcRemoteSurcharge, getDistanceTier } from '../../utils/remoteFee'
 import { SLOT_CONFIG, fetchSlotsAvailability } from '../../utils/slotAvailability'
+import { isTimeOutsideSlot } from '../../utils/orderTime'
 import { getStorageRates, FREE_SUPPLIES_LABEL } from '../../data/storageRates'
 import { supabase } from '../../lib/supabase'
 import { ArrowLeft, MapPin, Package, AlertTriangle, Info, CheckCircle, ExternalLink, Upload, X } from 'lucide-react'
@@ -94,6 +95,8 @@ export default function NewOrder() {
     serviceType: '搬家',
     date: new Date().toISOString().slice(0, 10),
     startTime: '',                 // slot label e.g. '08:00–10:00' (or HH:MM for non-搬家)
+    actualStartTime: '',           // 客服可选：跟客户约定的具体到场时间（师傅按这个）
+    actualEndTime: '',
     vehicle: '小卡车',
     customerName: '',
     customerPhone: '',
@@ -443,6 +446,8 @@ export default function NewOrder() {
       serviceType: '搬家',
       date: new Date().toISOString().slice(0, 10),
       startTime: '',
+      actualStartTime: '',
+      actualEndTime: '',
       vehicle: '小卡车',
       customerName: '',
       customerPhone: '',
@@ -591,6 +596,23 @@ export default function NewOrder() {
               </div>
               {submitted && !form.startTime && (
                 <p className="text-red-500 text-xs mt-1">请选择到达时段</p>
+              )}
+            </Field>
+          )}
+
+          {/* 实际约定时间（客户指定具体几点时填，师傅按这个到场）—— 微信/电话单常见 */}
+          {slotEnabled && (
+            <Field label="⏰ 实际约定时间（可选，师傅按这个到场）">
+              <p className="text-xs text-gray-400 mb-2">客户指定了具体时间就填；留空则师傅看系统时段。不影响运力。</p>
+              <div className="flex items-center gap-2">
+                <input type="time" value={form.actualStartTime} onChange={e => set('actualStartTime', e.target.value)}
+                  className={inputCls} />
+                <span className="text-gray-400 text-sm">至</span>
+                <input type="time" value={form.actualEndTime} onChange={e => set('actualEndTime', e.target.value)}
+                  className={inputCls} />
+              </div>
+              {isTimeOutsideSlot(form.actualStartTime, form.startTime) && (
+                <p className="text-amber-600 text-xs mt-1.5">⚠️ 实际时间落在所选时段（{form.startTime}）之外，确认无误即可（不拦截）</p>
               )}
             </Field>
           )}

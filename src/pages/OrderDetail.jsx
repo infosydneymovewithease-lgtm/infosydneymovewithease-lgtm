@@ -5,6 +5,7 @@ import {
   DollarSign, Calendar, Truck, CheckCircle, PlayCircle
 } from 'lucide-react'
 import { HEAVY_ITEM_OPTIONS, calcHeavyTotal } from '../data/heavyItems'
+import { scheduledTimeLabel } from '../utils/orderTime'
 function mapUrl(address) {
   const encoded = encodeURIComponent(address)
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
@@ -84,7 +85,7 @@ export default function OrderDetail() {
             {/* 时间与车型 */}
             <InfoCard>
               <InfoRow icon={<Calendar size={16} className="text-blue-500" />} label="日期时间">
-                {order.date} {order.startTime}
+                {order.date} {scheduledTimeLabel(order).text}
               </InfoRow>
               <InfoRow icon={<Truck size={16} className="text-blue-500" />} label="车型">
                 {order.vehicle}
@@ -358,12 +359,16 @@ export default function OrderDetail() {
               </InfoCard>
             )}
 
-            {/* 约定时间提醒 */}
-            {order.startTime && (
+            {/* 约定时间提醒 —— 有客户约定的具体时间就显示它，否则显示系统时段 */}
+            {scheduledTimeLabel(order).text && (
               <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
-                <p className="text-blue-600 text-xs font-semibold mb-1">约定到达时间</p>
-                <p className="text-blue-800 text-2xl font-bold">{order.startTime}</p>
-                <p className="text-blue-500 text-xs mt-1">到达即可开始计时</p>
+                <p className="text-blue-600 text-xs font-semibold mb-1">
+                  {scheduledTimeLabel(order).precise ? '客户约定到达时间' : '约定到达时段'}
+                </p>
+                <p className="text-blue-800 text-2xl font-bold">{scheduledTimeLabel(order).text}</p>
+                <p className="text-blue-500 text-xs mt-1">
+                  {scheduledTimeLabel(order).precise ? '请按此时间准时到场' : '到达即可开始计时'}
+                </p>
               </div>
             )}
           </div>

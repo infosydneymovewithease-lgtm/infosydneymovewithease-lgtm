@@ -5,6 +5,7 @@ import { VEHICLES, VAN_PROMO_DISCOUNT } from '../../data/vehicles'
 import { HEAVY_ITEM_OPTIONS, calcHeavyTotal } from '../../data/heavyItems'
 import { ORDER_STATUSES } from '../../data/orderStatus'
 import { SLOT_CONFIG, fetchSlotsAvailability } from '../../utils/slotAvailability'
+import { isTimeOutsideSlot } from '../../utils/orderTime'
 import {
   ArrowLeft, Phone, MapPin, Package, MessageSquare,
   DollarSign, Calendar, Truck, CheckCircle, User,
@@ -336,6 +337,14 @@ export default function AdminOrderDetail() {
         <Row icon={<Calendar size={15} className="text-blue-500" />} label="服务时间">
           {order.date} {order.startTime}
         </Row>
+        {order.actualStartTime && (
+          <Row icon={<Calendar size={15} className="text-amber-500" />} label="实际约定时间">
+            <span className="text-amber-700 font-semibold">
+              {order.actualEndTime ? `${order.actualStartTime}–${order.actualEndTime}` : order.actualStartTime}
+            </span>
+            <span className="text-gray-400 text-xs ml-1">（师傅按这个到场）</span>
+          </Row>
+        )}
         {isClean ? (
           <>
             {order.cleanTypeLabel && (
@@ -1448,6 +1457,8 @@ function EditOrderModal({ order, onClose, onSave }) {
   const [date, setDate]               = useState(order.date || '')
   const [vehicle, setVehicle]         = useState(order.vehicle || '')
   const [startTime, setStartTime]     = useState(order.startTime || '')
+  const [actualStartTime, setActualStartTime] = useState(order.actualStartTime || '')
+  const [actualEndTime, setActualEndTime]     = useState(order.actualEndTime || '')
   const [fromAddress, setFromAddress] = useState(order.fromAddress || '')
   const [toAddress, setToAddress]     = useState(order.toAddress || '')
   const [note, setNote]               = useState(order.csNote || '')
@@ -1481,12 +1492,18 @@ function EditOrderModal({ order, onClose, onSave }) {
   const changed =
     date !== (order.date || '') || vehicle !== (order.vehicle || '') ||
     startTime !== (order.startTime || '') || fromAddress !== (order.fromAddress || '') ||
-    toAddress !== (order.toAddress || '') || note !== (order.csNote || '')
+    toAddress !== (order.toAddress || '') || note !== (order.csNote || '') ||
+    actualStartTime !== (order.actualStartTime || '') || actualEndTime !== (order.actualEndTime || '')
+
+  // A2 软提醒：实际约定时间落在所选时段之外，只提示不拦截
+  const actualOutsideSlot = isTimeOutsideSlot(actualStartTime, startTime)
 
   function handleSave() {
     if (!date || !startTime) return
     onSave({
       date, vehicle, startTime, fromAddress, toAddress,
+      actualStartTime: actualStartTime || null,
+      actualEndTime:   actualEndTime || null,
       csNote: note.trim() || null,
     }, reason.trim())
   }
@@ -1550,6 +1567,31 @@ function EditOrderModal({ order, onClose, onSave }) {
             )}
             {pickedFull && (
               <p className="text-amber-600 text-xs mt-1.5">⚠️ 该时段已满，仍可安排进去（会超出当时段运力，请确认）</p>
+            )}
+          </div>
+
+          {/* 实际约定时间（师傅按这个到场）—— 微信/电话单客户常指定具体几点 */}
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+            <label className="block text-xs font-semibold text-blue-800 mb-1">⏰ 实际约定时间（师傅按这个到场）</label>
+            <p className="text-xs text-blue-500 mb-2">客户指定了具体时间就填这里；留空则师傅看系统时段。不影响运力。</p>
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <label className="block text-xs text-gray-500 mb-1">开始</label>
+                <input type="time" value={actualStartTime} onChange={e => setActualStartTime(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs text-gray-500 mb-1">结束（可选）</label>
+                <input type="time" value={actualEndTime} onChange={e => setActualEndTime(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" />
+              </div>
+            </div>
+            {actualStartTime && (
+              <button type="button" onClick={() => { setActualStartTime(''); setActualEndTime('') }}
+                className="text-xs text-gray-400 hover:text-gray-600 mt-1.5">清除实际时间</button>
+            )}
+            {actualOutsideSlot && (
+              <p className="text-amber-600 text-xs mt-1.5">⚠️ 实际时间落在所选时段（{startTime}）之外，确认无误即可（不拦截）</p>
             )}
           </div>
 
