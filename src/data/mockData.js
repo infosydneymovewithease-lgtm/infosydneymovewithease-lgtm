@@ -2,23 +2,8 @@ export const MOCK_ANNOUNCEMENTS = [
   { id: 1, text: '提醒：所有订单请在完成后30分钟内提交表单', date: '2026-04-27' },
 ]
 
-// Unified staff: workers + CS + admin
-export const MOCK_STAFF = [
-  // Workers
-  { id: 'laomou',     name: '老木',  username: 'laomou',     password: '123',  role: 'worker', stars: 4, isDriver: false, canDrive: [] },
-  { id: 'xiaoyu',    name: '小宇',  username: 'xiaoyu',    password: '1234', role: 'worker', stars: 1, isDriver: false, canDrive: [] },
-  { id: 'chenxi',    name: '晨曦',  username: 'chenxi',    password: '1234', role: 'worker', stars: 4, isDriver: true,  canDrive: ['面包车','小卡车','小卡三人','大卡车','大卡三人','双卡车'] },
-  { id: 'laowang',   name: '老王',  username: 'laowang',   password: '1234', role: 'worker', stars: 4, isDriver: true,  canDrive: ['面包车','小卡车','小卡三人','大卡车','大卡三人','双卡车'] },
-  { id: 'xiaozhang', name: '小张',  username: 'xiaozhang', password: '1234', role: 'worker', stars: 4, isDriver: true,  canDrive: ['面包车','小卡车','小卡三人','卡车单人'] },
-  // CS & Admin
-  { id: 'phill',    name: 'Phill', username: 'phill',    password: '1234', role: 'admin' },
-  { id: 'annie',    name: 'Annie', username: 'annie',    password: '1234', role: 'cs' },
-  { id: 'xiaoxi',   name: '小溪',  username: 'xiaoxi',   password: '1234', role: 'cs' },
-  { id: 'xiaomei',  name: '小美',  username: 'xiaomei',  password: '1234', role: 'cs' },
-]
-
-// Backward-compat alias used by worker app
-export const MOCK_WORKERS = MOCK_STAFF.filter(s => s.role === 'worker')
+// 员工名单与密码已全部移到数据库（staff 表 + login_staff RPC），
+// 前端不再保留任何账号/密码副本。2026-07-13 安全审计 A3。
 
 export const MOCK_ORDERS = [
   {
