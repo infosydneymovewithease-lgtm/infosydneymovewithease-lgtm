@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { MOCK_B2B_CUSTOMERS, generateOrderId } from '../data/mockData'
+import { generateOrderId } from '../data/mockData'
 import { supabase } from '../lib/supabase'
 import { isLegalOrderTransition } from '../data/orderStatus'
 import { isDepositPaid } from '../utils/orderHelpers'
@@ -187,12 +187,15 @@ export function AppProvider({ children }) {
         if (staffRes.data) setStaff(staffRes.data)
 
         // 企业客户：DB 为准。DB 空且没报错时，一次性把本地 localStorage 里现有客户搬上云
-        // （不丢老板已录入的合作客户），localStorage 没有则用 MOCK 兜底。
+        // （不丢老板已录入的合作客户）。
+        // 8/6：去掉 MOCK 兜底。7/13 上线时第一个打开的浏览器 localStorage 是空的，
+        // 兜底把两家示例公司写进了生产库，真名单从此再也迁不上来（分支只在表空时跑）。
+        // 现在 localStorage 也没有就保持空，宁可让老板手动录，也不往生产库塞假数据。
         if (b2bRes.data && b2bRes.data.length > 0) {
           setB2bCustomers(b2bRes.data)
         } else if (!b2bRes.error) {
           const localRaw = localStorage.getItem('b2bCustomers')
-          const seed = localRaw ? JSON.parse(localRaw) : MOCK_B2B_CUSTOMERS
+          const seed = localRaw ? JSON.parse(localRaw) : []
           if (Array.isArray(seed) && seed.length > 0) {
             const { data: inserted } = await supabase.from('b2b_customers')
               .insert(seed.map(pickB2B)).select()

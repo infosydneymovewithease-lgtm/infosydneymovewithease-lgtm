@@ -358,37 +358,8 @@ export const MOCK_STORAGE_ORDERS = [
   },
 ]
 
-// Mock B2B customers
-export const MOCK_B2B_CUSTOMERS = [
-  {
-    id: 'B2B-0001',
-    companyName: '悉尼中澳柜厂',
-    contactName: '老陈',
-    phone: '0288111222',
-    wechat: 'cabinet_sydney',
-    address: '45 Industrial Ave, Villawood NSW 2163',
-    level: 'A',
-    monthlyOrders: 8,
-    specialPricing: '大卡车9折，免回程费',
-    status: '合作中',
-    notes: '长期稳定客户，每周2-3单',
-    createdAt: '2025-06-01',
-  },
-  {
-    id: 'B2B-0002',
-    companyName: 'KO地产中介',
-    contactName: 'Ruby',
-    phone: '0299333444',
-    wechat: 'ko_realty',
-    address: 'Level 5, 100 George St, Parramatta NSW 2150',
-    level: 'B',
-    monthlyOrders: 3,
-    specialPricing: '小卡车9.5折',
-    status: '合作中',
-    notes: '中介介绍客户，每月稳定几单',
-    createdAt: '2026-01-15',
-  },
-]
+// MOCK_B2B_CUSTOMERS 已于 2026-08-06 删除：它曾被 AppContext 当作迁库兜底数据，
+// 在生产库里塞进两家不存在的公司，导致真实企业客户名单 24 天迁不上来。
 
 export function getOrdersForWorker(workerId) {
   return MOCK_ORDERS.filter(o => o.assignedTo === workerId)
