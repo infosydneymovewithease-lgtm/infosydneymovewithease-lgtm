@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext'
 import { Search, PlusCircle, Download, ClipboardList, Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
 import { SLOT_CONFIG } from '../../utils/slotAvailability'
 import { isDepositPaid } from '../../utils/orderHelpers'
+import { sydneyToday, addDays, weekdayOf } from '../../utils/date'
 
 // 车型 → 时段配置组（与 NewOrder.jsx 保持一致）
 const VEHICLE_TO_GROUP = {
@@ -67,7 +68,7 @@ export default function OrderList() {
   // URL ?date=all 表示初始查看全部日期（用于工作台「全部时间」提醒跳过来时），
   // 否则默认今天。仅影响初始化，后续用户手动改日期不被 URL 控制。
   const [selectedDate, setSelectedDate]   = useState(
-    searchParams.get('date') === 'all' ? '' : new Date().toISOString().slice(0, 10)
+    searchParams.get('date') === 'all' ? '' : sydneyToday()
   )
 
   function switchTab(tabValue) {
@@ -82,7 +83,7 @@ export default function OrderList() {
     })
   }
 
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = sydneyToday()
 
   // Merge regular orders + storage orders for combined view
   const combinedOrders = [...orders, ...(storageOrders || [])]
@@ -142,23 +143,20 @@ export default function OrderList() {
   }
 
   // 日期切换辅助
+  // 用 addDays 做纯日历运算：旧写法 setDate + toISOString 会在入夏令时那天
+  // （2026-10-04）把日期抹回原地，导致「后一天」箭头卡在 10/3 过不去。见 utils/date.js
   function shiftDate(days) {
-    const d = new Date(selectedDate || new Date().toISOString().slice(0, 10))
-    d.setDate(d.getDate() + days)
-    setSelectedDate(d.toISOString().slice(0, 10))
+    setSelectedDate(addDays(selectedDate || todayStr, days))
     setSelectedMonth('')
   }
   function formatDateLabel(s) {
     if (!s) return ''
-    const d = new Date(s)
-    const today = new Date().toISOString().slice(0, 10)
-    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1)
-    const tomorrowStr = tomorrow.toISOString().slice(0, 10)
-    const wd = ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()]
+    const [, mm, dd] = s.split('-').map(Number)
+    const wd = ['周日','周一','周二','周三','周四','周五','周六'][weekdayOf(s)]
     let prefix = ''
-    if (s === today) prefix = '今天 · '
-    else if (s === tomorrowStr) prefix = '明天 · '
-    return `${prefix}${d.getMonth() + 1}月${d.getDate()}日 ${wd}`
+    if (s === todayStr) prefix = '今天 · '
+    else if (s === addDays(todayStr, 1)) prefix = '明天 · '
+    return `${prefix}${mm}月${dd}日 ${wd}`
   }
 
   const activeTabDef = STATUS_TABS.find(t => t.value === activeTab)

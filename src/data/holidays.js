@@ -1,3 +1,5 @@
+import { sydneyToday } from '../utils/date'
+
 // NSW Public Holidays 2026
 export const NSW_HOLIDAYS_2026 = [
   { date: '2026-01-01', name: "New Year's Day 元旦" },
@@ -15,6 +17,6 @@ export const NSW_HOLIDAYS_2026 = [
 ]
 
 export function getTodayHoliday() {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = sydneyToday()
   return NSW_HOLIDAYS_2026.find(h => h.date === today) || null
 }

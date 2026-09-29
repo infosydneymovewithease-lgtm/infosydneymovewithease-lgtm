@@ -7,6 +7,7 @@ import { calcRemoteSurcharge, getDistanceTier } from '../../utils/remoteFee'
 import { SLOT_CONFIG, fetchSlotsAvailability } from '../../utils/slotAvailability'
 import { isTimeOutsideSlot } from '../../utils/orderTime'
 import { effectiveVehicleRate } from '../../utils/partnerPricing'
+import { sydneyToday } from '../../utils/date'
 import { getStorageRates, FREE_SUPPLIES_LABEL } from '../../data/storageRates'
 import { supabase } from '../../lib/supabase'
 import { ArrowLeft, MapPin, Package, AlertTriangle, Info, CheckCircle, ExternalLink, Upload, X } from 'lucide-react'
@@ -94,7 +95,7 @@ export default function NewOrder() {
 
   const [form, setForm] = useState({
     serviceType: '搬家',
-    date: new Date().toISOString().slice(0, 10),
+    date: sydneyToday(),
     startTime: '',                 // slot label e.g. '08:00–10:00' (or HH:MM for non-搬家)
     actualStartTime: '',           // 客服可选：跟客户约定的具体到场时间（师傅按这个）
     actualEndTime: '',
@@ -453,7 +454,7 @@ export default function NewOrder() {
     setSubmitted(false)
     setForm({
       serviceType: '搬家',
-      date: new Date().toISOString().slice(0, 10),
+      date: sydneyToday(),
       startTime: '',
       actualStartTime: '',
       actualEndTime: '',

@@ -3,6 +3,7 @@ import { generateOrderId } from '../data/mockData'
 import { supabase } from '../lib/supabase'
 import { isLegalOrderTransition } from '../data/orderStatus'
 import { isDepositPaid } from '../utils/orderHelpers'
+import { sydneyToday } from '../utils/date'
 
 const AppContext = createContext(null)
 
@@ -268,7 +269,7 @@ export function AppProvider({ children }) {
     if (!data) return false  // 用户名或密码错误，RPC 返回 null
     setUser(data)
     if (data.role !== 'worker') {
-      const today = new Date().toISOString().slice(0, 10)
+      const today = sydneyToday()
       const key = `clockin_${data.id}_${today}`
       if (!localStorage.getItem(key)) localStorage.setItem(key, new Date().toISOString())
     }
@@ -521,7 +522,7 @@ export function AppProvider({ children }) {
   // 创建寄存订单 — async + throw 版
   // Why: 5/7-5/13 静默漏单一周事故的根因，绝不能再 fire-and-forget
   async function createStorageOrder(data) {
-    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    const dateStr = sydneyToday().replace(/-/g, '')
     const rand = Math.random().toString(36).slice(2, 6).toUpperCase()
     const newStorage = {
       ...data,
@@ -578,7 +579,7 @@ export function AppProvider({ children }) {
       ...data,
       id: `SH-${String(secondhandItems.length + 1).padStart(4, '0')}`,
       status: '在售',
-      receivedDate: new Date().toISOString().slice(0, 10),
+      receivedDate: sydneyToday(),
       createdAt: new Date().toISOString(),
     }
     setSecondhandItems(prev => [item, ...prev])
@@ -618,7 +619,7 @@ export function AppProvider({ children }) {
       ...data,
       id: `B2B-${String(maxNum + 1).padStart(4, '0')}`,
       pricing: data.pricing || {},
-      createdAt: new Date().toISOString().slice(0, 10),
+      createdAt: sydneyToday(),
       status: data.status || '合作中',
     }
     setB2bCustomers(prev => prev.some(c => c.id === next.id) ? prev : [next, ...prev])
