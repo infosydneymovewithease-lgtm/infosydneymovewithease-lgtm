@@ -30,9 +30,31 @@ export function billedHours(totalSeconds, minHours) {
   return Math.max(roundToHalfHour(totalSeconds), minHours)
 }
 
-// 加班费：8点前或20点后，$10/小时/人
-export function calcOvertimeFee(startTime, endTime, people) {
-  if (!startTime || !endTime) return 0
+// ══════════════════════════════════════════════════════════════
+// 计时跑飞防护（2026-10-11）
+// ══════════════════════════════════════════════════════════════
+// 根因：师傅忘记点「结束」→ timerState.runStartedAt 一直挂着，
+// computeElapsed 按墙上时钟无限累加，workEndedAt 也一路往后跑。
+//
+// 一个 bug 同时撑大两个数 ——
+//   ① 计费工时   elapsed 按天算（见过 68.5 小时的面包车单）
+//   ② 加班费     8点前/20点后的时长按天累积
+//
+// 历史战果：10 单加班费虚高 $28,579.33，最严重一单 $20,514.59
+// （反推 28.5 天加班）。楼梯/加班费由工人全额平分，所以营收和工资一起虚高。
+//
+// 对策不是「算得更准」—— 时间本来就是错的，算不准。
+// 对策是【超过生理上限就不出数，交给人工】。
+export const OVERTIME_HOURS_CAP  = 6    // 加班只发生在 8 点前 / 20 点后，一天最多 6 小时
+export const WORK_HOURS_SUSPECT  = 14   // 连续工作超 14 小时 —— 基本可以断定没点结束
+
+/**
+ * 加班费明细。
+ * @returns {{fee:number, hours:number, capped:boolean}}
+ *   capped=true 表示超出上限，fee 强制为 0，等人工确认 —— 绝不自动写一个天文数字进账单。
+ */
+export function overtimeDetail(startTime, endTime, people) {
+  if (!startTime || !endTime) return { fee: 0, hours: 0, capped: false }
   const start = new Date(startTime)
   const end = new Date(endTime)
 
@@ -48,7 +70,20 @@ export function calcOvertimeFee(startTime, endTime, people) {
   }
 
   const overtimeHours = overtimeMs / 3600000
-  return Math.round(overtimeHours * 10 * people * 100) / 100
+
+  if (overtimeHours > OVERTIME_HOURS_CAP) {
+    return { fee: 0, hours: overtimeHours, capped: true }
+  }
+  return {
+    fee: Math.round(overtimeHours * 10 * people * 100) / 100,
+    hours: overtimeHours,
+    capped: false,
+  }
+}
+
+// 加班费：8点前或20点后，$10/小时/人。超上限返回 0（见 overtimeDetail）
+export function calcOvertimeFee(startTime, endTime, people) {
+  return overtimeDetail(startTime, endTime, people).fee
 }
 
 export function calcTotal({
@@ -85,7 +120,8 @@ export function calcTotal({
     ? (STAIRS_FEE[v.people] || 0) * Number(floors)
     : 0
 
-  const overtimeFee = calcOvertimeFee(startTime, endTime, v.people)
+  const ot = overtimeDetail(startTime, endTime, v.people)
+  const overtimeFee = ot.fee
   const highwayFee = highway ? (Number(highwayAmount) || 30) : 0
   const parkingFee = parkingViolation ? 300 : 0
 
@@ -122,6 +158,11 @@ export function calcTotal({
     stairsFee,
     heavyFee:      Number(heavyFee) || 0,
     overtimeFee,
+    // 计时跑飞标记 —— 页面据此提示人工核对，不影响其他字段
+    overtimeCapped:   ot.capped,
+    overtimeRawHours: Math.round(ot.hours * 10) / 10,
+    workHours:        Math.round(((Number(workSeconds) || 0) / 3600) * 10) / 10,
+    timerSuspect:     ot.capped || ((Number(workSeconds) || 0) / 3600) > WORK_HOURS_SUSPECT,
     highwayFee,
     parkingFee,
     miscFee:       Math.round(miscFee * 100) / 100,

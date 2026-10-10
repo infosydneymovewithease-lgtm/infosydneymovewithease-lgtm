@@ -394,6 +394,22 @@ export default function FormPage() {
           </div>
         </Section>
 
+        {/* 计时跑飞提醒 —— 忘记点「结束」时，工时和加班费会一起失控 */}
+        {result?.timerSuspect && (
+          <div className="bg-red-50 border-2 border-red-300 rounded-xl px-4 py-3 mb-3">
+            <p className="text-red-700 font-bold text-base mb-1">
+              ⚠️ 这单计时了 {result.workHours} 小时，是不是忘记点「结束」了？
+            </p>
+            <p className="text-red-600 text-sm leading-relaxed">
+              {result.overtimeCapped && (
+                <>按这个时间算出来的加班费是 <strong>${(result.overtimeRawHours * 10 * v.people).toFixed(2)}</strong>，
+                明显不对，<strong>已暂时按 $0 处理</strong>。<br /></>
+              )}
+              先联系客服把实际开工/收工时间改对，再提交账单。
+            </p>
+          </div>
+        )}
+
         {/* 加班费（自动，只读） */}
         {result?.overtimeFee > 0 && (
           <Section title="加班费（自动计算）">
