@@ -2,6 +2,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { useState, useEffect, useRef } from 'react'
 import { playDing } from '../../utils/sound'
+import { canSee, roleLabel } from '../../utils/roles'
 import {
   LayoutDashboard, ClipboardList, PlusCircle, Truck,
   Users, Building2, DollarSign, Package, Recycle,
@@ -16,11 +17,11 @@ const NAV_ITEMS = [
   { label: '取消历史',     icon: Ban,             to: '/admin/cancelled' },
   { label: '派单管理',     icon: Truck,           to: '/admin/dispatch' },
   { divider: true },
-  { label: '客户主档', icon: Users,            to: '/admin/customers',  adminOnly: true },
+  { label: '客户主档', icon: Users,            to: '/admin/customers',  roles: ['admin', 'manager'] },
   { label: '企业客户', icon: Building2,        to: '/admin/b2b' },
   { divider: true },
   { label: '收款记录', icon: DollarSign,       to: '/admin/bills' },
-  { label: '工资结算', icon: DollarSign,       to: '/admin/wages',      adminOnly: true },
+  { label: '工资结算', icon: DollarSign,       to: '/admin/wages',      roles: ['admin', 'manager'] },
   { divider: true },
   { label: '提货安装', icon: Truck,            to: '/admin/orders?service=IKEA',
     isActive: loc => new URLSearchParams(loc.search).get('service') === 'IKEA' },
@@ -28,8 +29,8 @@ const NAV_ITEMS = [
   { label: '寄存业务', icon: Package,          to: '/admin/storage' },
   { label: '二手物品', icon: Recycle,          to: '/admin/secondhand' },
   { divider: true },
-  { label: '运力管理', icon: Gauge,             to: '/admin/vehicles',   adminOnly: true },
-  { label: '系统设置', icon: Settings,         to: '/admin/settings',   adminOnly: true },
+  { label: '运力管理', icon: Gauge,             to: '/admin/vehicles',   roles: ['admin', 'manager'] },
+  { label: '系统设置', icon: Settings,         to: '/admin/settings',   roles: ['admin'] },
   { divider: true },
   { label: '操作手册', icon: BookOpen,         to: '/admin/help' },
 ]
@@ -99,7 +100,7 @@ export default function AdminLayout() {
         <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
           {NAV_ITEMS.map((item, i) => {
             if (item.divider) return <div key={i} className="my-2 border-t border-white/10" />
-            if (item.adminOnly && user?.role !== 'admin') return null
+            if (!canSee(item, user?.role)) return null
             if (item.soon) return (
               <div key={item.to} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/30 cursor-not-allowed text-sm">
                 <item.icon size={17} />
@@ -137,7 +138,7 @@ export default function AdminLayout() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-white text-sm font-medium truncate">{user?.name}</p>
-              <p className="text-white/40 text-xs">{user?.role === 'admin' ? '管理员' : '客服'}</p>
+              <p className="text-white/40 text-xs">{roleLabel(user?.role)}</p>
             </div>
             <button onClick={handleLogout} className="text-white/40 hover:text-white/80 transition-colors">
               <LogOut size={16} />
