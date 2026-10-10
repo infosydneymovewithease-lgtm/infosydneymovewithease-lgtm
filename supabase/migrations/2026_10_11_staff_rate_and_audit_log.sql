@@ -121,4 +121,4 @@ COMMENT ON TABLE audit_log IS '操作日志。写入失败不应阻塞主流程�
 -- 而 list_staff_rates() 没有 active 过滤，历史工资照常能算能显示。
 -- 回来时把 true 改回去即可，数据和历史工资全部保留。
 --
--- UPDATE staff SET active = false WHERE id = 'laozhou';
+UPDATE staff SET active = false WHERE id = 'laozhou';  -- 老板 10-11：先不起用他

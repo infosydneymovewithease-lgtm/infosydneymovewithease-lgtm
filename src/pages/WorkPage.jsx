@@ -4,15 +4,19 @@ import { useApp } from '../context/AppContext'
 import { formatDuration, billedHours, computeElapsed } from '../utils/pricing'
 import { scheduledTimeLabel } from '../utils/orderTime'
 import { VEHICLES, VAN_PROMO_DISCOUNT } from '../data/vehicles'
+import { findStaleWork, isLateStop } from '../utils/staleWork'
+import EndFixModal from '../components/EndFixModal'
 import { ArrowLeft, Play, Pause, StopCircle, Clock, CheckCircle } from 'lucide-react'
 
 export default function WorkPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { orders, updateOrderTimer, startWork } = useApp()
+  const { orders, updateOrderTimer, startWork, finishWorkWithCorrection, user } = useApp()
   const order = orders.find(o => o.id === id)
   const [startNote, setStartNote] = useState('')
   const [starting, setStarting] = useState(false)
+  // 补填弹窗。fix = { order, mode }；mode: 'gate'（上一单挡着）| 'late'（这单结束得太晚）
+  const [fix, setFix] = useState(null)
 
   // 计时状态上云：直接读订单行的 work* 字段，靠 realtime 同步给同组师傅
   // 用墙上时钟时间差计算，免疫手机锁屏 JS 暂停 bug
@@ -47,6 +51,14 @@ export default function WorkPage() {
   // 抢不到（别人已开始）就加入已在跑的计时，不再另起一个开始时间。
   async function handleStart() {
     if (starting) return
+    // 【开工闸门 10/11】上一单没结束不让开新单。
+    // 老板原话：「不可以开始下一单，需要上一单结束」
+    // 挡住的同时必须给出路 —— 直接弹补填，师傅自己 15 秒解开，不用找客服。
+    const stale = findStaleWork(orders, user?.id, id)
+    if (stale.length > 0) {
+      setFix({ order: stale[0], mode: 'gate' })
+      return
+    }
     setStarting(true)
     setStartNote('')
     try {
@@ -79,6 +91,14 @@ export default function WorkPage() {
     })
   }
   function handleStop() {
+    // 【迟到的结束 10/11】计时超过 14 小时才点结束 —— 几乎必然是忘了点。
+    // 这时候不能静默写「现在」当收工时间，那就是 QX2608021 变成 $21,364 的原因。
+    // 数据说明必须单独挡这一条：那 10 单跑飞的里只有 3 单会被开工闸门拦到，
+    // 其余的是挂了几天、期间没开新单，直接来点结束。
+    if (isLateStop(elapsed)) {
+      setFix({ order, mode: 'late' })
+      return
+    }
     // 同样把最后一段折进去，并记录真实收工时间
     updateOrderTimer(id, {
       workStatus: 'stopped',
@@ -114,6 +134,21 @@ export default function WorkPage() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+
+      {fix && (
+        <EndFixModal
+          order={fix.order}
+          mode={fix.mode}
+          onClose={() => setFix(null)}
+          onConfirm={async ({ endedAt, reason, note }) => {
+            await finishWorkWithCorrection(fix.order.id, { endedAt, reason, note })
+            const wasGate = fix.mode === 'gate'
+            setFix(null)
+            // 闸门场景：上一单结掉了，顺手把这一单开起来，师傅不用再点一次
+            if (wasGate) await handleStart()
+          }}
+        />
+      )}
 
       {/* Header */}
       <div className="px-4 pt-12 pb-5 md:pt-8 shadow-sm"

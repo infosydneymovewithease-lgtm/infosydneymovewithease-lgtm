@@ -45,6 +45,9 @@ const ORDER_COLUMNS = new Set([
   // workStatus: idle|running|paused|stopped；workStartedAt/EndedAt 是真实开工/收工时间
   // workStartedBy: 第一个按开始的师傅 id（并发提示用，7/13 加列）
   'workStatus','workStartedAt','workEndedAt','workAccumulatedSec','workRunStartedAt','workStartedBy',
+  // 师傅补填实际收工时间的留痕（10/11 加列）—— 补的时间是回忆出来的不是打卡打出来的，
+  // 对账时必须能分辨，否则下个月没人知道该不该信这个数
+  'endFixReason','endFixNote','endFixBy','endFixAt','endFixHoursLate',
   'materials','materialsCost',
   'fragileItems','fragileDescription','fragileEstimatedFee',
   'customer_code','workerNote','orderNo',
@@ -490,6 +493,33 @@ export function AppProvider({ children }) {
   // 师傅端工作计时上云 — 把计时状态写到订单行，靠 realtime 同步给同组所有师傅
   // Why: 旧版计时只存本地 localStorage，导致①同组师傅各跑各的不同步 ②重登录/清缓存丢失
   // How: 只在按钮（开始/暂停/继续/结束）时调用，不是每秒写；写失败 bg() 会弹窗提示
+  // 师傅补填「实际收工时间」—— 把挂着没结束的单结掉，并留下补填痕迹。
+  // 为什么写订单不写人：多人单三个人各填一个时间会打架，谁先补谁说了算。
+  // 为什么要 await + throw：这是在修钱的数据，静默失败等于没修。
+  async function finishWorkWithCorrection(orderId, { endedAt, reason, note }) {
+    const order = orders.find(o => o.id === orderId)
+    if (!order) throw new Error('订单不存在，请刷新重试')
+    const startMs = new Date(order.workStartedAt).getTime()
+    const endMs   = new Date(endedAt).getTime()
+    const patch = {
+      workStatus:         'stopped',
+      workEndedAt:        new Date(endMs).toISOString(),
+      workAccumulatedSec: Math.max(0, Math.round((endMs - startMs) / 1000)),
+      workRunStartedAt:   null,
+      endFixReason:       reason,
+      endFixNote:         note || null,
+      endFixBy:           user?.id || null,
+      endFixAt:           new Date().toISOString(),
+      endFixHoursLate:    Math.round(((Date.now() - startMs) / 3600000) * 10) / 10,
+    }
+    const { error } = await supabase.from('orders').update(pickOrder(patch)).eq('id', orderId)
+    if (error) {
+      console.error('[Supabase] finishWorkWithCorrection failed:', error)
+      throw new Error(error.message || '补填失败，请重试')
+    }
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...patch } : o))
+  }
+
   function updateOrderTimer(orderId, patch) {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...patch } : o))
     bg(supabase.from('orders').update(pickOrder(patch)).eq('id', orderId), '工作计时同步')
@@ -722,7 +752,7 @@ export function AppProvider({ children }) {
   return (
     <AppContext.Provider value={{
       user, worker, login, logout,
-      orders, confirmOrder, completeOrder, startWork, getMyOrders,
+      orders, confirmOrder, completeOrder, startWork, getMyOrders, finishWorkWithCorrection,
       createOrder, createOrderWithSlotCheck,
       updateOrder, updateOrderTimer, dispatchOrder, updateOrderStatus,
       storageOrders, createStorageOrder, updateStorageOrder, completeStorageOrder, deleteOrder,
