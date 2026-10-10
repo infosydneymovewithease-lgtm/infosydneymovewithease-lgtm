@@ -25,11 +25,13 @@
 -- ① staff_rate —— 工资费率（带生效日期）
 -- ════════════════════════════════════════════════════════════
 
+-- ⚠️ 不存 is_driver —— staff 表已经有 "isDriver" 和 "canDrive" 两列。
+--    再存一份，改了 staff 忘了改这里，工资就按错的费率算，而且很难发现。
+--    司机身份读 staff（单一真相），这张表只管「钱」。
 CREATE TABLE IF NOT EXISTS staff_rate (
   staff_id       text        NOT NULL,
   effective_from date        NOT NULL,
   hourly_rate    numeric     NOT NULL,
-  is_driver      boolean     NOT NULL DEFAULT false,
   driver_rates   jsonb,                 -- 司机按车型的加成，null = 用 hourly_rate
   note           text,
   created_at     timestamptz NOT NULL DEFAULT now(),
@@ -42,18 +44,21 @@ COMMENT ON COLUMN staff_rate.driver_rates IS '{"大卡车":40,"小卡车":37,...
 -- ── 初始数据（2026-10-11 老板确认）──────────────────────────
 -- 用 2020-01-01 作为"系统启用前"的兜底起点，保证任何历史订单都能匹配到一条
 
-INSERT INTO staff_rate (staff_id, effective_from, hourly_rate, is_driver, driver_rates, note) VALUES
-  ('laomou',    DATE '2020-01-01', 33, false, NULL, '老木 · 迁移自代码常量'),
-  ('xiaoyu',    DATE '2020-01-01', 30, false, NULL, '小宇 · 迁移自代码常量'),
-  ('xiaoyu',    DATE '2026-08-01', 31, false, NULL, '小宇 · 老板 10-11 确认 8/1 起涨 1 刀'),
-  ('laozhou',   DATE '2020-01-01', 32, false, NULL, '老周 · 原代码名单遗漏，老板 10-11 确认 $32、不开车'),
-  ('chenxi',    DATE '2020-01-01', 33, true,
+-- ⚠️ staff_id 用 staff 表的 "id" 列，不是 "username"。两者在三个人身上不一样：
+--      id=laomou / username=laomu（老木）     id=xiaoxi / username=lvy（迁喜小洁）
+--    orders 的 assignedTo / assignedWorkers 存的是 id，所以这里必须用 id。
+INSERT INTO staff_rate (staff_id, effective_from, hourly_rate, driver_rates, note) VALUES
+  ('laomou',    DATE '2020-01-01', 33, NULL, '老木 · 迁移自代码常量'),
+  ('xiaoyu',    DATE '2020-01-01', 30, NULL, '小宇 · 迁移自代码常量'),
+  ('xiaoyu',    DATE '2026-08-01', 31, NULL, '小宇 · 老板 10-11 确认 8/1 起涨 1 刀'),
+  ('laozhou',   DATE '2020-01-01', 32, NULL, '老周 · 原代码名单遗漏，老板 10-11 确认 $32、不开车'),
+  ('chenxi',    DATE '2020-01-01', 33,
      '{"大卡车":40,"大卡三人":40,"小卡车":37,"小卡三人":37,"卡车单人":37,"面包车":34,"双卡车":37}'::jsonb,
      '晨曦 · 迁移自代码常量'),
-  ('laowang',   DATE '2020-01-01', 33, true,
+  ('laowang',   DATE '2020-01-01', 33,
      '{"大卡车":40,"大卡三人":40,"小卡车":37,"小卡三人":37,"卡车单人":37,"面包车":34,"双卡车":37}'::jsonb,
      '老王 · 迁移自代码常量'),
-  ('xiaozhang', DATE '2020-01-01', 33, true,
+  ('xiaozhang', DATE '2020-01-01', 33,
      '{"大卡车":40,"大卡三人":40,"小卡车":37,"小卡三人":37,"卡车单人":37,"面包车":34,"双卡车":37}'::jsonb,
      '小张 · 迁移自代码常量')
 ON CONFLICT (staff_id, effective_from) DO NOTHING;
@@ -78,7 +83,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT r.staff_id, s.name, r.effective_from,
-         r.hourly_rate, r.is_driver, r.driver_rates, s.active
+         r.hourly_rate, s."isDriver" AS is_driver, r.driver_rates, s.active
   FROM staff_rate r
   JOIN staff s ON s.id = r.staff_id
   ORDER BY r.staff_id, r.effective_from
