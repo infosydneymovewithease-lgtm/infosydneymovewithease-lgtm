@@ -2,37 +2,23 @@ import { useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import { ChevronDown, ChevronRight, AlertCircle } from 'lucide-react'
 import dayjs from 'dayjs'
+import { hourlyRateFor, resolveRate, participantsIn } from '../../utils/wageRates'
 
 // ── Worker config ──────────────────────────────────────────────
-const WORKERS = {
-  laomou:    { name: '老木',  isDriver: false, fixedRate: 33 },
-  xiaoyu:    { name: '小宇',  isDriver: false, fixedRate: 30 },
-  chenxi:    { name: '晨曦',  isDriver: true,  fixedRate: 33 },
-  laowang:   { name: '老王',  isDriver: true,  fixedRate: 33 },
-  xiaozhang: { name: '小张',  isDriver: true,  fixedRate: 33 },
-}
+// 2026-10-11：费率从这里搬到了数据库 staff_rate（带生效日期）。
+// 原来写死的 WORKERS / DRIVER_VEHICLE_RATE 两个常量已移入 utils/wageRates.js
+// 作为【数据库读不到时的回退】，不再是唯一来源。
+//
+// 搬家的两个原因：
+//   ① 原名单漏了老周，而本页是遍历那个常量生成行的 —— 他从没在这页出现过
+//   ② 小宇 8/1 涨薪，只存当前值会把 7 月的历史工资一起改写
 
-const DRIVER_VEHICLE_RATE = {
-  '大卡车': 40, '大卡三人': 40,
-  '小卡车': 37, '小卡三人': 37, '卡车单人': 37,
-  '面包车': 34,
-  '双卡车': 37,
-}
-
-function getHourlyRate(workerId, isDriverRole, vehicle) {
-  const w = WORKERS[workerId]
-  if (!w) return 33
-  if (w.isDriver && isDriverRole && vehicle) {
-    return DRIVER_VEHICLE_RATE[vehicle] ?? w.fixedRate
-  }
-  return w.fixedRate
-}
-
-function calcWorkerWage(order, workerId) {
+function calcWorkerWage(order, workerId, staffRates) {
   if (!order.billedHours) return null
-  const isDriver = order.assignedTo === workerId
+  const r = hourlyRateFor(staffRates, workerId, order)
+  const isDriver = r.isDriverRole
   const workers = order.assignedWorkers?.length || 1
-  const rate = getHourlyRate(workerId, isDriver, isDriver ? order.vehicle : null)
+  const rate = r.rate
   const basePay = Math.round(rate * order.billedHours * 100) / 100
 
   // 楼梯费＋加班费：工人平分，公司不拿
@@ -45,6 +31,7 @@ function calcWorkerWage(order, workerId) {
 
   return {
     rate, isDriver, workers,
+    rateSource: r.source,          // 'db' | 'legacy' | 'default' —— 非 db 时页面标黄
     basePay,
     stairShare,
     heavyShare,
@@ -71,7 +58,7 @@ const TABS = [
 
 // ── Component ──────────────────────────────────────────────────
 export default function WageRecords() {
-  const { orders } = useApp()
+  const { orders, staffRates } = useApp()
   const [tab, setTab] = useState('thisWeek')
   const [expanded, setExpanded] = useState({})
 
@@ -94,16 +81,27 @@ export default function WageRecords() {
   })
 
   // Build per-worker summaries
-  const workerRows = Object.entries(WORKERS).map(([id, info]) => {
+  // 2026-10-11：改成遍历【这段时间真正参与过订单的人】，而不是写死的名单。
+  // 原来遍历 WORKERS 常量，名单外的人（老周 278.5 小时）永远不会出现在这页上。
+  const workerRows = participantsIn(completed).map(id => {
+    const info = resolveRate(staffRates, id)   // 不带日期 = 取最新一条，用来拿姓名
     const myOrders = completed.filter(o =>
       o.assignedTo === id || o.assignedWorkers?.includes(id)
     )
     const details = myOrders
-      .map(o => ({ order: o, wage: calcWorkerWage(o, id) }))
+      .map(o => ({ order: o, wage: calcWorkerWage(o, id, staffRates) }))
       .filter(x => x.wage !== null)
     const missingData = myOrders.filter(o => !o.billedHours)
     const total = details.reduce((s, x) => s + x.wage.total, 0)
-    return { id, ...info, details, missingData, total: Math.round(total * 100) / 100 }
+    return {
+      id,
+      name: info.name,
+      isDriver: info.isDriver,
+      rateSource: info.source,
+      inactive: info.active === false,
+      details, missingData,
+      total: Math.round(total * 100) / 100,
+    }
   }).filter(w => w.details.length > 0 || w.missingData.length > 0)
 
   const grandTotal = workerRows.reduce((s, w) => s + w.total, 0)
@@ -166,6 +164,14 @@ export default function WageRecords() {
                 </div>
                 <div className="flex-1 text-left">
                   <span className="font-semibold text-gray-900">{w.name}</span>
+                  {w.rateSource !== 'db' && (
+                    <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">
+                      {w.rateSource === 'default' ? '费率未录入·按$33算' : '费率用旧值'}
+                    </span>
+                  )}
+                  {w.inactive && (
+                    <span className="ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">已停用</span>
+                  )}
                   <span className="text-gray-400 text-xs ml-2">{w.details.length} 单</span>
                   {w.missingData.length > 0 && (
                     <span className="ml-2 text-xs text-amber-500 flex-inline items-center gap-0.5">

@@ -106,6 +106,7 @@ export function AppProvider({ children }) {
   const [orders, setOrders] = useState([])
   const [storageOrders, setStorageOrders] = useState([])
   const [staff, setStaff] = useState([])
+  const [staffRates, setStaffRates] = useState([])   // 2026-10-11 工资费率（带生效日期）
 
   // localStorage-backed state (Phase 2 will migrate these)
   // 企业客户改由数据库做单一数据源（7/13 迁库）；空数组起步，mount 时从 DB 加载
@@ -176,16 +177,20 @@ export function AppProvider({ children }) {
   useEffect(() => {
     async function init() {
       try {
-        const [ordersRes, storageRes, staffRes, b2bRes] = await Promise.all([
+        const [ordersRes, storageRes, staffRes, ratesRes, b2bRes] = await Promise.all([
           supabase.from('orders').select('*').order('created_at', { ascending: false }),
           supabase.from('storage_orders').select('*').order('created_at', { ascending: false }),
           // S1-D: staff 表已锁，必须通过 list_staff RPC 读取（不含密码）
           supabase.rpc('list_staff'),
+          supabase.rpc('list_staff_rates'),   // 2026-10-11 费率入库；迁移未跑时会报错，下面容错
           supabase.from('b2b_customers').select('*').order('created_at', { ascending: false }),
         ])
         if (ordersRes.data) setOrders(ordersRes.data)
         if (storageRes.data) setStorageOrders(storageRes.data)
         if (staffRes.data) setStaff(staffRes.data)
+        // 费率：迁移还没跑时 RPC 不存在，这里静默失败 —— 工资计算会回退到代码里的旧名单
+        if (ratesRes?.data) setStaffRates(ratesRes.data)
+        else if (ratesRes?.error) console.warn('[staff_rate] 读取失败，工资回退旧逻辑：', ratesRes.error.message)
 
         // 企业客户：DB 为准。DB 空且没报错时，一次性把本地 localStorage 里现有客户搬上云
         // （不丢老板已录入的合作客户）。
@@ -724,6 +729,7 @@ export function AppProvider({ children }) {
       secondhandItems, createSecondhandItem, updateSecondhandItem,
       secondhandLeads, createSecondhandLead, updateSecondhandLead,
       secondhandListings, createSecondhandListing, updateSecondhandListing, deleteSecondhandListing,
+      staffRates,
       b2bCustomers, createB2BCustomer, updateB2BCustomer,
       staff, addStaffMember, updateStaffMember,
       appSettings, updateAppSettings,
