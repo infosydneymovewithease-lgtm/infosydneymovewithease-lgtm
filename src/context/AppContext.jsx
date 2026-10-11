@@ -574,10 +574,31 @@ export function AppProvider({ children }) {
     if (error) throw new Error(error.message || '撤销确认失败，请重试')
   }
 
+  // 「我和师傅对过这一单了」—— 必须人勾，系统推断不出来
+  async function markReconciled(orderId, workDate, note) {
+    const { error } = await supabase.rpc('mark_reconciled', {
+      p_order_id: orderId, p_work_date: workDate, p_by: user?.id || null, p_note: note || null,
+    })
+    if (error) throw new Error(error.message || '标记失败，请重试')
+  }
+
+  async function markAllReconciled(workDate) {
+    const { data, error } = await supabase.rpc('mark_all_reconciled', {
+      p_work_date: workDate, p_by: user?.id || null,
+    })
+    if (error) throw new Error(error.message || '批量核对失败，请重试')
+    return data
+  }
+
+  async function unmarkReconciled(orderId) {
+    const { error } = await supabase.rpc('unmark_reconciled', { p_order_id: orderId })
+    if (error) throw new Error(error.message || '取消失败，请重试')
+  }
+
   async function getReconcile(workDate) {
     const { data, error } = await supabase.rpc('get_reconcile', { p_work_date: workDate })
-    if (error) { console.warn('[reconcile] 读取失败：', error.message); return { close: null, logs: [] } }
-    return { close: data?.close || null, logs: data?.logs || [] }
+    if (error) { console.warn('[reconcile] 读取失败：', error.message); return { close: null, logs: [], checked: [] } }
+    return { close: data?.close || null, logs: data?.logs || [], checked: data?.checked || [] }
   }
 
   // ── 运营配置的修改（2026-10-11 第 3 步）─────────────────────
@@ -835,6 +856,7 @@ export function AppProvider({ children }) {
       user, worker, login, logout,
       config, updateChannelAccount, updateStaffSchedule,
       reconcileOrder, undoReconcile, closeDay, reopenDay, getReconcile,
+      markReconciled, unmarkReconciled, markAllReconciled,
       orders, confirmOrder, completeOrder, startWork, getMyOrders, finishWorkWithCorrection,
       createOrder, createOrderWithSlotCheck,
       updateOrder, updateOrderTimer, dispatchOrder, updateOrderStatus,

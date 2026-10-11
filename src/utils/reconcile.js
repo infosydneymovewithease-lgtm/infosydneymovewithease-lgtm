@@ -96,22 +96,35 @@ export function impactOf(order, changes, staffRates) {
   }
 }
 
-/** 当日汇总。随补录实时变。 */
+/** 当日汇总。随补录实时变。
+ *  工资按人拆开 —— 佳慧要拿这个和每个师傅核工资，只给总数等于没给。 */
 export function daySummary(orders, staffRates) {
-  let due = 0, paid = 0, wages = 0
+  let due = 0, paid = 0, cash = 0, transfer = 0
+  const byStaff = new Map()
   for (const o of orders) {
     if (o.status !== '已完成') continue
     const amt = Number(o.finalAmount) || 0
     due += amt
-    if (o.paymentStatus === 'paid') paid += amt
+    if (o.paymentStatus === 'paid') {
+      paid += amt
+      if (o.paymentMethod === 'cash') cash += amt
+      else if (o.paymentMethod === 'transfer') transfer += amt
+    }
     const share = (Number(o.stairFee) || 0) + (Number(o.overtimeFee) || 0)
     const ids = participants(o)
     for (const id of ids) {
       const r = hourlyRateFor(staffRates, id, o)
-      wages += r.rate * (Number(o.billedHours) || 0) + share / (ids.length || 1)
+      const w = r.rate * (Number(o.billedHours) || 0) + share / (ids.length || 1)
+      const cur = byStaff.get(id) || { id, name: r.name, amount: 0, orders: 0 }
+      byStaff.set(id, { ...cur, amount: cur.amount + w, orders: cur.orders + 1 })
     }
   }
-  return { due, paid, unpaid: due - paid, wages }
+  const wageList = [...byStaff.values()].sort((a, b) => b.amount - a.amount)
+  return {
+    due, paid, unpaid: due - paid, cash, transfer,
+    wages: wageList.reduce((a, w) => a + w.amount, 0),
+    wageList,
+  }
 }
 
 /** 对账页要显示的字段（左右对照用）。顺序就是界面顺序。 */
