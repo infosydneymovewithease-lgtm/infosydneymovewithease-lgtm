@@ -7,7 +7,7 @@ import { FEATURES } from '../../config/features'
 import {
   LayoutDashboard, ClipboardList, PlusCircle, Truck,
   Users, Building2, DollarSign, Package, Recycle,
-  Settings, LogOut, Menu, X, ChevronRight, Ban, Sparkles, Gauge, BookOpen, ClipboardCheck
+  Settings, LogOut, Menu, X, ChevronRight, Ban, Sparkles, Gauge, BookOpen, ClipboardCheck, NotebookPen, UsersRound
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -21,6 +21,8 @@ const NAV_ITEMS = [
   { label: '客户主档', icon: Users,            to: '/admin/customers',  roles: ['admin', 'manager'] },
   { label: '企业客户', icon: Building2,        to: '/admin/b2b' },
   { divider: true },
+  { label: '我的日报', icon: NotebookPen,      to: '/admin/worklog',    feature: 'worklog' },
+  { label: '团队今日', icon: UsersRound,       to: '/admin/team-today', roles: ['admin', 'manager'], feature: 'worklog' },
   { label: '每日对账', icon: ClipboardCheck,   to: '/admin/reconcile',  roles: ['admin', 'manager'], feature: 'reconcile' },
   { label: '收款记录', icon: DollarSign,       to: '/admin/bills' },
   { label: '工资结算', icon: DollarSign,       to: '/admin/wages',      roles: ['admin', 'manager'] },

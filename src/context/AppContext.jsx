@@ -601,6 +601,64 @@ export function AppProvider({ children }) {
     return { close: data?.close || null, logs: data?.logs || [], checked: data?.checked || [] }
   }
 
+  // ── 客服工作台（2026-10-12 第 5 步）──────────────────────
+  // 全是新表，前端直连。和对账不一样：那边改的是钱，必须走白名单 RPC；
+  // 这边是客服填自己的日报，填错了改回来就是，不需要那层防护。
+
+  async function getWorkday(workDate) {
+    const { data, error } = await supabase.rpc('get_workday', { p_work_date: workDate })
+    if (error) { console.warn('[workday] 读取失败：', error.message); return { logs: [], breaks: [], inquiries: [], posts: [] } }
+    return { logs: data?.logs || [], breaks: data?.breaks || [], inquiries: data?.inquiries || [], posts: data?.posts || [] }
+  }
+
+  async function upsertWorkLog(workDate, patch) {
+    const row = { work_date: workDate, staff_id: user?.id, ...patch }
+    const { error } = await supabase.from('daily_work_log').upsert(row, { onConflict: 'work_date,staff_id' })
+    if (error) throw new Error(error.message || '保存失败，请重试')
+  }
+
+  async function startBreak(workDate, slotIndex) {
+    const row = { work_date: workDate, staff_id: user?.id, slot_index: slotIndex,
+                  started_at: new Date().toISOString() }
+    const { error } = await supabase.from('break_record').upsert(row, { onConflict: 'work_date,staff_id,slot_index' })
+    if (error) throw new Error(error.message || '开始休息失败，请重试')
+  }
+
+  async function endBreak(workDate, slotIndex, durationMin) {
+    const { data: cur } = await supabase.from('break_record').select('*')
+      .eq('work_date', workDate).eq('staff_id', user?.id).eq('slot_index', slotIndex).maybeSingle()
+    if (!cur?.started_at) throw new Error('没有找到这一段的开始记录')
+    const mins = Math.max(0, Math.round((Date.now() - new Date(cur.started_at).getTime()) / 60000))
+    const { error } = await supabase.from('break_record')
+      .update({ ended_at: new Date().toISOString(), minutes: mins, overtime: mins > (durationMin || 60) })
+      .eq('id', cur.id)
+    if (error) throw new Error(error.message || '结束休息失败，请重试')
+  }
+
+  async function saveInquiry(logDate, accountId, count) {
+    const row = { log_date: logDate, account_id: accountId, count: Number(count) || 0,
+                  recorded_by: user?.id, updated_at: new Date().toISOString() }
+    const { error } = await supabase.from('platform_inquiry').upsert(row, { onConflict: 'log_date,account_id' })
+    if (error) throw new Error(error.message || '登记失败，请重试')
+  }
+
+  async function addPost(postDate, { accountId, kind, title }) {
+    const { error } = await supabase.from('content_post').insert({
+      post_date: postDate, account_id: accountId, kind, title, posted_by: user?.id })
+    if (error) throw new Error(error.message || '添加失败，请重试')
+  }
+
+  async function deletePost(id) {
+    const { error } = await supabase.from('content_post').delete().eq('id', id)
+    if (error) throw new Error(error.message || '删除失败，请重试')
+  }
+
+  async function getInquiryWeek(from, to) {
+    const { data, error } = await supabase.rpc('get_inquiry_week', { p_from: from, p_to: to })
+    if (error) { console.warn('[inquiry week] 读取失败：', error.message); return [] }
+    return data || []
+  }
+
   // ── 运营配置的修改（2026-10-11 第 3 步）─────────────────────
   // 只开放两个真会动的：开新账号、改排班。
   // 班次和休息窗口改的频率极低（一年两次换季），先只读，要改跑 SQL。
@@ -857,6 +915,7 @@ export function AppProvider({ children }) {
       config, updateChannelAccount, updateStaffSchedule,
       reconcileOrder, undoReconcile, closeDay, reopenDay, getReconcile,
       markReconciled, unmarkReconciled, markAllReconciled,
+      getWorkday, upsertWorkLog, startBreak, endBreak, saveInquiry, addPost, deletePost, getInquiryWeek,
       orders, confirmOrder, completeOrder, startWork, getMyOrders, finishWorkWithCorrection,
       createOrder, createOrderWithSlotCheck,
       updateOrder, updateOrderTimer, dispatchOrder, updateOrderStatus,

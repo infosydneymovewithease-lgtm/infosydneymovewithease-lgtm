@@ -7,4 +7,5 @@
 
 export const FEATURES = {
   reconcile: true,   // 每日对账（/admin/reconcile）
+  worklog:   true,   // 客服工作台（/admin/worklog · /admin/team-today）
 }

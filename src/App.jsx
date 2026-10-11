@@ -24,6 +24,8 @@ import B2BList from './pages/admin/B2BList'
 import B2BDetail from './pages/admin/B2BDetail'
 import Settings from './pages/admin/Settings'
 import Reconcile from './pages/admin/Reconcile'
+import WorkLog from './pages/admin/WorkLog'
+import TeamToday from './pages/admin/TeamToday'
 import { FEATURES } from './config/features'
 import StorageList from './pages/admin/StorageList'
 import NewStorage from './pages/admin/NewStorage'
@@ -150,6 +152,8 @@ function AppRoutes() {
         <Route path="b2b" element={<B2BList />} />
         <Route path="b2b/:id" element={<B2BDetail />} />
         {FEATURES.reconcile && <Route path="reconcile" element={<Reconcile />} />}
+        {FEATURES.worklog && <Route path="worklog" element={<WorkLog />} />}
+        {FEATURES.worklog && <Route path="team-today" element={<TeamToday />} />}
         <Route path="settings" element={<Settings />} />
         <Route path="storage" element={<StorageList />} />
         <Route path="storage/new" element={<NewStorage />} />
