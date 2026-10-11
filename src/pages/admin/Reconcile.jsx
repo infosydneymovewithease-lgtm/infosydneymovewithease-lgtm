@@ -330,10 +330,21 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, o
         const isTime = RECONCILE_FIELDS.find(f => f.key === k)?.type === 'time'
         const cur = isTime ? toISO(order[k]) : (order[k] ?? null)
         if (v === null && (cur === null || cur === undefined || cur === '')) return false
-        return isTime ? v !== cur : String(v ?? '') !== String(cur ?? '')
+        if (isTime) return v !== cur
+        // ⚠️ 数值一律按数值比，不能按字符串。
+        // 自动算的值我格式化成了 '550.00'，数据库返回的是 550 ——
+        // 字符串比较会判成「改了」，于是存完还显示「未保存 3 项」，
+        // 而且每存一次就往 reconcile_log 里塞一条 'gst: 0 → 0.00' 的废记录。
+        const a = Number(v), b = Number(cur)
+        if (Number.isFinite(a) && Number.isFinite(b)) return Math.abs(a - b) >= 0.005
+        return String(v ?? '') !== String(cur ?? '')
       }))
   const nChanges = Object.keys(changes).length
-  const impact = nChanges ? impactOf(order, changes, staffRates) : null
+  const impactRaw = nChanges ? impactOf(order, changes, staffRates) : null
+  // 有改动但金额工时都没动（比如只改了收款方式）→ 不显示空的影响框
+  const impact = impactRaw && (impactRaw.wages.length
+    || impactRaw.hours.from !== impactRaw.hours.to
+    || impactRaw.amount.from !== impactRaw.amount.to) ? impactRaw : null
   useEffect(() => { onDirty?.(nChanges) }, [nChanges, onDirty])
 
   // 补录出来的工时也要查一遍 —— 填错结束时间会算出 28 小时，
