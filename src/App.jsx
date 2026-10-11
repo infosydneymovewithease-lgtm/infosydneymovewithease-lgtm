@@ -23,6 +23,8 @@ import DispatchBoard from './pages/admin/DispatchBoard'
 import B2BList from './pages/admin/B2BList'
 import B2BDetail from './pages/admin/B2BDetail'
 import Settings from './pages/admin/Settings'
+import Reconcile from './pages/admin/Reconcile'
+import { FEATURES } from './config/features'
 import StorageList from './pages/admin/StorageList'
 import NewStorage from './pages/admin/NewStorage'
 import StorageDetail from './pages/admin/StorageDetail'
@@ -147,6 +149,7 @@ function AppRoutes() {
         <Route path="dispatch" element={<DispatchBoard />} />
         <Route path="b2b" element={<B2BList />} />
         <Route path="b2b/:id" element={<B2BDetail />} />
+        {FEATURES.reconcile && <Route path="reconcile" element={<Reconcile />} />}
         <Route path="settings" element={<Settings />} />
         <Route path="storage" element={<StorageList />} />
         <Route path="storage/new" element={<NewStorage />} />

@@ -537,6 +537,49 @@ export function AppProvider({ children }) {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...patch } : o))
   }
 
+  // ── 每日对账（2026-10-12 第 4 步）────────────────────────
+  // 全部走数据库函数，不在前端直接 UPDATE orders。
+  // 白名单和留痕都在 SQL 里，前端有 bug 也绕不过去。
+
+  async function reconcileOrder(orderId, workDate, changes, reason) {
+    const { data, error } = await supabase.rpc('reconcile_order', {
+      p_order_id: orderId, p_work_date: workDate,
+      p_changes: changes, p_reason: reason || null, p_changed_by: user?.id || null,
+    })
+    if (error) throw new Error(error.message || '补录失败，请重试')
+    if (data?.order) setOrders(prev => prev.map(o => o.id === orderId ? data.order : o))
+    return data
+  }
+
+  async function undoReconcile(logId) {
+    const { data, error } = await supabase.rpc('undo_reconcile', {
+      p_log_id: logId, p_undone_by: user?.id || null,
+    })
+    if (error) throw new Error(error.message || '撤销失败，请重试')
+    const { data: row } = await supabase.from('orders').select('*').eq('id', data?.order_id || '').maybeSingle()
+    if (row) setOrders(prev => prev.map(o => o.id === row.id ? row : o))
+    return data
+  }
+
+  async function closeDay(workDate, note) {
+    const { data, error } = await supabase.rpc('close_day', {
+      p_work_date: workDate, p_by: user?.id || null, p_note: note || null,
+    })
+    if (error) throw new Error(error.message || '确认失败，请重试')
+    return data
+  }
+
+  async function reopenDay(workDate) {
+    const { error } = await supabase.rpc('reopen_day', { p_work_date: workDate })
+    if (error) throw new Error(error.message || '撤销确认失败，请重试')
+  }
+
+  async function getReconcile(workDate) {
+    const { data, error } = await supabase.rpc('get_reconcile', { p_work_date: workDate })
+    if (error) { console.warn('[reconcile] 读取失败：', error.message); return { close: null, logs: [] } }
+    return { close: data?.close || null, logs: data?.logs || [] }
+  }
+
   // ── 运营配置的修改（2026-10-11 第 3 步）─────────────────────
   // 只开放两个真会动的：开新账号、改排班。
   // 班次和休息窗口改的频率极低（一年两次换季），先只读，要改跑 SQL。
@@ -791,6 +834,7 @@ export function AppProvider({ children }) {
     <AppContext.Provider value={{
       user, worker, login, logout,
       config, updateChannelAccount, updateStaffSchedule,
+      reconcileOrder, undoReconcile, closeDay, reopenDay, getReconcile,
       orders, confirmOrder, completeOrder, startWork, getMyOrders, finishWorkWithCorrection,
       createOrder, createOrderWithSlotCheck,
       updateOrder, updateOrderTimer, dispatchOrder, updateOrderStatus,

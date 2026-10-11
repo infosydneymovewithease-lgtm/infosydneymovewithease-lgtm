@@ -3,10 +3,11 @@ import { useApp } from '../../context/AppContext'
 import { useState, useEffect, useRef } from 'react'
 import { playDing } from '../../utils/sound'
 import { canSee, roleLabel } from '../../utils/roles'
+import { FEATURES } from '../../config/features'
 import {
   LayoutDashboard, ClipboardList, PlusCircle, Truck,
   Users, Building2, DollarSign, Package, Recycle,
-  Settings, LogOut, Menu, X, ChevronRight, Ban, Sparkles, Gauge, BookOpen
+  Settings, LogOut, Menu, X, ChevronRight, Ban, Sparkles, Gauge, BookOpen, ClipboardCheck
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
   { label: '客户主档', icon: Users,            to: '/admin/customers',  roles: ['admin', 'manager'] },
   { label: '企业客户', icon: Building2,        to: '/admin/b2b' },
   { divider: true },
+  { label: '每日对账', icon: ClipboardCheck,   to: '/admin/reconcile',  roles: ['admin', 'manager'], feature: 'reconcile' },
   { label: '收款记录', icon: DollarSign,       to: '/admin/bills' },
   { label: '工资结算', icon: DollarSign,       to: '/admin/wages',      roles: ['admin', 'manager'] },
   { divider: true },
@@ -100,7 +102,8 @@ export default function AdminLayout() {
         <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
           {NAV_ITEMS.map((item, i) => {
             if (item.divider) return <div key={i} className="my-2 border-t border-white/10" />
-            if (!canSee(item, user?.role)) return null
+            if (item.feature && !FEATURES[item.feature]) return null
+    if (!canSee(item, user?.role)) return null
             if (item.soon) return (
               <div key={item.to} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/30 cursor-not-allowed text-sm">
                 <item.icon size={17} />
