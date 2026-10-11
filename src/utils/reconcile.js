@@ -144,25 +144,48 @@ export const RECONCILE_FIELDS = [
   { key: 'heavyFee',      label: '重物费',   type: 'money' },
   { key: 'parkingFee',    label: '停车费',   type: 'money' },
   { key: 'highwayFee',    label: '高速费',   type: 'money' },
-  { key: 'deposit',       label: '定金',     type: 'money', hint: '实收里要扣掉' },
+  { key: 'deposit',       label: '定金',     type: 'money' },
   { key: 'finalAmount',   label: '实收金额', type: 'money' },
 ]
 
-/** 数量字段的单价：回程 = 时薪/小时，楼梯 = 人数×$10/层 */
-export function unitPriceOf(order, key) {
+/**
+ * 数量字段的单价。
+ *
+ * ⚠️ 回程单价不能直接用时薪 —— 企业协议价里这两个会不一样：
+ *      staging / ko / Pod Pack 的面包车   时薪 $60（或标准）· 回程 $50
+ *    所以优先读企业价格表的 returnFee，再退回车型标准 returnFee。
+ *    （标准车型里 returnFee === hourlyRate，所以散客单两种算法结果一样。）
+ *
+ * @param b2bCustomers AppContext 里的企业客户列表；不传就退回标准价
+ */
+export function unitPriceOf(order, key, b2bCustomers) {
   const v = VEHICLES[order?.vehicle]
   if (!v) return 0
+
+  const agreed = (b2bCustomers || [])
+    .find(c => c.id === order?.b2bCompanyId)?.pricing?.[order?.vehicle]
+
   if (key === 'returnFee') {
-    return order.hourlyRate != null && order.hourlyRate !== ''
-      ? Number(order.hourlyRate) : v.hourlyRate
+    if (agreed?.returnFee != null) return Number(agreed.returnFee)
+    return v.returnFee
   }
   if (key === 'stairFee') return STAIRS_FEE[v.people] || 10
   return 0
 }
 
+/** 这一单该用的时薪。协议价快照优先 —— 和 pricing.js calcTotal 同源。 */
+export function rateOf(order, b2bCustomers) {
+  const v = VEHICLES[order?.vehicle]
+  if (order?.hourlyRate != null && order.hourlyRate !== '') return Number(order.hourlyRate)
+  const agreed = (b2bCustomers || [])
+    .find(c => c.id === order?.b2bCompanyId)?.pricing?.[order?.vehicle]
+  if (agreed?.hourlyRate != null) return Number(agreed.hourlyRate)
+  return v?.hourlyRate || 0
+}
+
 /** 金额 → 数量（把已存的费用倒推成「几小时 / 几层」显示在输入框里） */
-export function feeToQty(order, key, fee) {
-  const unit = unitPriceOf(order, key)
+export function feeToQty(order, key, fee, b2bCustomers) {
+  const unit = unitPriceOf(order, key, b2bCustomers)
   if (!unit) return ''
   const q = (Number(fee) || 0) / unit
   return Number.isFinite(q) ? String(Math.round(q * 100) / 100) : ''
@@ -192,13 +215,20 @@ export const SUMMED_FEES = [
 ]
 
 const num = v => (v === '' || v === null || v === undefined) ? 0 : (Number(v) || 0)
+
+/** 定金三选一。老板 10-11：「有 = 30，无 = 0，其他 = 手动填写」
+ *  —— 比按 isB2BOrder 自动推断好：那个字段本来就有漏标的
+ *  （ko 6 单、金姐 2 单、澳邮 1 单都是企业客户但没打标记）。
+ *  靠猜会把金额算错，让人点一下反而更快更准。
+ *  长途那种收 $500 以上的走「其他」手填。 */
+export const STANDARD_DEPOSIT = 30
 const pick = (order, draft, k) => draft[k] !== undefined && draft[k] !== '' ? draft[k] : order[k]
 
 /**
  * 用户改了 field 之后，哪些派生值要跟着变。
  * @returns 要并进 draft 的字段（不覆盖用户已经手动填过的）
  */
-export function deriveDraft(order, draft, field, auto = {}) {
+export function deriveDraft(order, draft, field, auto = {}, b2bCustomers) {
   const v = VEHICLES[order.vehicle]
   if (!v) return {}
   const out = {}
@@ -224,8 +254,7 @@ export function deriveDraft(order, draft, field, auto = {}) {
   // ② 工时变了（不管是自动算的还是人工填的）→ 重算时间费
   const hours = num(out.billedHours ?? pick(order, draft, 'billedHours'))
   if ((field === 'billedHours' || out.billedHours !== undefined) && hours > 0) {
-    const rate = order.hourlyRate != null && order.hourlyRate !== ''
-      ? Number(order.hourlyRate) : v.hourlyRate
+    const rate = rateOf(order, b2bCustomers)
     if (!touched('timeFee') || out.billedHours !== undefined) {
       out.timeFee = (Math.round(rate * hours * 100) / 100).toFixed(2)
     }

@@ -12,7 +12,7 @@ import { useApp } from '../../context/AppContext'
 import { sydneyToday, addDays } from '../../utils/date'
 import {
   vehicleMedians, detectIssues, impactOf, daySummary, participants, RECONCILE_FIELDS,
-  deriveDraft, DERIVED_FIELDS, unitPriceOf, feeToQty, breakdown,
+  deriveDraft, DERIVED_FIELDS, unitPriceOf, feeToQty, breakdown, STANDARD_DEPOSIT,
 } from '../../utils/reconcile'
 import {
   ChevronLeft, ChevronRight, Check, AlertTriangle, Undo2, Lock, Unlock, History,
@@ -40,7 +40,7 @@ const toISO = v => {
 
 export default function Reconcile() {
   const { orders, staffRates, staff, reconcileOrder, undoReconcile, closeDay, reopenDay,
-          getReconcile, markReconciled, unmarkReconciled, markAllReconciled } = useApp()
+          getReconcile, markReconciled, unmarkReconciled, markAllReconciled, b2bCustomers } = useApp()
   const [date, setDate] = useState(() => sydneyToday())
   const [close, setClose] = useState(null)
   const [logs, setLogs] = useState([])
@@ -171,7 +171,7 @@ export default function Reconcile() {
           <OrderRow key={`${o.id}:${openId === o.id}`} order={o}
             issues={issuesBy[o.id] || []}
             staffRates={staffRates} staff={staff} medians={medians}
-            checkedBy={checked.find(c => c.order_id === o.id)}
+            checkedBy={checked.find(c => c.order_id === o.id)} b2b={b2bCustomers}
             open={openId === o.id} onToggle={() => setOpenId(openId === o.id ? null : o.id)}
             disabled={busy}
             onSave={(changes, reason) => run(() => reconcileOrder(o.id, date, changes, reason))}
@@ -277,7 +277,7 @@ function Stat({ label, value, good, warn, sub }) {
 
 // key 里带了 open 状态 —— 开合时组件重新挂载，草稿自然清空。
 // 比用 effect 清 state 干净：没有「渲染完再 setState」那一拍级联渲染。
-function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, open, onToggle, onSave, onCheck, disabled }) {
+function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, open, onToggle, onSave, onCheck, disabled }) {
   const [draft, setDraft] = useState({})
   // auto 记录哪些值是系统算出来的（而不是人手敲的）——
   // 界面上标「自动」，并且后续重算时可以放心覆盖它们
@@ -292,7 +292,7 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, open, 
   function toFee(key, raw) {
     const f = RECONCILE_FIELDS.find(x => x.key === key)
     if (f?.type !== 'qty' || raw === '') return raw
-    return String(Math.round((Number(raw) || 0) * unitPriceOf(order, key) * 100) / 100)
+    return String(Math.round((Number(raw) || 0) * unitPriceOf(order, key, b2b) * 100) / 100)
   }
 
   function edit(key, raw) {
@@ -300,7 +300,7 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, open, 
     setQty(q => ({ ...q, [key]: raw }))
     setAuto(a => {
       const next = { ...draft, [key]: value }
-      const derived = deriveDraft(order, next, key, a)
+      const derived = deriveDraft(order, next, key, a, b2b)
       const n = { ...a, [key]: false }
       for (const k of Object.keys(derived)) n[k] = true
       setDraft({ ...next, ...derived })
@@ -426,7 +426,7 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, open, 
                   </span>
                   <span className={`font-mono text-sm ${empty ? 'text-red-400' : 'text-gray-500'}`}>
                     {empty ? '— 未记录'
-                      : f.type === 'qty' ? `${money(cur)}（${feeToQty(order, f.key, cur)} ${f.unit}）`
+                      : f.type === 'qty' ? `${money(cur)}（${feeToQty(order, f.key, cur, b2b)} ${f.unit}）`
                       : f.type === 'money' ? money(cur) : String(shown)}
                   </span>
                   <div className="flex items-center gap-1.5">
@@ -442,11 +442,33 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, open, 
                     className={`border rounded-lg px-2 py-1 text-sm font-mono w-full outline-none focus:border-red-400 ${
                       auto[f.key] ? 'border-amber-300 bg-amber-50' : 'border-gray-200'}`}
                   />
+                  {f.key === 'deposit' && (() => {
+                    // 老板 10-11：「有=30，无=0，其他=手动填写」
+                    // 不按 isB2BOrder 猜 —— 那个字段本来就有漏标的，猜错就算错钱
+                    const cur = Number(draft.deposit ?? order.deposit ?? 0)
+                    return (
+                      <span className="flex items-center gap-1 shrink-0">
+                        {[['30', '有 $30'], ['0', '无']].map(([v, l]) => (
+                          <button key={v} onClick={() => edit('deposit', v)}
+                            className={`text-xs rounded px-2 py-0.5 border whitespace-nowrap transition-colors ${
+                              cur === Number(v)
+                                ? 'border-red-400 bg-red-50 text-red-700 font-semibold'
+                                : 'border-gray-200 text-gray-400 hover:text-gray-600'}`}>
+                            {l}
+                          </button>
+                        ))}
+                        <span className={`text-xs whitespace-nowrap ${
+                          cur !== 0 && cur !== STANDARD_DEPOSIT ? 'text-red-700 font-semibold' : 'text-gray-300'}`}>
+                          {cur !== 0 && cur !== STANDARD_DEPOSIT ? '其他' : '其他←左边框填'}
+                        </span>
+                      </span>
+                    )
+                  })()}
                   {f.type === 'qty' && (
                     <span className="text-xs text-gray-400 whitespace-nowrap w-28 shrink-0">
                       {qty[f.key]
-                        ? `× $${unitPriceOf(order, f.key)} = ${money(draft[f.key])}`
-                        : `$${unitPriceOf(order, f.key)}/${f.unit}`}
+                        ? `× $${unitPriceOf(order, f.key, b2b)} = ${money(draft[f.key])}`
+                        : `$${unitPriceOf(order, f.key, b2b)}/${f.unit}`}
                     </span>
                   )}
                   </div>
