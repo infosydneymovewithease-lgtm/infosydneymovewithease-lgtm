@@ -12,7 +12,7 @@ import { useApp } from '../../context/AppContext'
 import { sydneyToday, addDays } from '../../utils/date'
 import {
   vehicleMedians, detectIssues, impactOf, daySummary, participants, RECONCILE_FIELDS,
-  deriveDraft, DERIVED_FIELDS,
+  deriveDraft, DERIVED_FIELDS, unitPriceOf, feeToQty,
 } from '../../utils/reconcile'
 import {
   ChevronLeft, ChevronRight, Check, AlertTriangle, Undo2, Lock, Unlock, History,
@@ -274,21 +274,29 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, open, 
   // auto 记录哪些值是系统算出来的（而不是人手敲的）——
   // 界面上标「自动」，并且后续重算时可以放心覆盖它们
   const [auto, setAuto] = useState({})
+  // qty 字段在界面上显示的是数量（几小时/几层），draft 里存的是金额，两边分开放
+  const [qty, setQty] = useState({})
   const [reason, setReason] = useState('师傅微信确认')
 
   // 老板 10-11：「都选到 5.5 小时了为什么不能自动核算」
   // 改一个值，把它派生出来的几项一起填上，人工填过的不动。
-  function edit(key, value) {
-    setDraft(d => {
-      const next = { ...d, [key]: value }
-      const derived = deriveDraft(order, next, key)
-      setAuto(a => {
-        const n = { ...a, [key]: false }
-        for (const k of Object.keys(derived)) if (!d[k] || a[k]) n[k] = true
-        return n
-      })
-      return { ...next, ...Object.fromEntries(
-        Object.entries(derived).filter(([k]) => !d[k] || auto[k])) }
+  // qty 字段（回程/楼梯）界面上填的是数量，存进 draft 的必须是金额
+  function toFee(key, raw) {
+    const f = RECONCILE_FIELDS.find(x => x.key === key)
+    if (f?.type !== 'qty' || raw === '') return raw
+    return String(Math.round((Number(raw) || 0) * unitPriceOf(order, key) * 100) / 100)
+  }
+
+  function edit(key, raw) {
+    const value = toFee(key, raw)
+    setQty(q => ({ ...q, [key]: raw }))
+    setAuto(a => {
+      const next = { ...draft, [key]: value }
+      const derived = deriveDraft(order, next, key, a)
+      const n = { ...a, [key]: false }
+      for (const k of Object.keys(derived)) n[k] = true
+      setDraft({ ...next, ...derived })
+      return n
     })
   }
 
@@ -409,20 +417,31 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, open, 
                     )}
                   </span>
                   <span className={`font-mono text-sm ${empty ? 'text-red-400' : 'text-gray-500'}`}>
-                    {empty ? '— 未记录' : f.type === 'money' ? money(cur) : String(shown)}
+                    {empty ? '— 未记录'
+                      : f.type === 'qty' ? `${money(cur)}（${feeToQty(order, f.key, cur)} ${f.unit}）`
+                      : f.type === 'money' ? money(cur) : String(shown)}
                   </span>
+                  <div className="flex items-center gap-1.5">
                   <input
                     type={f.type === 'time' ? 'datetime-local' : 'number'}
                     // ⚠️ datetime-local 的 step 单位是【秒】，不是和 number 一样的「最小增量」。
                     //    之前这里统一写 0.01，浏览器就按 10 毫秒精度渲染，
                     //    日期选择器多出「秒」和「分毫秒」两列 —— 记收工时间精确到毫秒是荒唐的。
-                    step={f.type === 'time' ? 60 : f.type === 'hours' ? '0.5' : '0.01'}
-                    value={draft[f.key] ?? ''}
-                    placeholder="不改就留空"
+                    step={f.type === 'time' ? 60 : f.type === 'qty' ? f.step : f.type === 'hours' ? '0.5' : '0.01'}
+                    value={f.type === 'qty' ? (qty[f.key] ?? '') : (draft[f.key] ?? '')}
+                    placeholder={f.type === 'qty' ? `几${f.unit}` : '不改就留空'}
                     onChange={e => edit(f.key, e.target.value)}
                     className={`border rounded-lg px-2 py-1 text-sm font-mono w-full outline-none focus:border-red-400 ${
                       auto[f.key] ? 'border-amber-300 bg-amber-50' : 'border-gray-200'}`}
                   />
+                  {f.type === 'qty' && (
+                    <span className="text-xs text-gray-400 whitespace-nowrap w-28 shrink-0">
+                      {qty[f.key]
+                        ? `× $${unitPriceOf(order, f.key)} = ${money(draft[f.key])}`
+                        : `$${unitPriceOf(order, f.key)}/${f.unit}`}
+                    </span>
+                  )}
+                  </div>
                 </Fragment>
               )
             })}

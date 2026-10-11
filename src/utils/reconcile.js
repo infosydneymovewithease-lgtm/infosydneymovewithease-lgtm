@@ -10,7 +10,7 @@
 
 import { hourlyRateFor } from './wageRates'
 import { billedHours as calcBilled, overtimeDetail } from './pricing'
-import { VEHICLES } from '../data/vehicles'
+import { VEHICLES, STAIRS_FEE } from '../data/vehicles'
 
 /** 这些字段为空不算异常 —— 低频，不是漏记 */
 export const LOW_FREQUENCY_FEES = ['parkingFee', 'highwayFee', 'fuelFee', 'suppliesFee']
@@ -127,20 +127,45 @@ export function daySummary(orders, staffRates) {
   }
 }
 
-/** 对账页要显示的字段（左右对照用）。顺序就是界面顺序。 */
+/** 对账页要显示的字段。顺序就是界面顺序。
+ *
+ *  type='qty' 的两项是老板 10-11 指出来的 —— 它们本来就不该让人算钱：
+ *    回程费  1 小时回程 = 1 小时费用（VEHICLES 里 returnFee 和 hourlyRate 本来就相等）
+ *    楼梯费  每层每人 $10，2 人 $20/层、3 人 $30/层（STAIRS_FEE 本来就这么定的）
+ *  填数量，钱自动出来。填「1」到底是一层还是一刀，不该让人猜。 */
 export const RECONCILE_FIELDS = [
   { key: 'workStartedAt', label: '实际开始', type: 'time'  },
   { key: 'workEndedAt',   label: '实际结束', type: 'time'  },
   { key: 'billedHours',   label: '计费工时', type: 'hours' },
   { key: 'timeFee',       label: '时间费',   type: 'money' },
-  { key: 'returnFee',     label: '回程费',   type: 'money' },
-  { key: 'stairFee',      label: '楼梯费',   type: 'money' },
+  { key: 'returnFee',     label: '回程',     type: 'qty', unit: '小时', step: 0.5 },
+  { key: 'stairFee',      label: '楼梯',     type: 'qty', unit: '层',   step: 1   },
   { key: 'overtimeFee',   label: '加班费',   type: 'money' },
   { key: 'heavyFee',      label: '重物费',   type: 'money' },
   { key: 'parkingFee',    label: '停车费',   type: 'money' },
   { key: 'highwayFee',    label: '高速费',   type: 'money' },
   { key: 'finalAmount',   label: '实收金额', type: 'money' },
 ]
+
+/** 数量字段的单价：回程 = 时薪/小时，楼梯 = 人数×$10/层 */
+export function unitPriceOf(order, key) {
+  const v = VEHICLES[order?.vehicle]
+  if (!v) return 0
+  if (key === 'returnFee') {
+    return order.hourlyRate != null && order.hourlyRate !== ''
+      ? Number(order.hourlyRate) : v.hourlyRate
+  }
+  if (key === 'stairFee') return STAIRS_FEE[v.people] || 10
+  return 0
+}
+
+/** 金额 → 数量（把已存的费用倒推成「几小时 / 几层」显示在输入框里） */
+export function feeToQty(order, key, fee) {
+  const unit = unitPriceOf(order, key)
+  if (!unit) return ''
+  const q = (Number(fee) || 0) / unit
+  return Number.isFinite(q) ? String(Math.round(q * 100) / 100) : ''
+}
 
 
 // ════════════════════════════════════════════════════════════
@@ -172,11 +197,14 @@ const pick = (order, draft, k) => draft[k] !== undefined && draft[k] !== '' ? dr
  * 用户改了 field 之后，哪些派生值要跟着变。
  * @returns 要并进 draft 的字段（不覆盖用户已经手动填过的）
  */
-export function deriveDraft(order, draft, field) {
+export function deriveDraft(order, draft, field, auto = {}) {
   const v = VEHICLES[order.vehicle]
   if (!v) return {}
   const out = {}
-  const touched = k => draft[k] !== undefined && draft[k] !== ''
+  // ⚠️ 「人工改过」必须排除系统自己填的那些。
+  //    第一版只看 draft 里有没有值 —— 系统自动填进去的也算「改过」，
+  //    于是实收金额自动填过一次之后就再也不更新了（老板 10-11 实测发现）。
+  const touched = k => draft[k] !== undefined && draft[k] !== '' && !auto[k]
 
   // ① 改了时间 → 重算工时和加班费
   if (field === 'workStartedAt' || field === 'workEndedAt') {
