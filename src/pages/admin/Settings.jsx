@@ -2,9 +2,15 @@ import { useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import { UserPlus, Save, ToggleLeft, ToggleRight, Pencil } from 'lucide-react'
 import { VEHICLES } from '../../data/vehicles'
+import { roleLabel } from '../../utils/roles'
+import SettingsOperations from './SettingsOperations'
 
-const ROLE_LABEL = { admin: '管理员', cs: '客服', worker: '师傅' }
-const ROLE_COLOR = { admin: 'bg-red-100 text-red-700', cs: 'bg-blue-100 text-blue-700', worker: 'bg-green-100 text-green-700' }
+// 角色名统一走 utils/roles.js ——
+// 10/11 加 manager（客服经理）时这里漏了，佳慧会显示成「客服」。
+const ROLE_COLOR = {
+  admin: 'bg-red-100 text-red-700', manager: 'bg-purple-100 text-purple-700',
+  cs: 'bg-blue-100 text-blue-700',  worker: 'bg-green-100 text-green-700',
+}
 
 export default function Settings() {
   const { staff, addStaffMember, updateStaffMember, appSettings, updateAppSettings } = useApp()
@@ -53,12 +59,12 @@ export default function Settings() {
   }
 
   return (
-    <div className="p-5 max-w-2xl mx-auto">
+    <div className="p-5 max-w-3xl mx-auto">
       <h1 className="text-xl font-bold text-gray-900 mb-5">系统设置</h1>
 
       {/* Tabs */}
       <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm mb-5 w-fit">
-        {[['staff','员工账号'],['prices','默认价格'],['company','公司信息']].map(([t, label]) => (
+        {[['staff','员工账号'],['ops','运营配置'],['prices','默认价格'],['company','公司信息']].map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               tab === t ? 'text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'
@@ -68,6 +74,9 @@ export default function Settings() {
           </button>
         ))}
       </div>
+
+      {/* ── 运营配置 tab（10/11 第 3 步）── */}
+      {tab === 'ops' && <SettingsOperations />}
 
       {/* ── Staff tab ── */}
       {tab === 'staff' && (
@@ -88,7 +97,7 @@ export default function Settings() {
             return (
               <div key={role} className="bg-white rounded-xl shadow-sm overflow-hidden">
                 <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100">
-                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{ROLE_LABEL[role]}</h3>
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{roleLabel(role)}</h3>
                 </div>
                 <div className="divide-y divide-gray-50">
                   {group.map(s => {
@@ -103,7 +112,7 @@ export default function Settings() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className={`font-semibold text-sm ${active ? 'text-gray-900' : 'text-gray-400'}`}>{s.name}</span>
-                            <span className={`text-xs px-1.5 py-0.5 rounded-full ${ROLE_COLOR[s.role]}`}>{ROLE_LABEL[s.role]}</span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full ${ROLE_COLOR[s.role]}`}>{roleLabel(s.role)}</span>
                             {s.isDriver && <span className="text-xs px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600">司机</span>}
                             {!active && <span className="text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-400">已停用</span>}
                           </div>
@@ -153,8 +162,8 @@ export default function Settings() {
                       className={inputCls} />
                   </Field>
                   <Field label="角色权限">
-                    <div className="grid grid-cols-3 gap-2">
-                      {['worker','cs','admin'].map(r => (
+                    <div className="grid grid-cols-4 gap-2">
+                      {['worker','cs','manager','admin'].map(r => (
                         <button key={r} type="button"
                           onClick={() => setEditingStaff(f => ({ ...f, role: r }))}
                           className={`py-2 rounded-xl border-2 text-xs font-semibold transition-colors ${
@@ -162,7 +171,7 @@ export default function Settings() {
                               ? 'border-red-300 bg-red-50 text-red-700'
                               : 'border-gray-200 text-gray-500'
                           }`}>
-                          {ROLE_LABEL[r]}
+                          {roleLabel(r)}
                         </button>
                       ))}
                     </div>
@@ -201,13 +210,13 @@ export default function Settings() {
                     <input value={newStaff.password} onChange={e => setNS('password', e.target.value)} className={inputCls} placeholder="初始密码" />
                   </Field>
                   <Field label="角色">
-                    <div className="grid grid-cols-3 gap-2">
-                      {['worker','cs','admin'].map(r => (
+                    <div className="grid grid-cols-4 gap-2">
+                      {['worker','cs','manager','admin'].map(r => (
                         <button key={r} type="button" onClick={() => setNS('role', r)}
                           className={`py-2 rounded-xl border-2 text-xs font-semibold transition-colors ${
                             newStaff.role === r ? 'border-red-300 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500'
                           }`}>
-                          {ROLE_LABEL[r]}
+                          {roleLabel(r)}
                         </button>
                       ))}
                     </div>

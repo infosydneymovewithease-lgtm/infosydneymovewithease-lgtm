@@ -60,6 +60,14 @@ const ORDER_COLUMNS = new Set([
   'isB2BOrder','b2bCompanyId','b2bCompanyName',
 ])
 
+// 运营配置的空壳。四张配置表的 RPC（list_config）读不到时用它兜底。
+const EMPTY_CONFIG = {
+  channelAccounts: [],
+  shiftConfigs:    [],
+  breakWindows:    [],
+  staffSchedules:  [],
+}
+
 const STORAGE_COLUMNS = new Set([
   'id','status','customerName','customerPhone','wechat','moveInDate','moveOutDate',
   'actualMoveOutDate','boxes','furniture','items','location','deposit','depositStatus',
@@ -106,6 +114,9 @@ export function AppProvider({ children }) {
   })
 
   // Supabase-backed state — starts empty, populated on mount
+  // 运营配置（2026-10-11 第 3 步）。四张配置表一次 RPC 取回。
+  // 迁移没跑时保持这个空壳 —— 读不到配置不能让整个后台白屏。
+  const [config, setConfig] = useState(EMPTY_CONFIG)
   const [orders, setOrders] = useState([])
   const [storageOrders, setStorageOrders] = useState([])
   const [staff, setStaff] = useState([])
@@ -180,13 +191,14 @@ export function AppProvider({ children }) {
   useEffect(() => {
     async function init() {
       try {
-        const [ordersRes, storageRes, staffRes, ratesRes, b2bRes] = await Promise.all([
+        const [ordersRes, storageRes, staffRes, ratesRes, b2bRes, configRes] = await Promise.all([
           supabase.from('orders').select('*').order('created_at', { ascending: false }),
           supabase.from('storage_orders').select('*').order('created_at', { ascending: false }),
           // S1-D: staff 表已锁，必须通过 list_staff RPC 读取（不含密码）
           supabase.rpc('list_staff'),
           supabase.rpc('list_staff_rates'),   // 2026-10-11 费率入库；迁移未跑时会报错，下面容错
           supabase.from('b2b_customers').select('*').order('created_at', { ascending: false }),
+          supabase.rpc('list_config'),        // 2026-10-11 第 3 步四张配置表；同样容错
         ])
         if (ordersRes.data) setOrders(ordersRes.data)
         if (storageRes.data) setStorageOrders(storageRes.data)
@@ -194,6 +206,11 @@ export function AppProvider({ children }) {
         // 费率：迁移还没跑时 RPC 不存在，这里静默失败 —— 工资计算会回退到代码里的旧名单
         if (ratesRes?.data) setStaffRates(ratesRes.data)
         else if (ratesRes?.error) console.warn('[staff_rate] 读取失败，工资回退旧逻辑：', ratesRes.error.message)
+
+        // 运营配置（账号/班次/休息窗口/排班）：迁移未跑时 RPC 不存在，
+        // 静默回退到 EMPTY_CONFIG —— 页面显示「配置未初始化」，不崩。
+        if (configRes?.data) setConfig({ ...EMPTY_CONFIG, ...configRes.data })
+        else if (configRes?.error) console.warn('[config] 读取失败，运营配置为空：', configRes.error.message)
 
         // 企业客户：DB 为准。DB 空且没报错时，一次性把本地 localStorage 里现有客户搬上云
         // （不丢老板已录入的合作客户）。
@@ -520,6 +537,27 @@ export function AppProvider({ children }) {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...patch } : o))
   }
 
+  // ── 运营配置的修改（2026-10-11 第 3 步）─────────────────────
+  // 只开放两个真会动的：开新账号、改排班。
+  // 班次和休息窗口改的频率极低（一年两次换季），先只读，要改跑 SQL。
+
+  async function updateChannelAccount(id, patch) {
+    const { error } = await supabase.from('channel_account').update(patch).eq('id', id)
+    if (error) throw new Error(error.message || '保存失败，请重试')
+    setConfig(c => ({ ...c,
+      channelAccounts: c.channelAccounts.map(a => a.id === id ? { ...a, ...patch } : a) }))
+  }
+
+  async function updateStaffSchedule(staffId, weekday, isWorking) {
+    const row = { staff_id: staffId, weekday, is_working: isWorking }
+    const { error } = await supabase.from('staff_schedule').upsert(row, { onConflict: 'staff_id,weekday' })
+    if (error) throw new Error(error.message || '保存失败，请重试')
+    setConfig(c => {
+      const rest = c.staffSchedules.filter(s => !(s.staff_id === staffId && s.weekday === weekday))
+      return { ...c, staffSchedules: [...rest, { ...row, note: null }] }
+    })
+  }
+
   function updateOrderTimer(orderId, patch) {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...patch } : o))
     bg(supabase.from('orders').update(pickOrder(patch)).eq('id', orderId), '工作计时同步')
@@ -752,6 +790,7 @@ export function AppProvider({ children }) {
   return (
     <AppContext.Provider value={{
       user, worker, login, logout,
+      config, updateChannelAccount, updateStaffSchedule,
       orders, confirmOrder, completeOrder, startWork, getMyOrders, finishWorkWithCorrection,
       createOrder, createOrderWithSlotCheck,
       updateOrder, updateOrderTimer, dispatchOrder, updateOrderStatus,
