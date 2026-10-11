@@ -12,7 +12,7 @@ import { useApp } from '../../context/AppContext'
 import { sydneyToday, addDays } from '../../utils/date'
 import {
   vehicleMedians, detectIssues, impactOf, daySummary, participants, RECONCILE_FIELDS,
-  deriveDraft, DERIVED_FIELDS, unitPriceOf, feeToQty,
+  deriveDraft, DERIVED_FIELDS, unitPriceOf, feeToQty, breakdown,
 } from '../../utils/reconcile'
 import {
   ChevronLeft, ChevronRight, Check, AlertTriangle, Undo2, Lock, Unlock, History,
@@ -256,6 +256,14 @@ function labelOf(k) {
   return RECONCILE_FIELDS.find(f => f.key === k)?.label || k
 }
 
+function Line({ label, value, bold, dim }) {
+  return (
+    <div className={`flex justify-between ${dim ? 'text-gray-400' : bold ? 'text-gray-900 font-bold' : 'text-gray-600'}`}>
+      <span className="font-sans">{label}</span><span>{value}</span>
+    </div>
+  )
+}
+
 function Stat({ label, value, good, warn, sub }) {
   return (
     <div className="bg-gray-50 rounded-xl px-3 py-2">
@@ -446,6 +454,41 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, open, 
               )
             })}
           </div>
+
+          {/* 收款方式 —— 老板 10-11：「缺现金还是转账，转账有 GST 的」 */}
+          <div className="flex items-center gap-3 mt-3 text-sm">
+            <span className="text-gray-600 whitespace-nowrap">收款方式</span>
+            <div className="flex gap-1.5">
+              {[['cash', '现金'], ['transfer', '转账 +10% GST']].map(([val, label]) => {
+                const on = (draft.paymentMethod ?? order.paymentMethod) === val
+                return (
+                  <button key={val} onClick={() => edit('paymentMethod', val)}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                      on ? 'border-red-400 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500'}`}>
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+            {!order.paymentMethod && <span className="text-xs text-red-500">原来没标</span>}
+          </div>
+
+          {/* 账单怎么算出来的 —— Annie 手里拿着现金或流水，得看懂这个数的来路 */}
+          {(() => {
+            const b = breakdown(order, draft)
+            return (
+              <div className="mt-3 bg-gray-50 rounded-xl px-3 py-2.5 text-sm font-mono">
+                <Line label="费用合计" value={money(b.fees)} />
+                {b.van > 0 && <Line label="面包车优惠" value={`−${money(b.van)}`} />}
+                <Line label={b.method === 'transfer' ? 'GST 10%' : 'GST（现金不收）'} value={money(b.gst)}
+                  dim={b.gst === 0} />
+                <Line label="定金" value={b.deposit ? `−${money(b.deposit)}` : money(0)} dim={!b.deposit} />
+                <div className="border-t border-gray-200 mt-1.5 pt-1.5">
+                  <Line label="实收金额" value={money(b.total)} bold />
+                </div>
+              </div>
+            )
+          })()}
 
           {impact && (
             <div className="mt-3 bg-amber-50 rounded-xl px-3 py-2.5 text-sm">

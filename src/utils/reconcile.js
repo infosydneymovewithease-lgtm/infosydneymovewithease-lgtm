@@ -10,7 +10,7 @@
 
 import { hourlyRateFor } from './wageRates'
 import { billedHours as calcBilled, overtimeDetail } from './pricing'
-import { VEHICLES, STAIRS_FEE } from '../data/vehicles'
+import { VEHICLES, STAIRS_FEE, VAN_PROMO_DISCOUNT } from '../data/vehicles'
 
 /** 这些字段为空不算异常 —— 低频，不是漏记 */
 export const LOW_FREQUENCY_FEES = ['parkingFee', 'highwayFee', 'fuelFee', 'suppliesFee']
@@ -144,6 +144,7 @@ export const RECONCILE_FIELDS = [
   { key: 'heavyFee',      label: '重物费',   type: 'money' },
   { key: 'parkingFee',    label: '停车费',   type: 'money' },
   { key: 'highwayFee',    label: '高速费',   type: 'money' },
+  { key: 'deposit',       label: '定金',     type: 'money', hint: '实收里要扣掉' },
   { key: 'finalAmount',   label: '实收金额', type: 'money' },
 ]
 
@@ -230,20 +231,40 @@ export function deriveDraft(order, draft, field, auto = {}) {
     }
   }
 
-  // ③ 任何费用变了 → 按【差额】推实收金额
-  //    不重新推导总额 —— 实测历史单里定金扣不扣、远途费算不算都不一致，
-  //    重算会把这些差异抹平。按差额走，原单怎么处理的就还是怎么处理。
+  // ③ 费用 / 收款方式 / 定金任一变了 → 重算 GST 和实收金额
+  //
+  //    老板 10-11 指出漏了收款方式和定金。实测 286 张已完成订单：
+  //      GST   11 张转账单全部 = 费用 × 10%，零例外 → 规则确定，可以放心算
+  //      定金  203 单扣了 / 32 单没扣 / 28 单为 0  → 标准做法是扣，
+  //            那 32 单没扣的是错的，正好是对账该揪出来的
+  //    所以这里用完整公式，不再按差额凑：
+  //      实收 = 费用合计 + GST − 定金
   const merged = { ...draft, ...out }
-  const oldSum = SUMMED_FEES.reduce((a, k) => a + num(order[k]), 0)
-  const newSum = SUMMED_FEES.reduce((a, k) => a + num(pick(order, merged, k)), 0)
-  const delta = newSum - oldSum
-  if (Math.abs(delta) >= 0.005 && !touched('finalAmount')) {
-    // 转账单带 10% GST，现金单不带 —— 看原单有没有 gst 来判断
-    const gstRate = num(order.gst) > 0 ? 1.1 : 1
-    out.finalAmount = (Math.round((num(order.finalAmount) + delta * gstRate) * 100) / 100).toFixed(2)
-  }
+  const b = breakdown(order, merged)
+  if (!touched('gst'))         out.gst = b.gst.toFixed(2)
+  if (!touched('finalAmount')) out.finalAmount = b.total.toFixed(2)
   return out
 }
 
+/**
+ * 账单分解。界面上把这几步摊开给 Annie 看 ——
+ * 她手里拿着现金或银行流水，得知道这个数是怎么来的。
+ */
+export function breakdown(order, draft = {}) {
+  const v = VEHICLES[order?.vehicle]
+  const get = k => num(pick(order, draft, k))
+  const fees = SUMMED_FEES.reduce((a, k) => a + get(k), 0)
+  const van = order?.vehicle === '面包车' ? VAN_PROMO_DISCOUNT : 0
+  const sub = fees - van
+  const method = pick(order, draft, 'paymentMethod')
+  const gst = method === 'transfer' ? Math.round(sub * 0.1 * 100) / 100 : 0
+  const deposit = get('deposit')
+  return {
+    fees, van, sub, gst, deposit, method,
+    total: Math.round((sub + gst - deposit) * 100) / 100,
+    people: v?.people || 1,
+  }
+}
+
 /** 这个字段是自动算出来的吗（界面上标一下，让 Annie 知道哪些是系统填的） */
-export const DERIVED_FIELDS = ['billedHours', 'timeFee', 'overtimeFee', 'finalAmount']
+export const DERIVED_FIELDS = ['billedHours', 'timeFee', 'overtimeFee', 'gst', 'finalAmount']
