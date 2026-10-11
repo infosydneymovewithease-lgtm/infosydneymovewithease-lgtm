@@ -12,6 +12,7 @@ import { useApp } from '../../context/AppContext'
 import { sydneyToday, addDays } from '../../utils/date'
 import {
   vehicleMedians, detectIssues, impactOf, daySummary, participants, RECONCILE_FIELDS,
+  deriveDraft, DERIVED_FIELDS,
 } from '../../utils/reconcile'
 import {
   ChevronLeft, ChevronRight, Check, AlertTriangle, Undo2, Lock, Unlock, History,
@@ -21,6 +22,11 @@ const money = n => `$${(Number(n) || 0).toFixed(2)}`
 const hhmm = iso => iso
   ? new Date(iso).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
   : null
+// 老板 10-11：时间一律只到分钟，秒没必要。
+// 注意 toLocaleString 不传字段时【默认带秒】，所以每处都要显式列出来。
+const stamp = iso => new Date(iso).toLocaleString('zh-CN', {
+  hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+})
 
 // ⚠️ datetime-local 给的是【浏览器本地墙上时间】，没有时区信息。
 // Annie 在国内，直接把 '2026-10-11T10:30' 送进 timestamptz 列会被当成 UTC —— 差 8 小时。
@@ -135,7 +141,7 @@ export default function Reconcile() {
         {dayOrders.map(o => (
           <OrderRow key={`${o.id}:${openId === o.id}`} order={o}
             issues={issuesBy[o.id] || []}
-            staffRates={staffRates} staff={staff}
+            staffRates={staffRates} staff={staff} medians={medians}
             open={openId === o.id} onToggle={() => setOpenId(openId === o.id ? null : o.id)}
             disabled={busy}
             onSave={(changes, reason) => run(() => reconcileOrder(o.id, date, changes, reason))} />
@@ -153,7 +159,7 @@ export default function Reconcile() {
                 </p>
                 <p className="text-gray-400 text-xs mt-0.5">
                   {staff.find(s => s.id === close.confirmed_by)?.name || close.confirmed_by} ·
-                  {' '}{new Date(close.confirmed_at).toLocaleString('zh-CN', { hour12: false })}
+                  {' '}{stamp(close.confirmed_at)}
                 </p>
               </div>
               <button disabled={busy} onClick={() => run(() => reopenDay(date))}
@@ -190,7 +196,7 @@ export default function Reconcile() {
               {logs.map(l => (
                 <div key={l.id} className={`flex items-center gap-3 text-sm py-1.5 ${l.undone_at ? 'opacity-40' : ''}`}>
                   <span className="font-mono text-xs text-gray-400 w-32 shrink-0">
-                    {new Date(l.changed_at).toLocaleString('zh-CN', { hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    {stamp(l.changed_at)}
                   </span>
                   <span className="font-semibold text-xs w-24 shrink-0">{l.order_no || l.order_id}</span>
                   <span className="text-gray-600 flex-1 min-w-0 truncate">
@@ -231,9 +237,28 @@ function Stat({ label, value, good, warn }) {
 
 // key 里带了 open 状态 —— 开合时组件重新挂载，草稿自然清空。
 // 比用 effect 清 state 干净：没有「渲染完再 setState」那一拍级联渲染。
-function OrderRow({ order, issues, staffRates, staff, open, onToggle, onSave, disabled }) {
+function OrderRow({ order, issues, staffRates, staff, medians, open, onToggle, onSave, disabled }) {
   const [draft, setDraft] = useState({})
+  // auto 记录哪些值是系统算出来的（而不是人手敲的）——
+  // 界面上标「自动」，并且后续重算时可以放心覆盖它们
+  const [auto, setAuto] = useState({})
   const [reason, setReason] = useState('师傅微信确认')
+
+  // 老板 10-11：「都选到 5.5 小时了为什么不能自动核算」
+  // 改一个值，把它派生出来的几项一起填上，人工填过的不动。
+  function edit(key, value) {
+    setDraft(d => {
+      const next = { ...d, [key]: value }
+      const derived = deriveDraft(order, next, key)
+      setAuto(a => {
+        const n = { ...a, [key]: false }
+        for (const k of Object.keys(derived)) if (!d[k] || a[k]) n[k] = true
+        return n
+      })
+      return { ...next, ...Object.fromEntries(
+        Object.entries(derived).filter(([k]) => !d[k] || auto[k])) }
+    })
+  }
 
   const incomplete = order.status !== '已完成'
   const high = issues.filter(i => i.sev === 'high').length
@@ -251,6 +276,14 @@ function OrderRow({ order, issues, staffRates, staff, open, onToggle, onSave, di
       }))
   const nChanges = Object.keys(changes).length
   const impact = nChanges ? impactOf(order, changes, staffRates) : null
+
+  // 补录出来的工时也要查一遍 —— 填错结束时间会算出 28 小时，
+  // 加班费有封顶挡着，工时和时间费没有。保存前必须让人看见。
+  const med = medians?.[order.vehicle]
+  const draftHours = Number(changes.billedHours ?? order.billedHours) || 0
+  const hoursWarn = med && draftHours > med * 4
+    ? `补录后计费 ${draftHours} 小时，是${order.vehicle}常规（中位 ${med} 小时）的 ${(draftHours / med).toFixed(0)} 倍 —— 确认结束时间填对了吗？`
+    : null
 
   return (
     <div className={`bg-white rounded-2xl shadow-sm overflow-hidden ${incomplete ? 'opacity-50' : ''}`}>
@@ -291,24 +324,36 @@ function OrderRow({ order, issues, staffRates, staff, open, onToggle, onSave, di
           <div className="grid grid-cols-[auto_1fr_1fr] gap-x-3 gap-y-1.5 items-center text-sm mt-3">
             <span />
             <span className="text-xs text-gray-400">系统现有</span>
-            <span className="text-xs text-gray-400">核对后补录</span>
+            <span className="text-xs text-gray-400">
+              核对后补录
+              <span className="ml-2 text-amber-600">黄底 = 系统自动算的，可以改</span>
+            </span>
             {RECONCILE_FIELDS.map(f => {
               const cur = order[f.key]
               const shown = f.type === 'time' ? hhmm(cur) : cur
               const empty = cur === null || cur === undefined || cur === ''
               return (
                 <Fragment key={f.key}>
-                  <span className="text-gray-600 whitespace-nowrap">{f.label}</span>
+                  <span className="text-gray-600 whitespace-nowrap">
+                    {f.label}
+                    {DERIVED_FIELDS.includes(f.key) && (
+                      <span className="text-gray-300 text-xs ml-1" title="改上面的值会自动算这一项">ƒ</span>
+                    )}
+                  </span>
                   <span className={`font-mono text-sm ${empty ? 'text-red-400' : 'text-gray-500'}`}>
                     {empty ? '— 未记录' : f.type === 'money' ? money(cur) : String(shown)}
                   </span>
                   <input
                     type={f.type === 'time' ? 'datetime-local' : 'number'}
-                    step={f.type === 'hours' ? '0.5' : '0.01'}
+                    // ⚠️ datetime-local 的 step 单位是【秒】，不是和 number 一样的「最小增量」。
+                    //    之前这里统一写 0.01，浏览器就按 10 毫秒精度渲染，
+                    //    日期选择器多出「秒」和「分毫秒」两列 —— 记收工时间精确到毫秒是荒唐的。
+                    step={f.type === 'time' ? 60 : f.type === 'hours' ? '0.5' : '0.01'}
                     value={draft[f.key] ?? ''}
                     placeholder="不改就留空"
-                    onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))}
-                    className="border border-gray-200 rounded-lg px-2 py-1 text-sm font-mono w-full focus:border-red-400 outline-none"
+                    onChange={e => edit(f.key, e.target.value)}
+                    className={`border rounded-lg px-2 py-1 text-sm font-mono w-full outline-none focus:border-red-400 ${
+                      auto[f.key] ? 'border-amber-300 bg-amber-50' : 'border-gray-200'}`}
                   />
                 </Fragment>
               )
@@ -327,6 +372,11 @@ function OrderRow({ order, issues, staffRates, staff, open, onToggle, onSave, di
                   <strong className="ml-1">
                     ({impact.amount.to > impact.amount.from ? '+' : ''}{money(impact.amount.to - impact.amount.from)})
                   </strong>
+                </p>
+              )}
+              {hoursWarn && (
+                <p className="text-red-700 font-semibold mt-1.5 pt-1.5 border-t border-amber-200">
+                  ⚠️ {hoursWarn}
                 </p>
               )}
               {impact.wages.map(w => (

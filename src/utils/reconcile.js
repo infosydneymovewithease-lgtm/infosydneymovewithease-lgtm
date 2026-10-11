@@ -9,6 +9,8 @@
 // 把低频项当异常报，结果就是 Annie 每天看一屏红字，然后再也不看了。
 
 import { hourlyRateFor } from './wageRates'
+import { billedHours as calcBilled, overtimeDetail } from './pricing'
+import { VEHICLES } from '../data/vehicles'
 
 /** 这些字段为空不算异常 —— 低频，不是漏记 */
 export const LOW_FREQUENCY_FEES = ['parkingFee', 'highwayFee', 'fuelFee', 'suppliesFee']
@@ -126,3 +128,81 @@ export const RECONCILE_FIELDS = [
   { key: 'highwayFee',    label: '高速费',   type: 'money' },
   { key: 'finalAmount',   label: '实收金额', type: 'money' },
 ]
+
+
+// ════════════════════════════════════════════════════════════
+// 自动核算 —— 老板 10-11：
+//   「为什么上面都选择到 5.5 小时了就不能自动核算呢，
+//     只有附加费用，否则一个一个改太（麻烦）」
+// ════════════════════════════════════════════════════════════
+// 派生值（自动算，但允许人工覆盖）：
+//   实际开始/结束 → 计费工时、加班费
+//   计费工时      → 时间费
+//   任何费用      → 实收金额
+//
+// 人工填（现场发生的，系统不可能知道）：
+//   楼梯费 · 停车费 · 高速费 · 重物费 · 物资费 · 油费 · 回程费
+
+/** 参与「实收金额」加总的费用项。
+ *  ⚠️ 不含 remoteSurcharge 和 materialsCost ——
+ *  实测 200 张已完成订单，这两项【从来没被算进 finalAmount】。
+ *  把它们加进来会让每一单都凭空多出几十到几百块。 */
+export const SUMMED_FEES = [
+  'timeFee', 'returnFee', 'stairFee', 'overtimeFee',
+  'heavyFee', 'highwayFee', 'parkingFee', 'suppliesFee', 'fuelFee',
+]
+
+const num = v => (v === '' || v === null || v === undefined) ? 0 : (Number(v) || 0)
+const pick = (order, draft, k) => draft[k] !== undefined && draft[k] !== '' ? draft[k] : order[k]
+
+/**
+ * 用户改了 field 之后，哪些派生值要跟着变。
+ * @returns 要并进 draft 的字段（不覆盖用户已经手动填过的）
+ */
+export function deriveDraft(order, draft, field) {
+  const v = VEHICLES[order.vehicle]
+  if (!v) return {}
+  const out = {}
+  const touched = k => draft[k] !== undefined && draft[k] !== ''
+
+  // ① 改了时间 → 重算工时和加班费
+  if (field === 'workStartedAt' || field === 'workEndedAt') {
+    const s = pick(order, draft, 'workStartedAt')
+    const e = pick(order, draft, 'workEndedAt')
+    if (s && e) {
+      const sec = (new Date(e) - new Date(s)) / 1000
+      if (sec > 0) {
+        out.billedHours = String(calcBilled(sec, v.minHours))
+        // 加班费带 6 小时封顶 —— 超了返回 0 并标记，不会再算出天文数字
+        out.overtimeFee = String(overtimeDetail(s, e, v.people).fee)
+      }
+    }
+  }
+
+  // ② 工时变了（不管是自动算的还是人工填的）→ 重算时间费
+  const hours = num(out.billedHours ?? pick(order, draft, 'billedHours'))
+  if ((field === 'billedHours' || out.billedHours !== undefined) && hours > 0) {
+    const rate = order.hourlyRate != null && order.hourlyRate !== ''
+      ? Number(order.hourlyRate) : v.hourlyRate
+    if (!touched('timeFee') || out.billedHours !== undefined) {
+      out.timeFee = (Math.round(rate * hours * 100) / 100).toFixed(2)
+    }
+  }
+
+  // ③ 任何费用变了 → 按【差额】推实收金额
+  //    不重新推导总额 —— 实测历史单里定金扣不扣、远途费算不算都不一致，
+  //    重算会把这些差异抹平。按差额走，原单怎么处理的就还是怎么处理。
+  const merged = { ...draft, ...out }
+  const oldSum = SUMMED_FEES.reduce((a, k) => a + num(order[k]), 0)
+  const newSum = SUMMED_FEES.reduce((a, k) => a + num(pick(order, merged, k)), 0)
+  const delta = newSum - oldSum
+  if (Math.abs(delta) >= 0.005 && !touched('finalAmount')) {
+    // 转账单带 10% GST，现金单不带 —— 看原单有没有 gst 来判断
+    const gstRate = num(order.gst) > 0 ? 1.1 : 1
+    out.finalAmount = (Math.round((num(order.finalAmount) + delta * gstRate) * 100) / 100).toFixed(2)
+  }
+  return out
+}
+
+/** 这个字段是自动算出来的吗（界面上标一下，让 Annie 知道哪些是系统填的） */
+export const DERIVED_FIELDS = ['billedHours', 'timeFee', 'overtimeFee', 'finalAmount']
