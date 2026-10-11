@@ -46,6 +46,10 @@ export default function Reconcile() {
   const [logs, setLogs] = useState([])
   const [checked, setChecked] = useState([])
   const [openId, setOpenId] = useState(null)
+  // 哪些单有没保存的补录。老板 10-11 实测：表单算出 $670，
+  // 汇总和确认按钮还是 $300 —— 因为草稿还在浏览器里没进库。
+  // 这种时候绝不能让人点「确认当日收入」。
+  const [dirty, setDirty] = useState({})
   const [showLogs, setShowLogs] = useState(false)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
@@ -94,6 +98,7 @@ export default function Reconcile() {
   }
 
   const confirmed = close?.status === 'confirmed'
+  const unsaved = Object.values(dirty).filter(n => n > 0).length
 
   return (
     <div className="p-5 max-w-5xl mx-auto">
@@ -175,7 +180,8 @@ export default function Reconcile() {
             open={openId === o.id} onToggle={() => setOpenId(openId === o.id ? null : o.id)}
             disabled={busy}
             onSave={(changes, reason) => run(() => reconcileOrder(o.id, date, changes, reason))}
-            onCheck={v => run(() => v ? markReconciled(o.id, date) : unmarkReconciled(o.id))} />
+            onCheck={v => run(() => v ? markReconciled(o.id, date) : unmarkReconciled(o.id))}
+            onDirty={n => setDirty(d => (d[o.id] || 0) === n ? d : { ...d, [o.id]: n })} />
         ))}
       </div>
 
@@ -200,15 +206,19 @@ export default function Reconcile() {
             </div>
           ) : (
             <>
-              <button disabled={busy || clean < done.length} onClick={() => run(() => closeDay(date))}
+              <button disabled={busy || clean < done.length || unsaved > 0} onClick={() => run(() => closeDay(date))}
                 className="w-full text-white font-bold py-3 rounded-xl disabled:opacity-40"
                 style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
-                {clean < done.length
-                  ? `还有 ${done.length - clean} 单没核对`
-                  : `确认当日收入 ${money(sum.due)}`}
+                {unsaved > 0
+                  ? `还有 ${unsaved} 单的补录没保存`
+                  : clean < done.length
+                    ? `还有 ${done.length - clean} 单没核对`
+                    : `确认当日收入 ${money(sum.due)}`}
               </button>
-              <p className="text-xs text-gray-400 mt-2 text-center">
-                逐单和师傅核对完再勾左边的框，全部勾完才能确认当日收入
+              <p className={`text-xs mt-2 text-center ${unsaved > 0 ? 'text-amber-600 font-medium' : 'text-gray-400'}`}>
+                {unsaved > 0
+                  ? '黄底的数字还只是草稿，先点那一单里的「保存」写进系统，这里的金额才会跟着变'
+                  : '逐单和师傅核对完再勾左边的框，全部勾完才能确认当日收入'}
               </p>
             </>
           )}
@@ -277,7 +287,7 @@ function Stat({ label, value, good, warn, sub }) {
 
 // key 里带了 open 状态 —— 开合时组件重新挂载，草稿自然清空。
 // 比用 effect 清 state 干净：没有「渲染完再 setState」那一拍级联渲染。
-function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, open, onToggle, onSave, onCheck, disabled }) {
+function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, open, onToggle, onSave, onCheck, onDirty, disabled }) {
   const [draft, setDraft] = useState({})
   // auto 记录哪些值是系统算出来的（而不是人手敲的）——
   // 界面上标「自动」，并且后续重算时可以放心覆盖它们
@@ -324,6 +334,7 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, o
       }))
   const nChanges = Object.keys(changes).length
   const impact = nChanges ? impactOf(order, changes, staffRates) : null
+  useEffect(() => { onDirty?.(nChanges) }, [nChanges, onDirty])
 
   // 补录出来的工时也要查一遍 —— 填错结束时间会算出 28 小时，
   // 加班费有封顶挡着，工时和时间费没有。保存前必须让人看见。
@@ -335,7 +346,7 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, o
     : null
 
   return (
-    <div className={`bg-white rounded-2xl shadow-sm overflow-hidden ${incomplete ? 'opacity-50' : ''} ${checkedBy ? 'ring-1 ring-green-200' : ''}`}>
+    <div className={`bg-white rounded-2xl shadow-sm overflow-hidden ${incomplete ? 'opacity-50' : ''} ${nChanges > 0 ? 'ring-2 ring-amber-300' : checkedBy ? 'ring-1 ring-green-200' : ''}`}>
       <div className="flex items-center gap-3 px-4 py-3">
       {!incomplete && (
         <button onClick={() => onCheck(!checkedBy)} disabled={disabled}
@@ -384,6 +395,8 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, o
 
       {incomplete
         ? <span className="text-xs text-gray-400 w-20 text-right shrink-0">{order.status}</span>
+        : nChanges > 0
+          ? <span className="text-xs text-amber-600 w-20 text-right shrink-0 font-semibold">未保存</span>
         : checkedBy
           ? <span className="text-xs text-green-600 w-20 text-right shrink-0 font-semibold">已核对</span>
           : issues.length === 0
@@ -546,11 +559,18 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, o
             <button
               disabled={!nChanges || disabled}
               onClick={() => onSave(changes, reason)}
-              className="px-4 py-2 rounded-lg text-white text-sm font-semibold disabled:opacity-30 shrink-0"
+              className={`rounded-lg text-white font-bold disabled:opacity-30 shrink-0 transition-all ${
+                nChanges ? 'px-6 py-2.5 text-sm shadow-md' : 'px-4 py-2 text-sm'}`}
               style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
-              保存 {nChanges ? `(${nChanges} 项)` : ''}
+              {nChanges ? `保存这 ${nChanges} 项改动` : '保存'}
             </button>
           </div>
+          {nChanges > 0 && (
+            <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 mt-2">
+              ⚠️ 上面黄底的数字还只是草稿，<strong>没点保存就不算数</strong> ——
+              页面顶上的汇总和底下的「确认当日收入」都还是旧金额。
+            </p>
+          )}
           <p className="text-xs text-gray-400 mt-2">
             只能改时间和费用。状态、订单号、客户信息、派单信息改不了 —— 数据库层挡着。
           </p>
