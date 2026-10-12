@@ -13,6 +13,7 @@
 //    只有一个人在岗，休 3 小时没人接电话。老板 10-11 定：单人日只休 2 小时。
 
 import { currentSeason, toMinutes, toHHMM, isWorkingOn } from './shifts'
+import { sydneyDateOf } from './date'
 
 /** 某天该开放哪几段休息。单人日自动砍掉 single_day=false 的那段。 */
 export function slotsForDay(breakWindows, staffSchedules, dateStr, now = new Date()) {
@@ -81,15 +82,34 @@ export function inquiryProgress(channelAccounts, inquiries, dateStr) {
   return { need, missing, filled: need.length - missing.length, total, ok: missing.length === 0 }
 }
 
-/** 今日业绩 —— 系统自动算，不用人填。按建单人统计。 */
+/**
+ * 今日业绩 —— 系统自动算，不用人填。
+ *
+ * ⚠️ 「我今天建了几单」必须按【建单时刻】算，不是服务日期。
+ *    实测 368 单里 88% 不是当天搬的（中位间隔 2 天）——
+ *    按服务日期算的话，客服今天接的单绝大多数都不算数。
+ *    第一版我写错了，老板 10-12 指出来的。
+ *
+ * 两个数分开给，因为是两回事：
+ *   booked   我今天接了几单（她今天的产出）
+ *   served   今天搬家且我建的单（那天的活，可能是上周接的）
+ */
 export function myPerformance(orders, staffId, dateStr) {
-  const mine = (orders || []).filter(o => o.createdBy === staffId && String(o.date) === dateStr)
-  const done = mine.filter(o => o.status === '已完成')
+  const booked = (orders || []).filter(o =>
+    o.createdBy === staffId && sydneyDateOf(o.createdAt) === dateStr && o.status !== '已取消')
+  const served = (orders || []).filter(o =>
+    o.createdBy === staffId && String(o.date) === dateStr && o.status === '已完成')
   return {
-    created: mine.length,
-    completed: done.length,
-    amount: done.reduce((s, o) => s + (Number(o.finalAmount) || 0), 0),
+    booked: booked.length,
+    bookedAmount: booked.reduce((s, o) => s + (Number(o.finalAmount) || Number(o.quote) || 0), 0),
+    served: served.length,
+    servedAmount: served.reduce((s, o) => s + (Number(o.finalAmount) || 0), 0),
   }
+}
+
+/** 某天建的单（全公司）—— 漏斗的分子。咨询和建单是同一天的事，成交是几天后。 */
+export function bookedOn(orders, dateStr) {
+  return (orders || []).filter(o => sydneyDateOf(o.createdAt) === dateStr && o.status !== '已取消')
 }
 
 /** 本周视频出了没 —— 老板 10-11：运营每周最少保证出一个视频 */

@@ -216,12 +216,16 @@ export default function WorkLog() {
       </Card>
 
       {/* ── 今日业绩（自动）────────────────────── */}
-      <Card title="今日业绩" hint="系统自动按建单人统计，不用填">
-        <div className="grid grid-cols-3 gap-3">
-          <Stat label="我建的单" value={`${perf.created} 单`} />
-          <Stat label="已完成" value={`${perf.completed} 单`} />
-          <Stat label="完成金额" value={money(perf.amount)} />
+      <Card title="今日业绩" hint="系统自动算，不用填">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Stat label="我今天接的单" value={`${perf.booked} 单`} />
+          <Stat label="接单金额" value={money(perf.bookedAmount)} />
+          <Stat label="今天搬的（我接的）" value={`${perf.served} 单`} />
+          <Stat label="完成金额" value={money(perf.servedAmount)} />
         </div>
+        <p className="text-xs text-gray-400 mt-2">
+          「今天接的」按建单时刻算 —— 多数单是几天后才搬，两个数不一样是正常的
+        </p>
       </Card>
 
       {/* ── 发布内容 ─────────────────────────── */}

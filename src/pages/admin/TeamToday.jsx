@@ -9,7 +9,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useApp } from '../../context/AppContext'
 import { sydneyToday, addDays } from '../../utils/date'
-import { slotsForDay, breakMinutes, requiredAccounts, weekRange, trustSignals } from '../../utils/worklog'
+import { slotsForDay, breakMinutes, requiredAccounts, weekRange, trustSignals, bookedOn } from '../../utils/worklog'
 import { isWorkingOn } from '../../utils/shifts'
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react'
 
@@ -53,9 +53,13 @@ export default function TeamToday() {
   const slots = slotsForDay(config.breakWindows, config.staffSchedules, date)
   const accounts = requiredAccounts(config.channelAccounts)
 
-  // 今日漏斗：咨询 → 成单
+  // 今日漏斗：咨询 → 建单
+  // ⚠️ 分子必须是【今天建的单】，不是「今天搬家的单」。
+  //    咨询和建单是同一天发生的事，搬家是几天后（实测中位 2 天）。
+  //    用服务日期当分子，分子分母根本不是一回事 —— 第一版我写错了。
   const inquiries = day.inquiries.reduce((s, i) => s + (Number(i.count) || 0), 0)
-  const dayOrders = orders.filter(o => String(o.date) === date)
+  const dayOrders = bookedOn(orders, date)
+  const servedToday = orders.filter(o => String(o.date) === date && o.status === '已完成')
   const rate = inquiries > 0 ? (dayOrders.length / inquiries * 100) : null
 
   // 本周视频
@@ -232,12 +236,17 @@ export default function TeamToday() {
       {/* ── 今日漏斗 ─────────────────────────── */}
       <div className="bg-white rounded-2xl p-4 shadow-sm">
         <h2 className="font-bold text-sm mb-3">今日漏斗</h2>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Stat label="平台咨询" value={`${inquiries} 人`} />
-          <Stat label="成单" value={`${dayOrders.length} 单`} />
+          <Stat label="今天接单" value={`${dayOrders.length} 单`} hint="按建单时刻" />
           <Stat label="转化率" value={rate == null ? '—' : `${rate.toFixed(0)}%`}
-            hint={rate == null ? '还没登记咨询' : null} />
+            hint={rate == null ? '还没登记咨询' : '接单 ÷ 咨询'} />
+          <Stat label="今天搬完" value={`${servedToday.length} 单`} hint="多是前几天接的" />
         </div>
+        <p className="text-xs text-gray-400 mt-2">
+          咨询和接单是同一天的事，搬家一般在几天后（实测中位 2 天）——
+          所以转化率用「接单」算，「搬完」那格是当天实际干的活
+        </p>
       </div>
 
       {/* ── 账号 × 星期 ──────────────────────── */}

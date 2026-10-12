@@ -50,3 +50,18 @@ export function weekdayOf(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number)
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay()
 }
+
+/**
+ * 一个 ISO 时间戳落在悉尼的哪一天。
+ *
+ * ⚠️ 为什么需要这个：orders 有两个日期概念，很容易混
+ *      date       服务日期（哪天搬家）—— 本来就是 'YYYY-MM-DD' 字符串
+ *      createdAt  建单时刻 —— timestamptz，要换算成悉尼日期才能比
+ *    实测 368 单：88% 不是当天搬的，中位间隔 2 天。
+ *    拿 date 当「今天建了几单」用，会漏掉绝大多数。
+ */
+export function sydneyDateOf(iso) {
+  if (!iso) return null
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString('en-CA', { timeZone: TZ })
+}

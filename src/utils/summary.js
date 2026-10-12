@@ -9,6 +9,7 @@
 
 import { hourlyRateFor } from './wageRates'
 import { participants } from './reconcile'
+import { sydneyDateOf } from './date'
 
 const num = v => Number(v) || 0
 const inRange = (d, from, to) => d && String(d) >= from && String(d) <= to
@@ -54,8 +55,11 @@ export function staffStats(opts) {
       if (!l.clock_in || !l.clock_out) return s
       return s + (new Date(l.clock_out) - new Date(l.clock_in)) / 60000
     }, 0)
-    const myOrders = (orders || []).filter(o => o.createdBy === id && inRange(o.date, from, to))
-    const myDone = myOrders.filter(o => o.status === '已完成')
+    // ⚠️ 接单数按【建单时刻】算，不是服务日期。
+    //    实测 368 单里 88% 不是当天搬的（中位间隔 2 天），
+    //    用服务日期算会把跨月的单算到错的月份去。
+    const myOrders = (orders || []).filter(o =>
+      o.createdBy === id && inRange(sydneyDateOf(o.createdAt), from, to) && o.status !== '已取消')
     // 咨询数按「那天这个人交了日报」归属 —— platform_inquiry 不分人，只能按天归
     const myDates = new Set(worked.map(l => String(l.work_date)))
     const myInq = (inquiries || [])
@@ -67,7 +71,7 @@ export function staffStats(opts) {
       days: worked.length,
       hours: Math.round(mins / 60 * 10) / 10,
       created: myOrders.length,
-      amount: myDone.reduce((s, o) => s + num(o.finalAmount), 0),
+      amount: myOrders.reduce((s, o) => s + (num(o.finalAmount) || num(o.quote)), 0),
       inquiries: myInq,
       // ⚠️ 转化率的咨询数是按天归的，两个人同一天都在岗时会重复计算 ——
       //    页面上要标注这一点，不能让人当精确值用
