@@ -12,6 +12,7 @@ import { useApp } from '../../context/AppContext'
 import { roleLabel } from '../../utils/roles'
 import { currentSeason, tzGapHours, sydneyToBeijing, isWorkingOn } from '../../utils/shifts'
 import { Radio, Clock, Coffee, CalendarDays, AlertTriangle } from 'lucide-react'
+import AddChannelAccount from '../../components/AddChannelAccount'
 
 const WEEK = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 const STATUS = {
@@ -96,7 +97,7 @@ export default function SettingsOperations() {
             账号名在代码里一个字都没写死，一直是从这张表读的，
             缺的只是新增入口。补上。 */}
         {adding ? (
-          <AddAccount busy={!!busy} onCancel={() => setAdding(false)}
+          <AddChannelAccount busy={!!busy} onCancel={() => setAdding(false)}
             onAdd={async v => { await run('new', () => addChannelAccount(v)); setAdding(false) }} />
         ) : (
           <button onClick={() => setAdding(true)}
@@ -201,46 +202,6 @@ export default function SettingsOperations() {
           </table>
         </div>
       </Block>
-    </div>
-  )
-}
-
-function AddAccount({ onAdd, onCancel, busy }) {
-  const [v, setV] = useState({ id: '', platform: '小红书', name: '', positioning: '', status: 'planned' })
-  const set = (k, x) => setV(p => ({ ...p, [k]: x }))
-  // id 只能英文小写数字 —— 它会被写进 platform_inquiry.account_id，
-  // 用中文会让以后查数据很痛苦
-  const idOk = /^[a-z0-9_]{2,20}$/.test(v.id)
-  return (
-    <div className="mt-3 border border-gray-200 rounded-xl p-3 space-y-2">
-      <div className="flex gap-2 flex-wrap">
-        <input value={v.name} onChange={e => set('name', e.target.value)} placeholder="账号名（如 寄存号）"
-          className="flex-1 min-w-32 border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-red-400" />
-        <input value={v.platform} onChange={e => set('platform', e.target.value)} placeholder="平台"
-          className="w-24 border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-red-400" />
-      </div>
-      <input value={v.positioning} onChange={e => set('positioning', e.target.value)}
-        placeholder="定位（如 仓储寄存）"
-        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-red-400" />
-      <div className="flex gap-2 items-center flex-wrap">
-        <input value={v.id} onChange={e => set('id', e.target.value.toLowerCase())} placeholder="英文代号 如 storage2"
-          className={`w-40 border rounded-lg px-2 py-1.5 text-sm font-mono outline-none focus:border-red-400 ${
-            v.id && !idOk ? 'border-red-300' : 'border-gray-200'}`} />
-        {[['planned', '计划中'], ['active', '直接启用']].map(([s, l]) => (
-          <button key={s} onClick={() => set('status', s)}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border ${
-              v.status === s ? 'border-red-400 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500'}`}>{l}</button>
-        ))}
-        <span className="flex-1" />
-        <button onClick={onCancel} className="px-3 py-1.5 text-sm text-gray-500">取消</button>
-        <button disabled={busy || !idOk || !v.name}
-          onClick={() => onAdd(v)}
-          className="px-4 py-1.5 rounded-lg text-white text-sm font-semibold disabled:opacity-40"
-          style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>添加</button>
-      </div>
-      <p className="text-xs text-gray-400">
-        英文代号只能小写字母/数字/下划线，建好后不能改 —— 它会被写进每天的咨询登记里
-      </p>
     </div>
   )
 }

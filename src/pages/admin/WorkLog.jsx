@@ -15,6 +15,7 @@ import {
   requiredAccounts, inquiryProgress, myPerformance, weeklyVideo, weekRange,
 } from '../../utils/worklog'
 import { LogIn, LogOut, Coffee, Plus, Trash2, Check } from 'lucide-react'
+import AddChannelAccount from '../../components/AddChannelAccount'
 
 const hhmm = iso => iso
   ? new Date(iso).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
@@ -25,6 +26,7 @@ export default function WorkLog() {
   const {
     user, staff, orders, config,
     getWorkday, upsertWorkLog, startBreak, endBreak, saveInquiry, addPost, deletePost, getPolicyText,
+    addChannelAccount,
   } = useApp()
   const date = sydneyToday()
   const [day, setDay] = useState({ logs: [], breaks: [], inquiries: [], posts: [] })
@@ -32,6 +34,7 @@ export default function WorkLog() {
   const [err, setErr] = useState('')
   const [, setTick] = useState(0)
   const [policy, setPolicy] = useState({})
+  const [adding, setAdding] = useState(false)
 
   const refresh = useCallback(async () => setDay(await getWorkday(date)), [getWorkday, date])
   useEffect(() => {
@@ -204,6 +207,21 @@ export default function WorkLog() {
             )
           })}
         </div>
+        {/* 老板 10-12：这里要能直接加新平台（抖音、新号…）。
+            ⚠️ 只对 admin/manager 显示 —— 加一个账号 = 全团队从此每天必填，
+               而且和真实性声明、罚款挂着，那是管理决定不是客服决定。 */}
+        {(user?.role === 'admin' || user?.role === 'manager') && (
+          adding ? (
+            <AddChannelAccount busy={busy} onCancel={() => setAdding(false)}
+              onAdd={async v => { await run(() => addChannelAccount(v)); setAdding(false) }} />
+          ) : (
+            <button onClick={() => setAdding(true)}
+              className="mt-3 w-full border border-dashed border-gray-300 rounded-xl py-2 text-sm text-gray-500 hover:border-red-300 hover:text-red-600">
+              + 新增运营平台 / 账号
+            </button>
+          )
+        )}
+
         <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100 text-sm">
           <span className="text-gray-500">今日咨询合计</span>
           <span className="font-mono font-bold text-lg">{prog.total} 人</span>
