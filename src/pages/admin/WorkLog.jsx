@@ -174,6 +174,7 @@ export default function WorkLog() {
       </Card>
 
       {/* ── 平台咨询登记 ──────────────────────── */}
+      <div id="inquiry-section" className="scroll-mt-4" />
       <Card title="平台咨询登记" hint="7 个触点每天逐个检查，填你自己接待的人数。今天 0 个也要登记 —— 填 0 就行，不填不算。左边显示你在「今天发了什么」里登记的内容，不用重复填">
         <div className="space-y-1.5">
           {(config.channelAccounts || []).map(a => {
@@ -246,8 +247,18 @@ export default function WorkLog() {
       <div className="bg-white rounded-2xl p-4 shadow-sm">
         <h2 className="font-bold text-gray-900 text-sm mb-3">今天接待了多少 · 下了几单</h2>
         <div className="flex items-center gap-2 sm:gap-4">
-          <Big label="我接待" value={prog.total} unit="人" tag="手填"
-            sub={`${prog.filled}/${prog.need.length} 个平台已登记`} />
+          {/* 标签写了「手填」就得点得动 —— 老板 10-12 指出这个数字本身
+              不可点，要滚到下面才能填。标签承诺了动作却做不到，比不标还糟。 */}
+          <Big label="我接待" value={prog.total} unit="人" tag="点这里填"
+            sub={prog.ok ? `${prog.need.length} 个平台都登记了` : `还差 ${prog.missing.length} 个平台 · 点一下去填`}
+            onClick={() => {
+              document.getElementById('inquiry-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              setTimeout(() => {
+                const first = document.querySelector('#inquiry-section ~ div input[type="number"]:not([value])')
+                  || document.querySelector('#inquiry-section ~ div input[type="number"]')
+                first?.focus()
+              }, 400)
+            }} />
           <Arrow />
           <Big label="我下单" value={perf.booked} unit="单" tag="自动" accent
             sub="你今天建的单" />
@@ -262,7 +273,7 @@ export default function WorkLog() {
           <Stat label="完成金额" value={money(perf.servedAmount)} />
         </div>
         <p className="text-xs text-gray-400 mt-2 leading-relaxed">
-          <b>只有「接待」要你填</b>（在上面 7 个平台逐个登记）—— 微信和小红书里的咨询系统看不见。<br />
+          <b>只有「接待」要你填</b> —— 点上面那个数字会跳到登记表。微信和小红书里的咨询系统看不见，只能你报。<br />
           「下单」和下面三个金额都是系统按你的账号自动算的，不用管。
           多数单几天后才搬，所以「今天搬的」和「今天下单的」不是同一批。
         </p>
@@ -387,14 +398,16 @@ function Card({ title, hint, children }) {
   )
 }
 
-function Big({ label, value, unit, sub, accent, tag }) {
+function Big({ label, value, unit, sub, accent, tag, onClick }) {
+  const Tag = onClick ? 'button' : 'div'
   return (
-    <div className="flex-1 min-w-0">
+    <Tag onClick={onClick}
+      className={`flex-1 min-w-0 text-left ${onClick ? 'rounded-lg -m-1 p-1 hover:bg-amber-50 transition-colors' : ''}`}>
       <p className="text-xs text-gray-400 flex items-center gap-1">
         {label}
         {tag && (
           <span className={`text-xs px-1 py-0.5 rounded leading-none ${
-            tag === '手填' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-400'}`}>{tag}</span>
+            tag === '自动' ? 'bg-gray-100 text-gray-400' : 'bg-amber-100 text-amber-700'}`}>{tag}</span>
         )}
       </p>
       <p className={`font-mono font-bold leading-none mt-1 ${accent ? 'text-red-700' : 'text-gray-900'}`}>
@@ -402,7 +415,7 @@ function Big({ label, value, unit, sub, accent, tag }) {
         <span className="text-sm ml-0.5 font-normal">{value == null ? '' : unit}</span>
       </p>
       {sub && <p className="text-xs text-gray-400 mt-1 truncate">{sub}</p>}
-    </div>
+    </Tag>
   )
 }
 
