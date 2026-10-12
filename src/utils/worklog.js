@@ -112,3 +112,68 @@ export function weekRange(dateStr) {
   const f = x => x.toISOString().slice(0, 10)
   return { from: f(from), to: f(to) }
 }
+
+
+// ════════════════════════════════════════════════════════════
+// 咨询登记的可信度信号
+// ════════════════════════════════════════════════════════════
+// 老板 10-12：「我是客服，晚上我很累，我想随便填写糊弄一下就好」
+//
+// ⚠️ 先说清楚：这个数【无法验证】。咨询发生在微信和小红书里，
+//    系统看不见。下面这些只是「看起来不像真实数据」的信号，
+//    不是证据 —— 真实情况也可能碰巧触发。所以用词是「可能」，
+//    而且只给 Annie 看，不给客服看（提示了等于教她怎么绕过）。
+//
+// 更根本的一条写在这里提醒以后的人：
+//   如果咨询数不参与考核，客服就没有造假的动机。
+//   这个数的用途是「看哪个平台有流量」，不是「看谁努力」。
+//   一旦拿它考核，再多的检测也挡不住。
+
+/** 几秒之内填完算「没去平台看」的阈值 */
+export const FILL_TOO_FAST_SECONDS = 60
+
+export function trustSignals({ today, yesterday, clockIn, orderCount }) {
+  const out = []
+  const vals = (today || []).map(i => Number(i.count) || 0)
+  if (vals.length < 2) return out
+
+  // ① 几个账号填了同一个非零数字 —— 真实流量不会这么整齐
+  const nonZero = vals.filter(v => v > 0)
+  if (nonZero.length >= 3 && new Set(nonZero).size === 1) {
+    out.push({ sev: 'mid', text: `${nonZero.length} 个账号都填了同一个数字 ${nonZero[0]}` })
+  }
+
+  // ② 和昨天一模一样
+  if (yesterday?.length === today.length && today.length > 0) {
+    const a = Object.fromEntries(today.map(i => [i.account_id, Number(i.count) || 0]))
+    const b = Object.fromEntries(yesterday.map(i => [i.account_id, Number(i.count) || 0]))
+    if (Object.keys(a).every(k => a[k] === b[k])) {
+      out.push({ sev: 'mid', text: '每个账号的数字和昨天完全一样' })
+    }
+  }
+
+  // ③ 全部在一分钟内填完
+  const times = today.map(i => i.first_filled_at && new Date(i.first_filled_at).getTime()).filter(Boolean)
+  if (times.length >= 3) {
+    const span = (Math.max(...times) - Math.min(...times)) / 1000
+    if (span < FILL_TOO_FAST_SECONDS) {
+      out.push({ sev: 'mid', text: `${times.length} 个账号在 ${Math.round(span)} 秒内全部填完` })
+    }
+  }
+
+  // ④ 下班前一口气补的（上班后 10 小时以上才第一次填）
+  if (clockIn && times.length) {
+    const hrs = (Math.min(...times) - new Date(clockIn).getTime()) / 3600000
+    if (hrs > 10) out.push({ sev: 'low', text: `上班 ${hrs.toFixed(0)} 小时后才第一次登记，像是下班前补的` })
+  }
+
+  // ⑤ 咨询和成单严重背离
+  const total = vals.reduce((s, v) => s + v, 0)
+  if (total >= 15 && orderCount === 0) {
+    out.push({ sev: 'low', text: `登记了 ${total} 个咨询但一单没成` })
+  }
+  if (total === 0 && orderCount > 0) {
+    out.push({ sev: 'low', text: `成了 ${orderCount} 单，但咨询登记全是 0` })
+  }
+  return out
+}

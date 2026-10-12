@@ -9,7 +9,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useApp } from '../../context/AppContext'
 import { sydneyToday, addDays } from '../../utils/date'
-import { slotsForDay, breakMinutes, requiredAccounts, weekRange } from '../../utils/worklog'
+import { slotsForDay, breakMinutes, requiredAccounts, weekRange, trustSignals } from '../../utils/worklog'
 import { isWorkingOn } from '../../utils/shifts'
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react'
 
@@ -23,13 +23,15 @@ export default function TeamToday() {
   const [date, setDate] = useState(() => sydneyToday())
   const [day, setDay] = useState({ logs: [], breaks: [], inquiries: [], posts: [] })
   const [week, setWeek] = useState([])
+  const [prevDay, setPrevDay] = useState([])
 
   const wk = useMemo(() => weekRange(date), [date])
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const [d, w] = await Promise.all([getWorkday(date), getInquiryWeek(wk.from, wk.to)])
-      if (alive) { setDay(d); setWeek(w) }
+      const [d, w, p] = await Promise.all([
+        getWorkday(date), getInquiryWeek(wk.from, wk.to), getWorkday(addDays(date, -1))])
+      if (alive) { setDay(d); setWeek(w); setPrevDay(p.inquiries || []) }
     })()
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -63,6 +65,14 @@ export default function TeamToday() {
     if (l?.issues) todo.push({ sev: 'high', text: `${name} 提了问题：${l.issues}` })
   }
   if (slots.length && videoThisWeek === 0) todo.push({ sev: 'mid', text: '本周还没出视频 —— 目标每周至少 1 条' })
+
+  // 咨询登记的可信度信号。⚠️ 只在这里显示，客服自己那页不提示 ——
+  // 提示了等于教她怎么绕过。而且这些是「看起来不像真实数据」，不是证据。
+  const trust = trustSignals({
+    today: day.inquiries, yesterday: prevDay,
+    clockIn: day.logs.find(l => onDuty.includes(l.staff_id))?.clock_in,
+    orderCount: dayOrders.length,
+  })
 
   return (
     <div className="p-5 max-w-4xl mx-auto space-y-4">
@@ -139,6 +149,19 @@ export default function TeamToday() {
         })}
         {onDuty.length === 0 && <p className="text-sm text-gray-400">今天没人排班</p>}
       </div>
+
+      {trust.length > 0 && (
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-amber-200">
+          <h2 className="font-bold text-sm mb-1">咨询登记 · 看着不太对的地方</h2>
+          <p className="text-xs text-gray-400 mb-2">
+            这些是「不像真实数据」的信号，<b>不是证据</b> —— 真实情况也可能碰巧触发。
+            值得问一句，不值得当成结论。客服那边看不到这一块。
+          </p>
+          <div className="space-y-1">
+            {trust.map((s, i) => <p key={i} className="text-sm text-amber-700">· {s.text}</p>)}
+          </div>
+        </div>
+      )}
 
       {/* ── 今日漏斗 ─────────────────────────── */}
       <div className="bg-white rounded-2xl p-4 shadow-sm">

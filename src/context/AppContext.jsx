@@ -635,10 +635,13 @@ export function AppProvider({ children }) {
     if (error) throw new Error(error.message || '结束休息失败，请重试')
   }
 
+  // 走 RPC 而不是直接 upsert —— 函数里会记首次填写时间和修改次数，
+  // 这两个是判断「有没有糊弄」的痕迹（老板 10-12 提的）
   async function saveInquiry(logDate, accountId, count) {
-    const row = { log_date: logDate, account_id: accountId, count: Number(count) || 0,
-                  recorded_by: user?.id, updated_at: new Date().toISOString() }
-    const { error } = await supabase.from('platform_inquiry').upsert(row, { onConflict: 'log_date,account_id' })
+    const { error } = await supabase.rpc('save_inquiry', {
+      p_log_date: logDate, p_account_id: accountId,
+      p_count: Number(count) || 0, p_by: user?.id || null,
+    })
     if (error) throw new Error(error.message || '登记失败，请重试')
   }
 
