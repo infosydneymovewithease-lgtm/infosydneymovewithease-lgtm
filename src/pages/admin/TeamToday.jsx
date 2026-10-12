@@ -246,11 +246,11 @@ export default function TeamToday() {
       <div className="bg-white rounded-2xl p-4 shadow-sm">
         <h2 className="font-bold text-sm mb-3">今天接待了多少 · 下了几单</h2>
         <div className="flex items-center gap-2 sm:gap-4">
-          <Big label="接待" value={inquiries} unit="人" sub="7 个平台合计" />
+          <Big label="接待" value={inquiries} unit="人" tag="客服填" sub="7 个平台合计" />
           <Arrow />
-          <Big label="下单" value={dayOrders.length} unit="单" sub="按建单时刻" accent />
+          <Big label="下单" value={dayOrders.length} unit="单" tag="自动" sub="按建单时刻" accent />
           <Arrow />
-          <Big label="转化率" value={rate == null ? null : Math.round(rate)} unit="%"
+          <Big label="转化率" value={rate == null ? null : Math.round(rate)} unit="%" tag="自动"
             sub={rate == null ? '还没登记咨询' : '下单 ÷ 接待'} />
         </div>
         {/* 分人 —— 两个人在岗时合计看不出谁干了多少 */}
@@ -361,10 +361,16 @@ export default function TeamToday() {
   )
 }
 
-function Big({ label, value, unit, sub, accent }) {
+function Big({ label, value, unit, sub, accent, tag }) {
   return (
     <div className="flex-1 min-w-0">
-      <p className="text-xs text-gray-400">{label}</p>
+      <p className="text-xs text-gray-400 flex items-center gap-1">
+        {label}
+        {tag && (
+          <span className={`text-xs px-1 py-0.5 rounded leading-none ${
+            tag === '客服填' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-400'}`}>{tag}</span>
+        )}
+      </p>
       <p className={`font-mono font-bold leading-none mt-1 ${accent ? 'text-red-700' : 'text-gray-900'}`}>
         <span className="text-3xl">{value == null ? '—' : value}</span>
         <span className="text-sm ml-0.5 font-normal">{value == null ? '' : unit}</span>

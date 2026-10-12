@@ -7,32 +7,19 @@
 --   ④ 以后可能增加运营平台或账户，现在好像写死了
 
 -- ════════════════════════════════════════════════════════════
--- ① 证明：每个号登记咨询数时，把当天发的内容标题贴进来
+-- ① 证明：用 content_post 当凭证，不另开字段
 -- ════════════════════════════════════════════════════════════
--- 光填数字无法验证，但「今天在这个号发了什么」是可以去平台核对的。
--- 不强制 —— 有些号不是每天都发（视频号每周一条）。
--- 填了就是证据，没填 Annie 可以问。
-
-ALTER TABLE platform_inquiry ADD COLUMN IF NOT EXISTS evidence text;
-COMMENT ON COLUMN platform_inquiry.evidence IS '当天在这个号发的内容标题。Annie 可以去平台核对，比数字可验证';
-
-CREATE OR REPLACE FUNCTION public.save_inquiry(
-  p_log_date date, p_account_id text, p_count integer, p_by text, p_evidence text DEFAULT NULL)
-RETURNS jsonb
-LANGUAGE sql SECURITY DEFINER SET search_path = public
-AS $$
-  INSERT INTO platform_inquiry (log_date, account_id, count, recorded_by, updated_at,
-                                first_filled_at, edit_count, evidence)
-  VALUES (p_log_date, p_account_id, p_count, p_by, now(), now(), 0, p_evidence)
-  ON CONFLICT (log_date, account_id) DO UPDATE
-    SET count = p_count, recorded_by = p_by, updated_at = now(),
-        edit_count = platform_inquiry.edit_count + 1,
-        evidence = COALESCE(p_evidence, platform_inquiry.evidence)
-  RETURNING to_jsonb(platform_inquiry);
-$$;
-
-GRANT EXECUTE ON FUNCTION public.save_inquiry(date, text, integer, text, text) TO anon, authenticated;
-
+-- 老板原话是「把每天发的内容标题粘贴进去，以证明」。
+-- 我第一版在 platform_inquiry 上加了 evidence 列 —— 错了：
+-- 「今天发了什么」已经有 content_post 在记，等于让人填两遍，
+-- 两边对不上时不知道信谁，而且月汇总的「发布」数只读 content_post，
+-- 填在 evidence 里的根本不算发布。
+--
+-- 正确做法：发布内容只在一个地方填（content_post），
+-- 咨询登记行把当天这个号发的内容【显示】出来当凭证。
+-- 填一次，两处都有，数据永远一致。
+--
+-- （evidence 列没建出来过，所以这里什么都不用做 —— 没有历史包袱要清）
 
 -- ════════════════════════════════════════════════════════════
 -- ② 真实性声明 —— 提交日报时必须勾

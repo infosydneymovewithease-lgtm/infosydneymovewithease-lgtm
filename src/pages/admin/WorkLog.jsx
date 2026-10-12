@@ -174,11 +174,12 @@ export default function WorkLog() {
       </Card>
 
       {/* ── 平台咨询登记 ──────────────────────── */}
-      <Card title="平台咨询登记" hint="7 个触点每天逐个检查，填你自己接待的人数。今天 0 个也要登记 —— 填 0 就行，不填不算。左边贴当天发的内容标题作为凭证">
+      <Card title="平台咨询登记" hint="7 个触点每天逐个检查，填你自己接待的人数。今天 0 个也要登记 —— 填 0 就行，不填不算。左边显示你在「今天发了什么」里登记的内容，不用重复填">
         <div className="space-y-1.5">
           {(config.channelAccounts || []).map(a => {
             // 只显示自己填的 —— 两个人在岗时各填各的
             const rec = day.inquiries.find(i => i.account_id === a.id && i.staff_id === user?.id)
+            const myPosts = day.posts.filter(p => p.account_id === a.id && p.posted_by === user?.id)
             const planned = a.status !== 'active'
             const done = !!rec
             return (
@@ -192,14 +193,19 @@ export default function WorkLog() {
                   <span className="text-xs text-gray-300 w-24 text-right shrink-0">未开通</span>
                 ) : (
                   <>
-                    {/* 老板 10-12：把当天发的内容标题贴进来，以证明。
-                        数字无法验证，但「在这个号发了什么」Annie 能去平台核对。 */}
-                    <input defaultValue={rec?.evidence ?? ''} placeholder="今天发的标题（可空）"
-                      onBlur={e => run(() => saveInquiry(date, a.id, rec?.count ?? 0, e.target.value))}
-                      className="w-44 border border-gray-200 rounded-lg px-2 py-1 text-xs outline-none focus:border-red-400 shrink-0" />
+                    {/* 凭证直接读「今天发了什么」里登记的内容 —— 不让人填两遍。
+                        老板 10-12 指出这两处是同一件事，确实是我做重复了。 */}
+                    <span className="text-xs w-44 truncate shrink-0 text-right">
+                      {myPosts.length
+                        ? <span className="text-gray-500">
+                            {myPosts[0].kind === 'video' ? '🎬' : '📝'} {myPosts[0].title || '（没写标题）'}
+                            {myPosts.length > 1 && ` 等 ${myPosts.length} 条`}
+                          </span>
+                        : <span className="text-gray-300">今天没登记发布</span>}
+                    </span>
                     <input type="number" min="0" step="1" placeholder="待填"
                       defaultValue={rec?.count ?? ''}
-                      onBlur={e => { if (e.target.value !== '') run(() => saveInquiry(date, a.id, e.target.value, rec?.evidence)) }}
+                      onBlur={e => { if (e.target.value !== '') run(() => saveInquiry(date, a.id, e.target.value)) }}
                       className={`w-20 border rounded-lg px-2 py-1 text-sm font-mono text-right outline-none focus:border-red-400 shrink-0 ${
                         done ? 'border-green-200 bg-green-50' : 'border-amber-300 bg-amber-50'}`} />
                   </>
@@ -240,11 +246,13 @@ export default function WorkLog() {
       <div className="bg-white rounded-2xl p-4 shadow-sm">
         <h2 className="font-bold text-gray-900 text-sm mb-3">今天接待了多少 · 下了几单</h2>
         <div className="flex items-center gap-2 sm:gap-4">
-          <Big label="我接待" value={prog.total} unit="人" sub={`${prog.filled}/${prog.need.length} 个平台已登记`} />
+          <Big label="我接待" value={prog.total} unit="人" tag="手填"
+            sub={`${prog.filled}/${prog.need.length} 个平台已登记`} />
           <Arrow />
-          <Big label="我下单" value={perf.booked} unit="单" sub="按建单时刻算" accent />
+          <Big label="我下单" value={perf.booked} unit="单" tag="自动" accent
+            sub="你今天建的单" />
           <Arrow />
-          <Big label="转化率"
+          <Big label="转化率" tag="自动"
             value={prog.total > 0 ? Math.round(perf.booked / prog.total * 100) : null}
             unit="%" sub={prog.total > 0 ? '下单 ÷ 接待' : '还没登记咨询'} />
         </div>
@@ -253,9 +261,10 @@ export default function WorkLog() {
           <Stat label="今天搬的（我接的）" value={`${perf.served} 单`} />
           <Stat label="完成金额" value={money(perf.servedAmount)} />
         </div>
-        <p className="text-xs text-gray-400 mt-2">
-          「接待」来自上面 7 个平台的登记，「下单」按建单时刻算 ——
-          多数单几天后才搬，所以「今天搬的」是另一回事
+        <p className="text-xs text-gray-400 mt-2 leading-relaxed">
+          <b>只有「接待」要你填</b>（在上面 7 个平台逐个登记）—— 微信和小红书里的咨询系统看不见。<br />
+          「下单」和下面三个金额都是系统按你的账号自动算的，不用管。
+          多数单几天后才搬，所以「今天搬的」和「今天下单的」不是同一批。
         </p>
       </div>
 
@@ -378,10 +387,16 @@ function Card({ title, hint, children }) {
   )
 }
 
-function Big({ label, value, unit, sub, accent }) {
+function Big({ label, value, unit, sub, accent, tag }) {
   return (
     <div className="flex-1 min-w-0">
-      <p className="text-xs text-gray-400">{label}</p>
+      <p className="text-xs text-gray-400 flex items-center gap-1">
+        {label}
+        {tag && (
+          <span className={`text-xs px-1 py-0.5 rounded leading-none ${
+            tag === '手填' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-400'}`}>{tag}</span>
+        )}
+      </p>
       <p className={`font-mono font-bold leading-none mt-1 ${accent ? 'text-red-700' : 'text-gray-900'}`}>
         <span className="text-3xl">{value == null ? '—' : value}</span>
         <span className="text-sm ml-0.5 font-normal">{value == null ? '' : unit}</span>

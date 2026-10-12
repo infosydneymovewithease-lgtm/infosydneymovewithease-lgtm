@@ -637,11 +637,10 @@ export function AppProvider({ children }) {
 
   // 走 RPC 而不是直接 upsert —— 函数里会记首次填写时间和修改次数，
   // 这两个是判断「有没有糊弄」的痕迹（老板 10-12 提的）
-  async function saveInquiry(logDate, accountId, count, evidence) {
+  async function saveInquiry(logDate, accountId, count) {
     const { error } = await supabase.rpc('save_inquiry', {
       p_log_date: logDate, p_account_id: accountId,
       p_count: Number(count) || 0, p_by: user?.id || null,
-      p_evidence: evidence ?? null,
     })
     if (error) throw new Error(error.message || '登记失败，请重试')
   }

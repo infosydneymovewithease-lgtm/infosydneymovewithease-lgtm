@@ -23,7 +23,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS platform_inquiry_uniq
 COMMENT ON COLUMN platform_inquiry.staff_id IS '谁接待的。两个人在岗时各填各的，合计是相加';
 
 CREATE OR REPLACE FUNCTION public.save_inquiry(
-  p_log_date date, p_account_id text, p_count integer, p_by text, p_evidence text DEFAULT NULL)
+  p_log_date date, p_account_id text, p_count integer, p_by text)
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
@@ -34,14 +34,13 @@ BEGIN
 
   IF r.id IS NULL THEN
     INSERT INTO platform_inquiry (log_date, account_id, staff_id, count, recorded_by,
-                                  updated_at, first_filled_at, edit_count, evidence)
-    VALUES (p_log_date, p_account_id, p_by, p_count, p_by, now(), now(), 0, p_evidence)
+                                  updated_at, first_filled_at, edit_count)
+    VALUES (p_log_date, p_account_id, p_by, p_count, p_by, now(), now(), 0)
     RETURNING * INTO r;
   ELSE
     UPDATE platform_inquiry
        SET count = p_count, recorded_by = p_by, updated_at = now(),
-           edit_count = edit_count + 1,
-           evidence = COALESCE(p_evidence, evidence)
+           edit_count = edit_count + 1
      WHERE id = r.id
     RETURNING * INTO r;
   END IF;
@@ -49,4 +48,4 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.save_inquiry(date, text, integer, text, text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.save_inquiry(date, text, integer, text) TO anon, authenticated;
