@@ -659,6 +659,36 @@ export function AppProvider({ children }) {
     return data || []
   }
 
+  // ── 周月汇总（2026-10-12 第 6 步）────────────────────────
+  // 按时间窗口拉一段数据。不做成数据库视图 ——
+  // 周/月/上周/上月每个窗口都要一套，改口径时两边都得改。
+
+  async function getPeriodData(from, to) {
+    const [logs, breaks, inq, posts, closes] = await Promise.all([
+      supabase.from('daily_work_log').select('*').gte('work_date', from).lte('work_date', to),
+      supabase.from('break_record').select('*').gte('work_date', from).lte('work_date', to),
+      supabase.from('platform_inquiry').select('*').gte('log_date', from).lte('log_date', to),
+      supabase.from('content_post').select('*').gte('post_date', from).lte('post_date', to),
+      supabase.from('daily_close').select('*').gte('work_date', from).lte('work_date', to),
+    ])
+    return {
+      logs: logs.data || [], breaks: breaks.data || [],
+      inquiries: inq.data || [], posts: posts.data || [], closes: closes.data || [],
+    }
+  }
+
+  async function getSummaryNote(period) {
+    const { data } = await supabase.from('summary_note').select('*').eq('period', period).maybeSingle()
+    return data || null
+  }
+
+  async function saveSummaryNote(period, content) {
+    const { error } = await supabase.from('summary_note').upsert(
+      { period, content, updated_by: user?.id, updated_at: new Date().toISOString() },
+      { onConflict: 'period' })
+    if (error) throw new Error(error.message || '保存失败，请重试')
+  }
+
   // ── 运营配置的修改（2026-10-11 第 3 步）─────────────────────
   // 只开放两个真会动的：开新账号、改排班。
   // 班次和休息窗口改的频率极低（一年两次换季），先只读，要改跑 SQL。
@@ -916,6 +946,7 @@ export function AppProvider({ children }) {
       reconcileOrder, undoReconcile, closeDay, reopenDay, getReconcile,
       markReconciled, unmarkReconciled, markAllReconciled,
       getWorkday, upsertWorkLog, startBreak, endBreak, saveInquiry, addPost, deletePost, getInquiryWeek,
+      getPeriodData, getSummaryNote, saveSummaryNote,
       orders, confirmOrder, completeOrder, startWork, getMyOrders, finishWorkWithCorrection,
       createOrder, createOrderWithSlotCheck,
       updateOrder, updateOrderTimer, dispatchOrder, updateOrderStatus,
