@@ -693,16 +693,22 @@ export function AppProvider({ children }) {
   // 周/月/上周/上月每个窗口都要一套，改口径时两边都得改。
 
   async function getPeriodData(from, to) {
-    const [logs, breaks, inq, posts, closes] = await Promise.all([
+    const [logs, breaks, inq, posts, closes, confirms, checks, fixes] = await Promise.all([
       supabase.from('daily_work_log').select('*').gte('work_date', from).lte('work_date', to),
       supabase.from('break_record').select('*').gte('work_date', from).lte('work_date', to),
       supabase.from('platform_inquiry').select('*').gte('log_date', from).lte('log_date', to),
       supabase.from('content_post').select('*').gte('post_date', from).lte('post_date', to),
       supabase.from('daily_close').select('*').gte('work_date', from).lte('work_date', to),
+      // 下面三张是【管理工作】的痕迹。老板 10-12：
+      // 「经理会监管核对…但我们这个表格应该可以让她的工作量体现出来」
+      supabase.from('team_day_confirm').select('*').gte('work_date', from).lte('work_date', to),
+      supabase.from('order_reconciled').select('*').gte('work_date', from).lte('work_date', to),
+      supabase.from('reconcile_log').select('*').gte('work_date', from).lte('work_date', to),
     ])
     return {
       logs: logs.data || [], breaks: breaks.data || [],
       inquiries: inq.data || [], posts: posts.data || [], closes: closes.data || [],
+      confirms: confirms.data || [], checks: checks.data || [], fixes: fixes.data || [],
     }
   }
 

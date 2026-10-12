@@ -46,8 +46,19 @@ export function overview(orders, from, to, staffRates) {
 }
 
 /** ② 客服工作情况。客服只看自己 —— 过滤在页面层做。 */
+/**
+ * 客服工作情况。
+ *
+ * ⚠️ 老板 10-12 提的公平性问题：
+ *   「经理会监管核对，还有运营多一些，在小洁休息的时候顶上，
+ *     所以接待订单数量会不同…但我们这个表格应该可以让她的工作量体现出来」
+ *
+ * 只统计「接了几单」的话，佳慧永远显得产出低 ——
+ * 而那恰恰是因为她把时间花在核对和运营上。
+ * 所以把管理工作也算成产出：日结确认、核对订单数、补录笔数。
+ */
 export function staffStats(opts) {
-  const { orders, logs, inquiries, posts, breaks, from, to, staffIds } = opts
+  const { orders, logs, inquiries, posts, breaks, confirms, checks, fixes, from, to, staffIds } = opts
   return (staffIds || []).map(id => {
     const myLogs = (logs || []).filter(l => l.staff_id === id && inRange(l.work_date, from, to))
     const worked = myLogs.filter(l => l.clock_in)
@@ -76,6 +87,12 @@ export function staffStats(opts) {
       posts: (posts || []).filter(p => p.posted_by === id && inRange(p.post_date, from, to)).length,
       submitted: myLogs.filter(l => l.submitted_at).length,
       overtimeBreaks: myBreaks.filter(b => b.overtime).length,
+      // 管理工作 —— 不记的话做这些的人在表上显得没干活
+      videos: (posts || []).filter(p => p.posted_by === id && p.kind === 'video'
+        && inRange(p.post_date, from, to)).length,
+      dayConfirms: (confirms || []).filter(c => c.confirmed_by === id).length,
+      ordersChecked: (checks || []).filter(c => c.checked_by === id).length,
+      fixesMade: (fixes || []).filter(f => f.changed_by === id && !f.undone_at).length,
     }
   })
 }

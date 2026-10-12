@@ -131,45 +131,44 @@ export default function Summary() {
 
       {/* ② 客服工作情况 */}
       <Card title="客服工作情况" lock={isBoss}
-        hint={isBoss ? '全部自动：出勤工时来自打卡，接单按建单人，咨询来自平台登记' : '只显示你自己的'}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-gray-400">
-                <th className="text-left pb-2 pr-3" />
-                {['出勤', '工时', '建单', '金额', '咨询', '转化', '发布', '日报', '餐休超时'].map(h => (
-                  <th key={h} className="pb-2 px-1.5 text-right font-medium whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {visibleRows.map(r => {
-                const who = staff.find(s => s.id === r.id)
-                return (
-                  <tr key={r.id} className="border-t border-gray-50">
-                    <td className="pr-3 py-2 font-semibold whitespace-nowrap">{who?.name || r.id}</td>
-                    <td className="px-1.5 text-right font-mono">{r.days} 天</td>
-                    <td className="px-1.5 text-right font-mono">{r.hours} h</td>
-                    <td className="px-1.5 text-right font-mono">{r.created}</td>
-                    <td className="px-1.5 text-right font-mono">{money(r.amount)}</td>
-                    <td className="px-1.5 text-right font-mono">{r.inquiries}</td>
-                    <td className="px-1.5 text-right font-mono">{pct(r.rate)}</td>
-                    <td className="px-1.5 text-right font-mono">{r.posts}</td>
-                    <td className="px-1.5 text-right font-mono">{r.submitted}/{r.days}</td>
-                    <td className={`px-1.5 text-right font-mono ${r.overtimeBreaks ? 'text-red-600 font-semibold' : ''}`}>
-                      {r.overtimeBreaks}
-                    </td>
-                  </tr>
-                )
-              })}
-              {visibleRows.length === 0 && (
-                <tr><td colSpan={10} className="py-3 text-sm text-gray-400">这期间还没有打卡记录</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        <p className="text-xs text-gray-400 mt-2">
-          接单按建单时刻归属，咨询按登记人归属 —— 两个人在岗时各自的数是分开的
+        hint={isBoss ? '全部自动。接单按建单时刻归属，咨询按登记人归属 —— 两个人在岗时各自的数是分开的' : '只显示你自己的'}>
+        {visibleRows.map(r => {
+          const who = staff.find(s => s.id === r.id)
+          const mgr = r.dayConfirms + r.ordersChecked + r.fixesMade > 0
+          return (
+            <div key={r.id} className="py-3 border-b border-gray-50 last:border-0">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="font-bold">{who?.name || r.id}</span>
+                <span className="text-xs text-gray-400">
+                  {r.days} 天 · {r.hours} 小时 · 日报 {r.submitted}/{r.days}
+                </span>
+                {r.overtimeBreaks > 0 && (
+                  <span className="text-xs text-red-600">餐休超时 {r.overtimeBreaks} 次</span>
+                )}
+              </div>
+
+              <p className="text-xs text-gray-400 mb-1">接待与接单</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
+                <Mini label="接待" value={`${r.inquiries} 人`} />
+                <Mini label="接单" value={`${r.created} 单`} />
+                <Mini label="转化率" value={pct(r.rate)} />
+                <Mini label="接单金额" value={money(r.amount)} />
+              </div>
+
+              <p className="text-xs text-gray-400 mb-1">运营与管理</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <Mini label="发布" value={`${r.posts} 条`} sub={r.videos ? `含视频 ${r.videos}` : null} />
+                <Mini label="日结确认" value={`${r.dayConfirms} 天`} dim={!mgr} />
+                <Mini label="核对订单" value={`${r.ordersChecked} 单`} dim={!mgr} />
+                <Mini label="补录" value={`${r.fixesMade} 笔`} dim={!mgr} />
+              </div>
+            </div>
+          )
+        })}
+        {visibleRows.length === 0 && <p className="text-sm text-gray-400">这期间还没有打卡记录</p>}
+        <p className="text-xs text-gray-400 mt-3 pt-3 border-t border-dashed border-gray-200 leading-relaxed">
+          ⚠️ <b>接单少不等于产出低。</b> 经理把时间花在核对和运营上，接单自然少；
+          顶班那天接待量也会和平时不一样。两组数要一起看，<b>不要只盯接单数</b>。
         </p>
       </Card>
 
@@ -263,6 +262,16 @@ function Card({ title, hint, lock, children }) {
       </div>
       {hint && <p className="text-xs text-gray-400 mt-0.5">{hint}</p>}
       <div className="mt-3">{children}</div>
+    </div>
+  )
+}
+
+function Mini({ label, value, sub, dim }) {
+  return (
+    <div className={`rounded-lg px-2.5 py-1.5 ${dim ? 'bg-gray-50/60' : 'bg-gray-50'}`}>
+      <p className="text-xs text-gray-400">{label}</p>
+      <p className={`font-mono font-semibold text-sm mt-0.5 ${dim ? 'text-gray-400' : 'text-gray-800'}`}>{value}</p>
+      {sub && <p className="text-xs text-gray-400">{sub}</p>}
     </div>
   )
 }
