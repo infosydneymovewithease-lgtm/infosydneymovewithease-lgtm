@@ -35,6 +35,7 @@ export default function WorkLog() {
   const [, setTick] = useState(0)
   const [policy, setPolicy] = useState({})
   const [adding, setAdding] = useState(false)
+  const [quickFill, setQuickFill] = useState(false)
 
   const refresh = useCallback(async () => setDay(await getWorkday(date)), [getWorkday, date])
   useEffect(() => {
@@ -247,18 +248,13 @@ export default function WorkLog() {
       <div className="bg-white rounded-2xl p-4 shadow-sm">
         <h2 className="font-bold text-gray-900 text-sm mb-3">今天接待了多少 · 下了几单</h2>
         <div className="flex items-center gap-2 sm:gap-4">
-          {/* 标签写了「手填」就得点得动 —— 老板 10-12 指出这个数字本身
-              不可点，要滚到下面才能填。标签承诺了动作却做不到，比不标还糟。 */}
-          <Big label="我接待" value={prog.total} unit="人" tag="点这里填"
-            sub={prog.ok ? `${prog.need.length} 个平台都登记了` : `还差 ${prog.missing.length} 个平台 · 点一下去填`}
-            onClick={() => {
-              document.getElementById('inquiry-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-              setTimeout(() => {
-                const first = document.querySelector('#inquiry-section ~ div input[type="number"]:not([value])')
-                  || document.querySelector('#inquiry-section ~ div input[type="number"]')
-                first?.focus()
-              }, 400)
-            }} />
+          {/* 老板 10-12/13 两次反馈：先是「写了手填但点不动」，
+              改成跳转后又说「只是希望在我接待那里点选填写」——
+              要的是【就地填】。合计是 7 个平台的和，不能只填一个总数
+              （那就失去逐个检查的意义），所以点一下在原地展开小面板。 */}
+          <Big label="我接待" value={prog.total} unit="人" tag={quickFill ? '收起' : '点这里填'}
+            sub={prog.ok ? `${prog.need.length} 个平台都登记了` : `还差 ${prog.missing.length} 个平台`}
+            onClick={() => setQuickFill(v => !v)} />
           <Arrow />
           <Big label="我下单" value={perf.booked} unit="单" tag="自动" accent
             sub="你今天建的单" />
@@ -267,13 +263,37 @@ export default function WorkLog() {
             value={prog.total > 0 ? Math.round(perf.booked / prog.total * 100) : null}
             unit="%" sub={prog.total > 0 ? '下单 ÷ 接待' : '还没登记咨询'} />
         </div>
+        {/* 就地填 —— 不用滚到下面的登记表 */}
+        {quickFill && (
+          <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
+            {prog.need.map(a => {
+              const rec = day.inquiries.find(i => i.account_id === a.id && i.staff_id === user?.id)
+              return (
+                <div key={a.id} className="flex items-center gap-3">
+                  <span className="text-xs text-gray-400 w-10 shrink-0">{a.platform}</span>
+                  <span className="text-sm font-semibold w-20 shrink-0">{a.name}</span>
+                  <span className="text-xs text-gray-400 flex-1 truncate min-w-0">{a.positioning}</span>
+                  <input type="number" min="0" step="1" placeholder="待填"
+                    defaultValue={rec?.count ?? ''}
+                    onBlur={e => { if (e.target.value !== '') run(() => saveInquiry(date, a.id, e.target.value)) }}
+                    className={`w-20 border rounded-lg px-2 py-1 text-sm font-mono text-right outline-none focus:border-red-400 shrink-0 ${
+                      rec ? 'border-green-200 bg-green-50' : 'border-amber-300 bg-amber-50'}`} />
+                </div>
+              )
+            })}
+            <p className="text-xs text-gray-400 pt-1">
+              今天 0 个也要填 0 —— 空着不算登记。未开通的号在下面的登记表里，这里不显示
+            </p>
+          </div>
+        )}
+
         <div className="grid grid-cols-3 gap-3 mt-4 pt-3 border-t border-gray-100">
           <Stat label="接单金额" value={money(perf.bookedAmount)} />
           <Stat label="今天搬的（我接的）" value={`${perf.served} 单`} />
           <Stat label="完成金额" value={money(perf.servedAmount)} />
         </div>
         <p className="text-xs text-gray-400 mt-2 leading-relaxed">
-          <b>只有「接待」要你填</b> —— 点上面那个数字会跳到登记表。微信和小红书里的咨询系统看不见，只能你报。<br />
+          <b>只有「接待」要你填</b> —— 点上面那个数字就能在这里直接填。微信和小红书里的咨询系统看不见，只能你报。<br />
           「下单」和下面三个金额都是系统按你的账号自动算的，不用管。
           多数单几天后才搬，所以「今天搬的」和「今天下单的」不是同一批。
         </p>
