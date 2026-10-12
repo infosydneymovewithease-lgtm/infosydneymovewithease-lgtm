@@ -162,7 +162,44 @@ export function weekRange(dateStr) {
 /** 几秒之内填完算「没去平台看」的阈值 */
 export const FILL_TOO_FAST_SECONDS = 60
 
-export function trustSignals({ today, yesterday, clockIn, orderCount }) {
+/**
+ * 同一天两个人的登记互相对照。
+ *
+ * 老板 10-12 指出的：「填写都是自己账号登录的人填写，本身就可以分辨出来
+ * 填写数据不同，可以在统计一面看出两个人的差异」
+ *
+ * 这个信号比「数字看着不像真的」那几个硬得多 ——
+ * 它不靠猜，而是【两个独立来源对同一件事的报告不一致】。
+ * 两人同一天在岗、看的是同样的平台，数字差太远就只有两种可能：
+ * 一个人没去看那个号，或者另一个人报多了。两种都该问一句。
+ */
+export function crossCheck(inquiries, dateStr, accounts, nameOf = x => x) {
+  const byStaff = {}
+  for (const i of inquiries || []) {
+    if (String(i.log_date) !== dateStr) continue
+    ;(byStaff[i.staff_id] ||= {})[i.account_id] = Number(i.count) || 0
+  }
+  const ids = Object.keys(byStaff)
+  if (ids.length < 2) return []          // 单人日没有对照，不出信号
+
+  const out = []
+  for (const a of accounts || []) {
+    const vals = ids.map(id => ({ id, v: byStaff[id][a.id] }))
+    const filled = vals.filter(x => x.v !== undefined)
+    if (filled.length < 2) continue
+    const nums = filled.map(x => x.v)
+    const lo = Math.min(...nums), hi = Math.max(...nums)
+    // 一个报 0 另一个报 >=5，或者高的是低的 4 倍以上且差 >=5
+    if ((lo === 0 && hi >= 5) || (lo > 0 && hi >= lo * 4 && hi - lo >= 5)) {
+      const names = filled.map(x => `${nameOf(x.id)} ${x.v}`).join(' / ')
+      out.push({ sev: 'mid', account: a.name,
+        text: `${a.name}：${names} —— 同一天同一个号，差这么多值得问一句` })
+    }
+  }
+  return out
+}
+
+export function trustSignals({ today, yesterday, clockIn, orderCount, accounts, nameOf }) {
   const out = []
   const vals = (today || []).map(i => Number(i.count) || 0)
   if (vals.length < 2) return out
@@ -205,5 +242,8 @@ export function trustSignals({ today, yesterday, clockIn, orderCount }) {
   if (total === 0 && orderCount > 0) {
     out.push({ sev: 'low', text: `成了 ${orderCount} 单，但咨询登记全是 0` })
   }
+
+  // ⑥ 同日两人互相对照 —— 最硬的一个信号，放最后但权重最高
+  out.push(...crossCheck(today, today[0] && String(today[0].log_date), accounts, nameOf))
   return out
 }

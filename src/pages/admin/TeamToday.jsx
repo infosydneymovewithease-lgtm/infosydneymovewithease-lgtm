@@ -88,6 +88,8 @@ export default function TeamToday() {
     today: day.inquiries, yesterday: prevDay,
     clockIn: day.logs.find(l => onDuty.includes(l.staff_id))?.clock_in,
     orderCount: dayOrders.length,
+    accounts,
+    nameOf: id => staff.find(s => s.id === id)?.name || id,
   })
 
   return (
@@ -171,7 +173,9 @@ export default function TeamToday() {
           <h2 className="font-bold text-sm mb-1">咨询登记 · 看着不太对的地方</h2>
           <p className="text-xs text-gray-400 mb-2">
             这些是「不像真实数据」的信号，<b>不是证据</b> —— 真实情况也可能碰巧触发。
-            值得问一句，不值得当成结论。客服那边看不到这一块。
+            值得问一句，不值得当成结论。客服那边看不到这一块。<br />
+            其中<b>「同一天同一个号两人差很多」最值得看</b> ——
+            那不是靠猜，是两个人对同一件事的报告不一致。
           </p>
           <div className="space-y-1">
             {trust.map((s, i) => <p key={i} className="text-sm text-amber-700">· {s.text}</p>)}
