@@ -83,6 +83,8 @@ export function staffStats(opts) {
       created: myOrders.length,
       amount: myOrders.reduce((s, o) => s + (num(o.finalAmount) || num(o.quote)), 0),
       inquiries: myInq,
+      // 实际接待 —— 真的加上微信的人。和平台咨询的差额就是流失
+      wechatAdds: myLogs.reduce((s, l) => s + (l.wechat_adds ?? 0), 0),
       rate: myInq ? myOrders.length / myInq : null,
       posts: (posts || []).filter(p => p.posted_by === id && inRange(p.post_date, from, to)).length,
       submitted: myLogs.filter(l => l.submitted_at).length,

@@ -147,12 +147,17 @@ export default function Summary() {
                 )}
               </div>
 
-              <p className="text-xs text-gray-400 mb-1">接待与接单</p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
-                <Mini label="接待" value={`${r.inquiries} 人`} />
-                <Mini label="接单" value={`${r.created} 单`} />
-                <Mini label="转化率" value={pct(r.rate)} />
+              <p className="text-xs text-gray-400 mb-1">
+                接待与接单　<span className="text-gray-300">平台咨询 → 加微信 → 下单</span>
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-2">
+                <Mini label="平台咨询" value={`${r.inquiries} 人`} sub="应接待" />
+                <Mini label="加微信" value={`${r.wechatAdds} 人`}
+                  sub={r.inquiries ? `留下 ${Math.round(r.wechatAdds / r.inquiries * 100)}%` : '实际接待'} />
+                <Mini label="接单" value={`${r.created} 单`}
+                  sub={r.wechatAdds ? `成交 ${Math.round(r.created / r.wechatAdds * 100)}%` : null} />
                 <Mini label="接单金额" value={money(r.amount)} />
+                <Mini label="总转化" value={pct(r.rate)} sub="下单÷平台咨询" />
               </div>
 
               <p className="text-xs text-gray-400 mb-1">运营与管理</p>

@@ -60,6 +60,8 @@ export default function TeamToday() {
   const inquiries = day.inquiries.reduce((s, i) => s + (Number(i.count) || 0), 0)
   const dayOrders = bookedOn(orders, date)
   const servedToday = orders.filter(o => String(o.date) === date && o.status === '已完成')
+  // 实际接待 = 微信新增好友，所有在岗的人加起来
+  const adds = day.logs.reduce((s, l) => s + (l.wechat_adds ?? 0), 0) || null
   // 老板 10-12：「有时候是两个人，所以需要知道各自」
   const perStaff = inquiryByStaff(day.inquiries, date).map(x => {
     const booked = dayOrders.filter(o => o.createdBy === x.staff_id).length
@@ -246,12 +248,13 @@ export default function TeamToday() {
       <div className="bg-white rounded-2xl p-4 shadow-sm">
         <h2 className="font-bold text-sm mb-3">今天接待了多少 · 下了几单</h2>
         <div className="flex items-center gap-2 sm:gap-4">
-          <Big label="接待" value={inquiries} unit="人" tag="客服填" sub="7 个平台合计" />
+          <Big label="平台咨询" value={inquiries} unit="人" tag="客服填" sub="应接待 · 7 个平台合计" />
           <Arrow />
-          <Big label="下单" value={dayOrders.length} unit="单" tag="自动" sub="按建单时刻" accent />
+          <Big label="加微信" value={adds} unit="人" tag="客服填" accent
+            sub={inquiries > 0 && adds != null ? `平台来的留下 ${Math.round(adds / inquiries * 100)}%` : '实际接待'} />
           <Arrow />
-          <Big label="转化率" value={rate == null ? null : Math.round(rate)} unit="%" tag="自动"
-            sub={rate == null ? '还没登记咨询' : '下单 ÷ 接待'} />
+          <Big label="下单" value={dayOrders.length} unit="单" tag="自动"
+            sub={adds > 0 ? `加微信的成了 ${Math.round(dayOrders.length / adds * 100)}%` : '按建单时刻'} />
         </div>
         {/* 分人 —— 两个人在岗时合计看不出谁干了多少 */}
         {perStaff.length > 0 && (
@@ -261,12 +264,13 @@ export default function TeamToday() {
                 <span className="font-semibold w-16 shrink-0">
                   {staff.find(s => s.id === x.staff_id)?.name || x.staff_id}
                 </span>
-                <span className="font-mono text-gray-600">接待 {x.total} 人</span>
+                <span className="font-mono text-gray-600">咨询 {x.total}</span>
                 <span className="text-gray-300">→</span>
-                <span className="font-mono text-gray-800 font-semibold">下单 {x.booked} 单</span>
-                <span className="font-mono text-xs text-gray-400">
-                  {x.rate == null ? '' : `${Math.round(x.rate * 100)}%`}
+                <span className="font-mono text-gray-600">
+                  微信 {day.logs.find(l => l.staff_id === x.staff_id)?.wechat_adds ?? '—'}
                 </span>
+                <span className="text-gray-300">→</span>
+                <span className="font-mono text-gray-800 font-semibold">下单 {x.booked}</span>
                 <span className="flex-1" />
                 <span className="text-xs text-gray-300">{x.accounts}/{accounts.length} 个平台已登记</span>
               </div>

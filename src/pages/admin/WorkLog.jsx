@@ -69,6 +69,7 @@ export default function WorkLog() {
   const wk = weekRange(date)
   const video = weeklyVideo(day.posts, wk.from, wk.to)
   const others = othersOnBreak(day.breaks, user?.id)
+  const adds = mine?.wechat_adds ?? null
   const gap = tzGapHours()
 
   const [truth, setTruth] = useState(false)
@@ -247,21 +248,39 @@ export default function WorkLog() {
            下单几个」—— 这是整页最重要的一行，不该拆在两张卡片里。 */}
       <div className="bg-white rounded-2xl p-4 shadow-sm">
         <h2 className="font-bold text-gray-900 text-sm mb-3">今天接待了多少 · 下了几单</h2>
-        <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-1.5 sm:gap-3">
           {/* 老板 10-12/13 两次反馈：先是「写了手填但点不动」，
               改成跳转后又说「只是希望在我接待那里点选填写」——
               要的是【就地填】。合计是 7 个平台的和，不能只填一个总数
               （那就失去逐个检查的意义），所以点一下在原地展开小面板。 */}
-          <Big label="我接待" value={prog.total} unit="人" tag={quickFill ? '收起' : '点这里填'}
-            sub={prog.ok ? `${prog.need.length} 个平台都登记了` : `还差 ${prog.missing.length} 个平台`}
+          {/* 三段漏斗（老板 10-13 指出的「应接待 vs 实际接待」）：
+              平台上有人问 → 真的加了微信 → 下单。
+              中间那一跳的流失率才是有用的 —— 问了 20 个只加 5 个，
+              说明文案或回复有问题。混成一个数就看不出来。 */}
+          <Big label="平台咨询" value={prog.total} unit="人" tag={quickFill ? '收起' : '点这里填'}
+            sub={prog.ok ? `${prog.need.length} 个平台都登记了` : `还差 ${prog.missing.length} 个`}
             onClick={() => setQuickFill(v => !v)} />
           <Arrow />
-          <Big label="我下单" value={perf.booked} unit="单" tag="自动" accent
-            sub="你今天建的单" />
+          <Big label="加微信" value={adds} unit="人" tag="手填" accent
+            sub={prog.total > 0 && adds != null ? `平台来的留下 ${Math.round(adds / prog.total * 100)}%` : '微信今天新增好友'}
+            onClick={() => document.getElementById('wechat-adds')?.focus()} />
           <Arrow />
-          <Big label="转化率" tag="自动"
-            value={prog.total > 0 ? Math.round(perf.booked / prog.total * 100) : null}
-            unit="%" sub={prog.total > 0 ? '下单 ÷ 接待' : '还没登记咨询'} />
+          <Big label="下单" value={perf.booked} unit="单" tag="自动"
+            sub={adds > 0 ? `加微信的成了 ${Math.round(perf.booked / adds * 100)}%` : '你今天建的单'} />
+        </div>
+
+        {/* 实际接待 —— 一个数，不分平台 */}
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100">
+          <span className="text-sm text-gray-600 shrink-0">今天微信加了几个人</span>
+          <input id="wechat-adds" type="number" min="0" step="1" placeholder="待填"
+            defaultValue={mine?.wechat_adds ?? ''}
+            onBlur={e => { if (e.target.value !== '') run(() => upsertWorkLog(date, { wechat_adds: Number(e.target.value) })) }}
+            className={`w-24 border rounded-lg px-2 py-1 text-sm font-mono text-right outline-none focus:border-red-400 shrink-0 ${
+              adds != null ? 'border-green-200 bg-green-50' : 'border-amber-300 bg-amber-50'}`} />
+          <span className="text-xs text-gray-400 flex-1 min-w-0">
+            这是<b>实际接待</b> —— 真的加上「迁喜生活服务」的人。
+            平台上问了但没加的不算，那部分流失正是要看的
+          </span>
         </div>
         {/* 就地填 —— 不用滚到下面的登记表 */}
         {quickFill && (
@@ -293,7 +312,8 @@ export default function WorkLog() {
           <Stat label="完成金额" value={money(perf.servedAmount)} />
         </div>
         <p className="text-xs text-gray-400 mt-2 leading-relaxed">
-          <b>只有「接待」要你填</b> —— 点上面那个数字就能在这里直接填。微信和小红书里的咨询系统看不见，只能你报。<br />
+          <b>两个数要你填</b>：平台咨询（分平台登记）和加微信人数。
+          微信、小红书里发生的事系统看不见，只能你报。<br />
           「下单」和下面三个金额都是系统按你的账号自动算的，不用管。
           多数单几天后才搬，所以「今天搬的」和「今天下单的」不是同一批。
         </p>
