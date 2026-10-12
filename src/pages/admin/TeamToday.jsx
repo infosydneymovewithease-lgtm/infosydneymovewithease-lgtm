@@ -235,13 +235,18 @@ export default function TeamToday() {
 
       {/* ── 今日漏斗 ─────────────────────────── */}
       <div className="bg-white rounded-2xl p-4 shadow-sm">
-        <h2 className="font-bold text-sm mb-3">今日漏斗</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Stat label="平台咨询" value={`${inquiries} 人`} />
-          <Stat label="今天接单" value={`${dayOrders.length} 单`} hint="按建单时刻" />
-          <Stat label="转化率" value={rate == null ? '—' : `${rate.toFixed(0)}%`}
-            hint={rate == null ? '还没登记咨询' : '接单 ÷ 咨询'} />
-          <Stat label="今天搬完" value={`${servedToday.length} 单`} hint="多是前几天接的" />
+        <h2 className="font-bold text-sm mb-3">今天接待了多少 · 下了几单</h2>
+        <div className="flex items-center gap-2 sm:gap-4">
+          <Big label="接待" value={inquiries} unit="人" sub="7 个平台合计" />
+          <Arrow />
+          <Big label="下单" value={dayOrders.length} unit="单" sub="按建单时刻" accent />
+          <Arrow />
+          <Big label="转化率" value={rate == null ? null : Math.round(rate)} unit="%"
+            sub={rate == null ? '还没登记咨询' : '下单 ÷ 接待'} />
+        </div>
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <Stat label="今天搬完（当天实际干的活）" value={`${servedToday.length} 单`}
+            hint="多是前几天接的，和上面那组不是一回事" />
         </div>
         <p className="text-xs text-gray-400 mt-2">
           咨询和接单是同一天的事，搬家一般在几天后（实测中位 2 天）——
@@ -325,6 +330,23 @@ export default function TeamToday() {
       </div>
     </div>
   )
+}
+
+function Big({ label, value, unit, sub, accent }) {
+  return (
+    <div className="flex-1 min-w-0">
+      <p className="text-xs text-gray-400">{label}</p>
+      <p className={`font-mono font-bold leading-none mt-1 ${accent ? 'text-red-700' : 'text-gray-900'}`}>
+        <span className="text-3xl">{value == null ? '—' : value}</span>
+        <span className="text-sm ml-0.5 font-normal">{value == null ? '' : unit}</span>
+      </p>
+      {sub && <p className="text-xs text-gray-400 mt-1 truncate">{sub}</p>}
+    </div>
+  )
+}
+
+function Arrow() {
+  return <span className="text-gray-300 text-xl shrink-0">→</span>
 }
 
 function Stat({ label, value, hint }) {

@@ -233,18 +233,30 @@ export default function WorkLog() {
         )}
       </Card>
 
-      {/* ── 今日业绩（自动）────────────────────── */}
-      <Card title="今日业绩" hint="系统自动算，不用填">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Stat label="我今天接的单" value={`${perf.booked} 单`} />
+      {/* ── 今天接待多少、下单几个 ───────────────
+           老板 10-12：「我们需要了解的主要东西是今天客服一共接待了多少人，
+           下单几个」—— 这是整页最重要的一行，不该拆在两张卡片里。 */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm">
+        <h2 className="font-bold text-gray-900 text-sm mb-3">今天接待了多少 · 下了几单</h2>
+        <div className="flex items-center gap-2 sm:gap-4">
+          <Big label="接待" value={prog.total} unit="人" sub={`${prog.filled}/${prog.need.length} 个平台已登记`} />
+          <Arrow />
+          <Big label="下单" value={perf.booked} unit="单" sub="按建单时刻算" accent />
+          <Arrow />
+          <Big label="转化率"
+            value={prog.total > 0 ? Math.round(perf.booked / prog.total * 100) : null}
+            unit="%" sub={prog.total > 0 ? '下单 ÷ 接待' : '还没登记咨询'} />
+        </div>
+        <div className="grid grid-cols-3 gap-3 mt-4 pt-3 border-t border-gray-100">
           <Stat label="接单金额" value={money(perf.bookedAmount)} />
           <Stat label="今天搬的（我接的）" value={`${perf.served} 单`} />
           <Stat label="完成金额" value={money(perf.servedAmount)} />
         </div>
         <p className="text-xs text-gray-400 mt-2">
-          「今天接的」按建单时刻算 —— 多数单是几天后才搬，两个数不一样是正常的
+          「接待」来自上面 7 个平台的登记，「下单」按建单时刻算 ——
+          多数单几天后才搬，所以「今天搬的」是另一回事
         </p>
-      </Card>
+      </div>
 
       {/* ── 发布内容 ─────────────────────────── */}
       <Card title="今天发了什么"
@@ -363,6 +375,23 @@ function Card({ title, hint, children }) {
       {children}
     </div>
   )
+}
+
+function Big({ label, value, unit, sub, accent }) {
+  return (
+    <div className="flex-1 min-w-0">
+      <p className="text-xs text-gray-400">{label}</p>
+      <p className={`font-mono font-bold leading-none mt-1 ${accent ? 'text-red-700' : 'text-gray-900'}`}>
+        <span className="text-3xl">{value == null ? '—' : value}</span>
+        <span className="text-sm ml-0.5 font-normal">{value == null ? '' : unit}</span>
+      </p>
+      {sub && <p className="text-xs text-gray-400 mt-1 truncate">{sub}</p>}
+    </div>
+  )
+}
+
+function Arrow() {
+  return <span className="text-gray-300 text-xl shrink-0">→</span>
 }
 
 function Stat({ label, value }) {
