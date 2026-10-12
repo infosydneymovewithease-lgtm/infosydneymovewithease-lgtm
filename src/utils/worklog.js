@@ -70,16 +70,26 @@ export function requiredAccounts(channelAccounts) {
  * ⚠️ 判断依据是「这个账号今天有没有登记过」，不是「人数大于 0」——
  *    今天 0 个咨询也是有效登记，不能逼人填个假数字。
  */
-export function inquiryProgress(channelAccounts, inquiries, dateStr) {
+export function inquiryProgress(channelAccounts, inquiries, dateStr, staffId) {
   const need = requiredAccounts(channelAccounts)
-  const done = new Set((inquiries || [])
-    .filter(i => String(i.log_date) === dateStr)
-    .map(i => i.account_id))
+  // staffId 给了就只看这个人填的 —— 老板 10-12：「有时候是两个人，需要知道各自」
+  const mine = (inquiries || []).filter(i =>
+    String(i.log_date) === dateStr && (!staffId || i.staff_id === staffId))
+  const done = new Set(mine.map(i => i.account_id))
   const missing = need.filter(a => !done.has(a.id))
-  const total = (inquiries || [])
-    .filter(i => String(i.log_date) === dateStr && done.has(i.account_id))
-    .reduce((s, i) => s + (Number(i.count) || 0), 0)
+  const total = mine.reduce((s, i) => s + (Number(i.count) || 0), 0)
   return { need, missing, filled: need.length - missing.length, total, ok: missing.length === 0 }
+}
+
+/** 某天每个人各接待了多少。两人在岗时各填各的，合计是相加。 */
+export function inquiryByStaff(inquiries, dateStr) {
+  const by = new Map()
+  for (const i of inquiries || []) {
+    if (String(i.log_date) !== dateStr) continue
+    const cur = by.get(i.staff_id) || { staff_id: i.staff_id, total: 0, accounts: 0 }
+    by.set(i.staff_id, { ...cur, total: cur.total + (Number(i.count) || 0), accounts: cur.accounts + 1 })
+  }
+  return [...by.values()].sort((a, b) => b.total - a.total)
 }
 
 /**

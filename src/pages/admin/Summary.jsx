@@ -168,9 +168,8 @@ export default function Summary() {
             </tbody>
           </table>
         </div>
-        <p className="text-xs text-amber-600 mt-2">
-          ⚠️ 转化率的「咨询」是按天归到当天在岗的人，两人同一天都在岗时会重复计 ——
-          看趋势可以，别当精确值用
+        <p className="text-xs text-gray-400 mt-2">
+          接单按建单时刻归属，咨询按登记人归属 —— 两个人在岗时各自的数是分开的
         </p>
       </Card>
 

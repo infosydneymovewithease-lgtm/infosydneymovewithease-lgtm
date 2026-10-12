@@ -60,10 +60,9 @@ export function staffStats(opts) {
     //    用服务日期算会把跨月的单算到错的月份去。
     const myOrders = (orders || []).filter(o =>
       o.createdBy === id && inRange(sydneyDateOf(o.createdAt), from, to) && o.status !== '已取消')
-    // 咨询数按「那天这个人交了日报」归属 —— platform_inquiry 不分人，只能按天归
-    const myDates = new Set(worked.map(l => String(l.work_date)))
+    // 咨询数精确归属到人（2026-10-12 起 platform_inquiry 按人存）
     const myInq = (inquiries || [])
-      .filter(i => myDates.has(String(i.log_date)))
+      .filter(i => i.staff_id === id && inRange(i.log_date, from, to))
       .reduce((s, i) => s + num(i.count), 0)
     const myBreaks = (breaks || []).filter(b => b.staff_id === id && inRange(b.work_date, from, to))
     return {
@@ -73,8 +72,6 @@ export function staffStats(opts) {
       created: myOrders.length,
       amount: myOrders.reduce((s, o) => s + (num(o.finalAmount) || num(o.quote)), 0),
       inquiries: myInq,
-      // ⚠️ 转化率的咨询数是按天归的，两个人同一天都在岗时会重复计算 ——
-      //    页面上要标注这一点，不能让人当精确值用
       rate: myInq ? myOrders.length / myInq : null,
       posts: (posts || []).filter(p => p.posted_by === id && inRange(p.post_date, from, to)).length,
       submitted: myLogs.filter(l => l.submitted_at).length,

@@ -62,8 +62,8 @@ export default function WorkLog() {
     () => slotsForDay(config.breakWindows, config.staffSchedules, date),
     [config.breakWindows, config.staffSchedules, date])
   const prog = useMemo(
-    () => inquiryProgress(config.channelAccounts, day.inquiries, date),
-    [config.channelAccounts, day.inquiries, date])
+    () => inquiryProgress(config.channelAccounts, day.inquiries, date, user?.id),
+    [config.channelAccounts, day.inquiries, date, user?.id])
   const perf = useMemo(() => myPerformance(orders, user?.id, date), [orders, user?.id, date])
   const wk = weekRange(date)
   const video = weeklyVideo(day.posts, wk.from, wk.to)
@@ -174,10 +174,11 @@ export default function WorkLog() {
       </Card>
 
       {/* ── 平台咨询登记 ──────────────────────── */}
-      <Card title="平台咨询登记" hint="7 个触点每天逐个检查。今天 0 个咨询也要登记 —— 填 0 就行，不填不算。左边贴当天发的内容标题作为凭证">
+      <Card title="平台咨询登记" hint="7 个触点每天逐个检查，填你自己接待的人数。今天 0 个也要登记 —— 填 0 就行，不填不算。左边贴当天发的内容标题作为凭证">
         <div className="space-y-1.5">
           {(config.channelAccounts || []).map(a => {
-            const rec = day.inquiries.find(i => i.account_id === a.id)
+            // 只显示自己填的 —— 两个人在岗时各填各的
+            const rec = day.inquiries.find(i => i.account_id === a.id && i.staff_id === user?.id)
             const planned = a.status !== 'active'
             const done = !!rec
             return (
@@ -223,7 +224,7 @@ export default function WorkLog() {
         )}
 
         <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100 text-sm">
-          <span className="text-gray-500">今日咨询合计</span>
+          <span className="text-gray-500">我今天接待合计</span>
           <span className="font-mono font-bold text-lg">{prog.total} 人</span>
         </div>
         {!prog.ok && (
@@ -239,9 +240,9 @@ export default function WorkLog() {
       <div className="bg-white rounded-2xl p-4 shadow-sm">
         <h2 className="font-bold text-gray-900 text-sm mb-3">今天接待了多少 · 下了几单</h2>
         <div className="flex items-center gap-2 sm:gap-4">
-          <Big label="接待" value={prog.total} unit="人" sub={`${prog.filled}/${prog.need.length} 个平台已登记`} />
+          <Big label="我接待" value={prog.total} unit="人" sub={`${prog.filled}/${prog.need.length} 个平台已登记`} />
           <Arrow />
-          <Big label="下单" value={perf.booked} unit="单" sub="按建单时刻算" accent />
+          <Big label="我下单" value={perf.booked} unit="单" sub="按建单时刻算" accent />
           <Arrow />
           <Big label="转化率"
             value={prog.total > 0 ? Math.round(perf.booked / prog.total * 100) : null}

@@ -9,7 +9,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useApp } from '../../context/AppContext'
 import { sydneyToday, addDays } from '../../utils/date'
-import { slotsForDay, breakMinutes, requiredAccounts, weekRange, trustSignals, bookedOn } from '../../utils/worklog'
+import { slotsForDay, breakMinutes, requiredAccounts, weekRange, trustSignals, bookedOn, inquiryByStaff } from '../../utils/worklog'
 import { isWorkingOn } from '../../utils/shifts'
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react'
 
@@ -60,6 +60,11 @@ export default function TeamToday() {
   const inquiries = day.inquiries.reduce((s, i) => s + (Number(i.count) || 0), 0)
   const dayOrders = bookedOn(orders, date)
   const servedToday = orders.filter(o => String(o.date) === date && o.status === '已完成')
+  // 老板 10-12：「有时候是两个人，所以需要知道各自」
+  const perStaff = inquiryByStaff(day.inquiries, date).map(x => {
+    const booked = dayOrders.filter(o => o.createdBy === x.staff_id).length
+    return { ...x, booked, rate: x.total ? booked / x.total : null }
+  })
   const rate = inquiries > 0 ? (dayOrders.length / inquiries * 100) : null
 
   // 本周视频
@@ -244,6 +249,26 @@ export default function TeamToday() {
           <Big label="转化率" value={rate == null ? null : Math.round(rate)} unit="%"
             sub={rate == null ? '还没登记咨询' : '下单 ÷ 接待'} />
         </div>
+        {/* 分人 —— 两个人在岗时合计看不出谁干了多少 */}
+        {perStaff.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-gray-100 space-y-1.5">
+            {perStaff.map(x => (
+              <div key={x.staff_id} className="flex items-center gap-3 text-sm">
+                <span className="font-semibold w-16 shrink-0">
+                  {staff.find(s => s.id === x.staff_id)?.name || x.staff_id}
+                </span>
+                <span className="font-mono text-gray-600">接待 {x.total} 人</span>
+                <span className="text-gray-300">→</span>
+                <span className="font-mono text-gray-800 font-semibold">下单 {x.booked} 单</span>
+                <span className="font-mono text-xs text-gray-400">
+                  {x.rate == null ? '' : `${Math.round(x.rate * 100)}%`}
+                </span>
+                <span className="flex-1" />
+                <span className="text-xs text-gray-300">{x.accounts}/{accounts.length} 个平台已登记</span>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="mt-3 pt-3 border-t border-gray-100">
           <Stat label="今天搬完（当天实际干的活）" value={`${servedToday.length} 单`}
             hint="多是前几天接的，和上面那组不是一回事" />
