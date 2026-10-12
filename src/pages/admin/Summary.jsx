@@ -148,7 +148,7 @@ export default function Summary() {
               </div>
 
               <p className="text-xs text-gray-400 mb-1">
-                接待与接单　<span className="text-gray-300">平台咨询 → 加微信 → 下单</span>
+                接待与接单 <span className="text-gray-300">平台咨询 → 加微信 → 下单</span>
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-2">
                 <Mini label="平台咨询" value={`${r.inquiries} 人`} sub="应接待" />

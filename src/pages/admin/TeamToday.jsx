@@ -67,7 +67,6 @@ export default function TeamToday() {
     const booked = dayOrders.filter(o => o.createdBy === x.staff_id).length
     return { ...x, booked, rate: x.total ? booked / x.total : null }
   })
-  const rate = inquiries > 0 ? (dayOrders.length / inquiries * 100) : null
 
   // 本周视频
   const weekPosts = day.posts
