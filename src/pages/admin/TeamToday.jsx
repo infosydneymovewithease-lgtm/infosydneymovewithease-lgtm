@@ -19,11 +19,17 @@ const hhmm = iso => iso
 const WEEK = ['一', '二', '三', '四', '五', '六', '日']
 
 export default function TeamToday() {
-  const { staff, orders, config, getWorkday, getInquiryWeek } = useApp()
+  const { user, staff, orders, config, getWorkday, getInquiryWeek,
+          getPolicyText, confirmTeamDay, getTeamConfirm } = useApp()
   const [date, setDate] = useState(() => sydneyToday())
   const [day, setDay] = useState({ logs: [], breaks: [], inquiries: [], posts: [] })
   const [week, setWeek] = useState([])
   const [prevDay, setPrevDay] = useState([])
+  const [policy, setPolicy] = useState({})
+  const [confirm, setConfirm] = useState(null)
+  const [checked, setChecked] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
 
   const wk = useMemo(() => weekRange(date), [date])
   useEffect(() => {
@@ -31,7 +37,8 @@ export default function TeamToday() {
     ;(async () => {
       const [d, w, p] = await Promise.all([
         getWorkday(date), getInquiryWeek(wk.from, wk.to), getWorkday(addDays(date, -1))])
-      if (alive) { setDay(d); setWeek(w); setPrevDay(p.inquiries || []) }
+      const [pol, cf] = await Promise.all([getPolicyText(), getTeamConfirm(date)])
+      if (alive) { setDay(d); setWeek(w); setPrevDay(p.inquiries || []); setPolicy(pol); setConfirm(cf); setChecked(false) }
     })()
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -160,6 +167,65 @@ export default function TeamToday() {
           <div className="space-y-1">
             {trust.map((s, i) => <p key={i} className="text-sm text-amber-700">· {s.text}</p>)}
           </div>
+        </div>
+      )}
+
+      {/* ── 今日咨询登记明细（带凭证）──────────── */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm">
+        <h2 className="font-bold text-sm mb-1">今日咨询登记</h2>
+        <p className="text-xs text-gray-400 mb-3">
+          数字无法验证，但「发了什么」可以去平台核对 —— 这才是能查的那一栏
+        </p>
+        {accounts.map(a => {
+          const r = day.inquiries.find(i => i.account_id === a.id)
+          return (
+            <div key={a.id} className="flex items-center gap-3 py-1.5 text-sm border-b border-gray-50 last:border-0">
+              <span className="font-semibold w-16 shrink-0">{a.name}</span>
+              <span className="font-mono w-12 text-right shrink-0">{r ? `${r.count} 人` : '—'}</span>
+              <span className={`flex-1 min-w-0 truncate text-xs ${r?.evidence ? 'text-gray-600' : 'text-amber-600'}`}>
+                {r?.evidence || (r ? '没贴发布标题' : '还没登记')}
+              </span>
+              {r?.first_filled_at && (
+                <span className="text-xs text-gray-300 shrink-0 font-mono">{hhmm(r.first_filled_at)}</span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── 经理每日确认 ─────────────────────── */}
+      {(user?.role === 'admin' || user?.role === 'manager') && (
+        <div className={`rounded-2xl p-4 shadow-sm ${confirm ? 'bg-green-50' : 'bg-white border border-amber-200'}`}>
+          <h2 className="font-bold text-sm mb-1">经理每日确认</h2>
+          {confirm ? (
+            <p className="text-sm text-green-700 flex items-center gap-1.5">
+              <Check size={14} /> {staff.find(s => s.id === confirm.confirmed_by)?.name || confirm.confirmed_by}
+              已于 {hhmm(confirm.confirmed_at)} 确认
+            </p>
+          ) : (
+            <>
+              {policy.manager_declaration && (
+                <label className="flex items-start gap-2 my-2 cursor-pointer">
+                  <input type="checkbox" checked={checked} onChange={e => setChecked(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-red-700 shrink-0" />
+                  <span className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">
+                    {policy.manager_declaration}
+                  </span>
+                </label>
+              )}
+              {err && <p className="text-red-600 text-xs mb-2">{err}</p>}
+              <button disabled={busy || !checked}
+                onClick={async () => {
+                  setBusy(true); setErr('')
+                  try { await confirmTeamDay(date); setConfirm(await getTeamConfirm(date)) }
+                  catch (e) { setErr(e.message) } finally { setBusy(false) }
+                }}
+                className="w-full text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-40"
+                style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
+                {checked ? '确认今日已核对' : '请先勾选上面的确认'}
+              </button>
+            </>
+          )}
         </div>
       )}
 

@@ -24,13 +24,14 @@ const money = n => `$${(Number(n) || 0).toFixed(2)}`
 export default function WorkLog() {
   const {
     user, staff, orders, config,
-    getWorkday, upsertWorkLog, startBreak, endBreak, saveInquiry, addPost, deletePost,
+    getWorkday, upsertWorkLog, startBreak, endBreak, saveInquiry, addPost, deletePost, getPolicyText,
   } = useApp()
   const date = sydneyToday()
   const [day, setDay] = useState({ logs: [], breaks: [], inquiries: [], posts: [] })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [, setTick] = useState(0)
+  const [policy, setPolicy] = useState({})
 
   const refresh = useCallback(async () => setDay(await getWorkday(date)), [getWorkday, date])
   useEffect(() => {
@@ -39,6 +40,7 @@ export default function WorkLog() {
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date])
+  useEffect(() => { getPolicyText().then(setPolicy) /* eslint-disable-next-line */ }, [])
   // 休息中每分钟刷新一次计时
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 30000)
@@ -65,7 +67,8 @@ export default function WorkLog() {
   const others = othersOnBreak(day.breaks, user?.id)
   const gap = tzGapHours()
 
-  const canSubmit = !!mine?.clock_in && prog.ok
+  const [truth, setTruth] = useState(false)
+  const canSubmit = !!mine?.clock_in && prog.ok && (!policy.truth_declaration || truth)
   const submitted = !!mine?.submitted_at
 
   return (
@@ -168,7 +171,7 @@ export default function WorkLog() {
       </Card>
 
       {/* ── 平台咨询登记 ──────────────────────── */}
-      <Card title="平台咨询登记" hint="7 个触点每天逐个检查。今天 0 个咨询也要登记 —— 填 0 就行，不填不算">
+      <Card title="平台咨询登记" hint="7 个触点每天逐个检查。今天 0 个咨询也要登记 —— 填 0 就行，不填不算。左边贴当天发的内容标题作为凭证">
         <div className="space-y-1.5">
           {(config.channelAccounts || []).map(a => {
             const rec = day.inquiries.find(i => i.account_id === a.id)
@@ -180,15 +183,22 @@ export default function WorkLog() {
                   background: planned ? '#d1d5db' : done ? '#22c55e' : '#f59e0b' }} />
                 <span className="text-xs text-gray-400 w-12 shrink-0">{a.platform}</span>
                 <span className={`text-sm w-20 shrink-0 ${planned ? 'text-gray-400' : 'font-semibold'}`}>{a.name}</span>
-                <span className="text-xs text-gray-400 flex-1 truncate">{a.positioning}</span>
+                <span className="text-xs text-gray-400 flex-1 truncate min-w-0">{a.positioning}</span>
                 {planned ? (
                   <span className="text-xs text-gray-300 w-24 text-right shrink-0">未开通</span>
                 ) : (
-                  <input type="number" min="0" step="1" placeholder="待填"
-                    defaultValue={rec?.count ?? ''}
-                    onBlur={e => { if (e.target.value !== '') run(() => saveInquiry(date, a.id, e.target.value)) }}
-                    className={`w-24 border rounded-lg px-2 py-1 text-sm font-mono text-right outline-none focus:border-red-400 ${
-                      done ? 'border-green-200 bg-green-50' : 'border-amber-300 bg-amber-50'}`} />
+                  <>
+                    {/* 老板 10-12：把当天发的内容标题贴进来，以证明。
+                        数字无法验证，但「在这个号发了什么」Annie 能去平台核对。 */}
+                    <input defaultValue={rec?.evidence ?? ''} placeholder="今天发的标题（可空）"
+                      onBlur={e => run(() => saveInquiry(date, a.id, rec?.count ?? 0, e.target.value))}
+                      className="w-44 border border-gray-200 rounded-lg px-2 py-1 text-xs outline-none focus:border-red-400 shrink-0" />
+                    <input type="number" min="0" step="1" placeholder="待填"
+                      defaultValue={rec?.count ?? ''}
+                      onBlur={e => { if (e.target.value !== '') run(() => saveInquiry(date, a.id, e.target.value, rec?.evidence)) }}
+                      className={`w-20 border rounded-lg px-2 py-1 text-sm font-mono text-right outline-none focus:border-red-400 shrink-0 ${
+                        done ? 'border-green-200 bg-green-50' : 'border-amber-300 bg-amber-50'}`} />
+                  </>
                 )}
               </div>
             )
@@ -262,12 +272,23 @@ export default function WorkLog() {
           </p>
         ) : (
           <>
+            {policy.truth_declaration && (
+              <label className="flex items-start gap-2 mb-3 cursor-pointer">
+                <input type="checkbox" checked={truth} onChange={e => setTruth(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-red-700 shrink-0" />
+                <span className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">
+                  {policy.truth_declaration}
+                </span>
+              </label>
+            )}
             <button disabled={busy || !canSubmit}
-              onClick={() => run(() => upsertWorkLog(date, { submitted_at: new Date().toISOString() }))}
+              onClick={() => run(() => upsertWorkLog(date, {
+                submitted_at: new Date().toISOString(), truth_confirmed: true }))}
               className="w-full text-white font-bold py-3 rounded-xl disabled:opacity-40"
               style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
               {!mine?.clock_in ? '先打上班卡'
                 : !prog.ok ? `提交今日记录 · 还差 ${prog.missing.length} 项`
+                : !truth && policy.truth_declaration ? '请先勾选上面的确认'
                 : '提交今日记录'}
             </button>
             {!prog.ok && (

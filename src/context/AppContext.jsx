@@ -637,12 +637,38 @@ export function AppProvider({ children }) {
 
   // 走 RPC 而不是直接 upsert —— 函数里会记首次填写时间和修改次数，
   // 这两个是判断「有没有糊弄」的痕迹（老板 10-12 提的）
-  async function saveInquiry(logDate, accountId, count) {
+  async function saveInquiry(logDate, accountId, count, evidence) {
     const { error } = await supabase.rpc('save_inquiry', {
       p_log_date: logDate, p_account_id: accountId,
       p_count: Number(count) || 0, p_by: user?.id || null,
+      p_evidence: evidence ?? null,
     })
     if (error) throw new Error(error.message || '登记失败，请重试')
+  }
+
+  async function getPolicyText() {
+    const { data } = await supabase.from('policy_text').select('*')
+    return Object.fromEntries((data || []).map(r => [r.key, r.content]))
+  }
+
+  async function confirmTeamDay(workDate, note) {
+    const { error } = await supabase.rpc('confirm_team_day', {
+      p_work_date: workDate, p_by: user?.id || null, p_note: note || null })
+    if (error) throw new Error(error.message || '确认失败，请重试')
+  }
+
+  async function getTeamConfirm(workDate) {
+    const { data } = await supabase.from('team_day_confirm').select('*').eq('work_date', workDate).maybeSingle()
+    return data || null
+  }
+
+  async function addChannelAccount({ id, platform, name, positioning, status }) {
+    const { error } = await supabase.rpc('add_channel_account', {
+      p_id: id, p_platform: platform, p_name: name,
+      p_positioning: positioning || null, p_status: status || 'planned' })
+    if (error) throw new Error(error.message || '新增失败，请重试')
+    const { data } = await supabase.rpc('list_config')
+    if (data) setConfig({ ...EMPTY_CONFIG, ...data })
   }
 
   async function addPost(postDate, { accountId, kind, title }) {
@@ -950,6 +976,7 @@ export function AppProvider({ children }) {
       markReconciled, unmarkReconciled, markAllReconciled,
       getWorkday, upsertWorkLog, startBreak, endBreak, saveInquiry, addPost, deletePost, getInquiryWeek,
       getPeriodData, getSummaryNote, saveSummaryNote,
+      getPolicyText, confirmTeamDay, getTeamConfirm, addChannelAccount,
       orders, confirmOrder, completeOrder, startWork, getMyOrders, finishWorkWithCorrection,
       createOrder, createOrderWithSlotCheck,
       updateOrder, updateOrderTimer, dispatchOrder, updateOrderStatus,
