@@ -37,13 +37,13 @@ CREATE TABLE IF NOT EXISTS policy_text (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- ⚠️ 用单个 E'' 字符串，不要把普通字符串和 E'' 拼接 ——
+--    PostgreSQL 的隐式拼接不接受这种混用，会报 syntax error。
 INSERT INTO policy_text (key, content) VALUES
   ('truth_declaration',
-   '我确认以上登记的咨询人数、发布内容均为真实数据，未虚报、未编造。'
-   E'\n如查实虚报，按公司规定罚款。'),
+   E'我确认以上登记的咨询人数、发布内容均为真实数据，未虚报、未编造。\n如查实虚报，按公司规定罚款。'),
   ('manager_declaration',
-   '我已逐项核对今日客服登记的咨询数与发布内容，确认属实。'
-   E'\n如经理未每日核对、事后查出虚报，经理罚款双倍。')
+   E'我已逐项核对今日客服登记的咨询数与发布内容，确认属实。\n如经理未每日核对、事后查出虚报，经理罚款双倍。')
 ON CONFLICT (key) DO NOTHING;
 
 COMMENT ON TABLE policy_text IS '声明文字。存库不写死 —— 措辞和罚则是管理决定，改它不该动代码';
