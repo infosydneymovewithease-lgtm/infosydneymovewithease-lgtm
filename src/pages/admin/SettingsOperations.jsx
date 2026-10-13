@@ -22,9 +22,10 @@ const STATUS = {
 }
 
 export default function SettingsOperations() {
-  const { config, staff, updateChannelAccount, updateStaffSchedule, addChannelAccount } = useApp()
+  const { config, staff, updateChannelAccount, updateStaffSchedule, addChannelAccount, deleteChannelAccount } = useApp()
   const [busy, setBusy] = useState('')
   const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState(null)
   const [err, setErr] = useState('')
 
   const { channelAccounts, shiftConfigs, breakWindows, staffSchedules } = config
@@ -72,7 +73,11 @@ export default function SettingsOperations() {
       <Block icon={Radio} title="运营账号"
         hint="「运营中」的账号每天必须登记咨询数；「计划中」的在登记表里灰显不必填。以后开新号在这里加，不用找人改代码">
         <div className="divide-y divide-gray-100">
-          {channelAccounts.map(a => (
+          {channelAccounts.map(a => editing === a.id ? (
+            <EditAccount key={a.id} account={a} busy={busy === a.id}
+              onCancel={() => setEditing(null)}
+              onSave={async v => { await run(a.id, () => updateChannelAccount(a.id, v)); setEditing(null) }} />
+          ) : (
             <div key={a.id} className="flex items-center gap-3 py-2.5">
               <span className="text-xs text-gray-400 w-12 shrink-0">{a.platform}</span>
               <div className="flex-1 min-w-0">
@@ -82,6 +87,8 @@ export default function SettingsOperations() {
               <span className={`text-xs font-semibold px-2 py-0.5 rounded shrink-0 ${STATUS[a.status]?.cls}`}>
                 {STATUS[a.status]?.label || a.status}
               </span>
+              <button disabled={busy === a.id} onClick={() => setEditing(a.id)}
+                className="text-xs px-2 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 shrink-0">改</button>
               <button
                 disabled={busy === a.id}
                 onClick={() => run(a.id, () => updateChannelAccount(a.id,
@@ -90,6 +97,9 @@ export default function SettingsOperations() {
               >
                 {a.status === 'active' ? '停用' : '启用'}
               </button>
+              <button disabled={busy === a.id}
+                onClick={() => { if (confirm(`删除「${a.name}」？\n\n已经有登记记录的账号删不掉 —— 那种情况请用「停用」。`)) run(a.id, () => deleteChannelAccount(a.id)) }}
+                className="text-xs px-2 py-1 rounded-lg text-gray-300 hover:text-red-600 disabled:opacity-40 shrink-0">删</button>
             </div>
           ))}
         </div>
@@ -202,6 +212,26 @@ export default function SettingsOperations() {
           </table>
         </div>
       </Block>
+    </div>
+  )
+}
+
+function EditAccount({ account, onSave, onCancel, busy }) {
+  const [v, setV] = useState({ platform: account.platform, name: account.name, positioning: account.positioning || '' })
+  const set = (k, x) => setV(p => ({ ...p, [k]: x }))
+  return (
+    <div className="py-2.5 flex items-center gap-2 flex-wrap">
+      <input value={v.platform} onChange={e => set('platform', e.target.value)} placeholder="平台"
+        className="w-24 border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-red-400" />
+      <input value={v.name} onChange={e => set('name', e.target.value)} placeholder="账号名"
+        className="w-28 border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-red-400" />
+      <input value={v.positioning} onChange={e => set('positioning', e.target.value)} placeholder="定位"
+        className="flex-1 min-w-32 border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-red-400" />
+      <span className="text-xs text-gray-300 font-mono shrink-0">{account.id}</span>
+      <button onClick={onCancel} className="px-2 py-1.5 text-sm text-gray-500 shrink-0">取消</button>
+      <button disabled={busy || !v.name.trim()} onClick={() => onSave(v)}
+        className="px-3 py-1.5 rounded-lg text-white text-sm font-semibold disabled:opacity-40 shrink-0"
+        style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>保存</button>
     </div>
   )
 }
