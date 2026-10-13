@@ -71,6 +71,9 @@ export default function WorkLog() {
   const video = weeklyVideo(day.posts, wk.from, wk.to)
   const adds = mine?.wechat_adds ?? null
   const isManager = user?.role === 'admin' || user?.role === 'manager'
+  // 老板两边都管，而且他是唯一要检查客服那张卡长什么样的人 —— 看不到就没法验。
+  // 所以三档：客服只看小红书、经理只看企业开发、老板两个都看（都不卡他）。
+  const isBoss    = user?.role === 'admin'
   const quota = Number(policy.comment_quota) || 3
   const commentCount = mine?.comment_count ?? 0
   // 客服要达配额才能提交；经理没有日配额（to B 开发按天算没意义）
@@ -318,16 +321,19 @@ export default function WorkLog() {
             客服  小红书搜关键词留评论，每天至少 3 条，截图为证 —— 日配额、可核验
             经理  to B 企业开发，联系了哪家、什么形式、到哪一步 —— 长线，按天算没意义
           所以不是一个字段，是分开两块。 */}
-      {isManager ? (
+      {isManager && (
         <Card title="企业开发（to B）" hint="长线工作，不按天算数量。联系了哪家、什么形式、到哪一步">
           <textarea rows={3} defaultValue={mine?.b2b_outreach || ''}
             placeholder={'例如：\n· 给 2 家中介发了合作方案，Hurstville 那家约了周四见面\n· staging 的 ruby 介绍了一家同行，加了微信还没聊'}
             onBlur={e => run(() => upsertWorkLog(date, { b2b_outreach: e.target.value }))}
             className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400 resize-none leading-relaxed" />
         </Card>
-      ) : (
+      )}
+
+      {(!isManager || isBoss) && (
         <Card title="小红书评论引流"
-          hint={commentOk ? `今天 ${commentCount} 条，达标（目标 ${quota} 条）`
+          hint={isBoss ? `客服每天要求 ${quota} 条。你是老板，这张卡不卡你的提交`
+            : commentOk ? `今天 ${commentCount} 条，达标（目标 ${quota} 条）`
             : `⚠️ 今天 ${commentCount} 条，还差 ${quota - commentCount} 条才能提交日报`}>
           {policy.comment_hint && (
             <p className="text-xs text-gray-500 bg-gray-50 rounded-xl px-3 py-2 mb-2.5 whitespace-pre-line leading-relaxed">
@@ -340,7 +346,8 @@ export default function WorkLog() {
               defaultValue={mine?.comment_count ?? ''}
               onBlur={e => { if (e.target.value !== '') run(() => upsertWorkLog(date, { comment_count: Number(e.target.value) })) }}
               className={`w-20 border rounded-lg px-2 py-1 text-sm font-mono text-right outline-none focus:border-red-400 shrink-0 ${
-                commentOk ? 'border-green-200 bg-green-50' : 'border-amber-300 bg-amber-50'}`} />
+                isBoss ? 'border-gray-200'
+                  : commentOk ? 'border-green-200 bg-green-50' : 'border-amber-300 bg-amber-50'}`} />
             <input defaultValue={mine?.comment_keywords || ''} placeholder="搜的关键词，如 搬家、长途、留学生搬家"
               onBlur={e => run(() => upsertWorkLog(date, { comment_keywords: e.target.value }))}
               className="flex-1 min-w-40 border border-gray-200 rounded-lg px-2 py-1 text-sm outline-none focus:border-red-400" />
