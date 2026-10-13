@@ -650,6 +650,20 @@ export function AppProvider({ children }) {
     return Object.fromEntries((data || []).map(r => [r.key, r.content]))
   }
 
+  // 老板 10-13：经理核对发现虚假错报要有出口。
+  // 原因必填的校验在数据库函数里，不在这儿 —— 前端有 bug 也绕不过去。
+  async function returnWorkLog(workDate, staffId, reason) {
+    const { error } = await supabase.rpc('return_work_log', {
+      p_work_date: workDate, p_staff_id: staffId, p_by: user?.id || null, p_reason: reason })
+    if (error) throw new Error(error.message || '退回失败，请重试')
+  }
+
+  async function listWorkLogReturns(from, to) {
+    const { data, error } = await supabase.rpc('list_work_log_returns', { p_from: from, p_to: to })
+    if (error) { console.warn('[worklog] 退回记录读取失败：', error.message); return [] }
+    return data || []
+  }
+
   async function confirmTeamDay(workDate, note) {
     const { error } = await supabase.rpc('confirm_team_day', {
       p_work_date: workDate, p_by: user?.id || null, p_note: note || null })
@@ -994,6 +1008,7 @@ export function AppProvider({ children }) {
       getWorkday, upsertWorkLog, startBreak, endBreak, saveInquiry, addPost, deletePost, getInquiryWeek,
       getPeriodData, getSummaryNote, saveSummaryNote,
       getPolicyText, confirmTeamDay, getTeamConfirm, addChannelAccount, deleteChannelAccount, channelUsage,
+      returnWorkLog, listWorkLogReturns,
       orders, confirmOrder, completeOrder, startWork, getMyOrders, finishWorkWithCorrection,
       createOrder, createOrderWithSlotCheck,
       updateOrder, updateOrderTimer, dispatchOrder, updateOrderStatus,

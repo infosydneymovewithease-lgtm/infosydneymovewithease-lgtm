@@ -26,9 +26,10 @@ const money = n => `$${(Number(n) || 0).toFixed(2)}`
 
 export default function WorkLog() {
   const {
-    user, orders, config,
+    user, orders, config, staff,
     getWorkday, upsertWorkLog, saveInquiry, addPost, deletePost, getPolicyText,
     addChannelAccount, updateChannelAccount, deleteChannelAccount, channelUsage,
+    listWorkLogReturns,
   } = useApp()
   const navigate = useNavigate()
   const date = sydneyToday()
@@ -40,6 +41,7 @@ export default function WorkLog() {
   const [adding, setAdding] = useState(false)
   const [quickFill, setQuickFill] = useState(false)
   const [editRow, setEditRow] = useState(null)
+  const [returns, setReturns] = useState([])
 
   const refresh = useCallback(async () => setDay(await getWorkday(date)), [getWorkday, date])
   useEffect(() => {
@@ -49,6 +51,8 @@ export default function WorkLog() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date])
   useEffect(() => { getPolicyText().then(setPolicy) /* eslint-disable-next-line */ }, [])
+  // 被经理退回过就要看到原因，否则她不知道该改哪里
+  useEffect(() => { listWorkLogReturns(date, date).then(setReturns) /* eslint-disable-next-line */ }, [date])
   // 休息中每分钟刷新一次计时
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 30000)
@@ -84,6 +88,9 @@ export default function WorkLog() {
   const issuesOk = isBoss || !!String(mine?.issues || '').trim()
   const gap = tzGapHours()
 
+  const myReturns = returns.filter(r => r.staff_id === user?.id)
+  const staffName = id => staff?.find?.(x => x.id === id)?.name || id
+
   const [truth, setTruth] = useState(false)
   const canSubmit = !!mine?.clock_in && prog.ok && commentOk && issuesOk && (!policy.truth_declaration || truth)
   const submitted = !!mine?.submitted_at
@@ -105,6 +112,30 @@ export default function WorkLog() {
           <span className="shrink-0">⚠️</span>
           <span className="text-sm flex-1 leading-relaxed">{err}</span>
           <button onClick={() => setErr('')} className="shrink-0 opacity-70 hover:opacity-100">✕</button>
+        </div>
+      )}
+
+      {/* 被退回了 —— 放在最上面，一进来就看到。
+          老板 10-13：经理核对发现问题要退回重填，客服得知道哪里不对。
+          退回时 submitted_at 被清空，所以「有退回记录 + 当前未提交」= 要改。 */}
+      {!submitted && myReturns.length > 0 && (
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4">
+          <p className="font-bold text-amber-900 text-sm mb-1.5">
+            ↩ 这份日报被退回了，改完要重新提交
+          </p>
+          {myReturns.map(r => (
+            <div key={r.id} className="text-sm text-amber-900 bg-white/70 rounded-xl px-3 py-2 mb-1.5 last:mb-0">
+              <p className="leading-relaxed">{r.reason}</p>
+              <p className="text-xs text-amber-700 mt-1">
+                {new Date(r.returned_at).toLocaleString('zh-CN', {
+                  month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}
+                {' · '}{staffName(r.returned_by)}
+              </p>
+            </div>
+          ))}
+          <p className="text-xs text-amber-700 mt-1">
+            真实性声明要重新勾一次 —— 改完的内容也要你确认。
+          </p>
         </div>
       )}
 

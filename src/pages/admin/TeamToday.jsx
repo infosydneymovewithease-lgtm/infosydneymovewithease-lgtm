@@ -20,7 +20,8 @@ const WEEK = ['一', '二', '三', '四', '五', '六', '日']
 
 export default function TeamToday() {
   const { user, staff, orders, config, getWorkday, getInquiryWeek,
-          getPolicyText, confirmTeamDay, getTeamConfirm } = useApp()
+          getPolicyText, confirmTeamDay, getTeamConfirm,
+          returnWorkLog, listWorkLogReturns } = useApp()
   const [date, setDate] = useState(() => sydneyToday())
   const [day, setDay] = useState({ logs: [], breaks: [], inquiries: [], posts: [] })
   const [week, setWeek] = useState([])
@@ -30,6 +31,10 @@ export default function TeamToday() {
   const [checked, setChecked] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const [returns, setReturns] = useState([])   // 今天的退回记录
+  const [retOpen, setRetOpen] = useState(null) // 正在写退回原因的 staff_id
+  const [retText, setRetText] = useState('')
+  const [shotsOf, setShotsOf] = useState(null) // 正在看谁的截图
 
   const wk = useMemo(() => weekRange(date), [date])
   useEffect(() => {
@@ -37,12 +42,20 @@ export default function TeamToday() {
     ;(async () => {
       const [d, w, p] = await Promise.all([
         getWorkday(date), getInquiryWeek(wk.from, wk.to), getWorkday(addDays(date, -1))])
-      const [pol, cf] = await Promise.all([getPolicyText(), getTeamConfirm(date)])
-      if (alive) { setDay(d); setWeek(w); setPrevDay(p.inquiries || []); setPolicy(pol); setConfirm(cf); setChecked(false) }
+      const [pol, cf, rt] = await Promise.all([
+        getPolicyText(), getTeamConfirm(date), listWorkLogReturns(date, date)])
+      if (alive) { setDay(d); setWeek(w); setPrevDay(p.inquiries || []); setPolicy(pol)
+                   setConfirm(cf); setChecked(false); setReturns(rt) }
     })()
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, wk.from, wk.to])
+
+  async function reload() {
+    const [d, cf, rt] = await Promise.all([
+      getWorkday(date), getTeamConfirm(date), listWorkLogReturns(date, date)])
+    setDay(d); setConfirm(cf); setReturns(rt); setChecked(false)
+  }
 
   // 今天该上班的人
   const onDuty = useMemo(() => {
@@ -51,6 +64,9 @@ export default function TeamToday() {
   }, [config.staffSchedules, date])
 
   const slots = slotsForDay(config.breakWindows, config.staffSchedules, date)
+  // 退回是管理动作，客服之间不能互退；也不能退自己的
+  const canReturn = user?.role === 'admin' || user?.role === 'manager'
+  const quota = Number(policy.comment_quota) || 3
   const accounts = requiredAccounts(config.channelAccounts)
 
   // 今日漏斗：咨询 → 建单
@@ -153,9 +169,91 @@ export default function TeamToday() {
                 </span>
                 <span className="flex-1" />
                 {l?.submitted_at
-                  ? <span className="text-xs text-green-600 flex items-center gap-1"><Check size={12} />日报已交</span>
+                  ? <span className="text-xs text-green-600 flex items-center gap-1"><Check size={12} />日报已交 {hhmm(l.submitted_at)}</span>
                   : <span className="text-xs text-gray-400">日报未交</span>}
+                {/* 老板 10-13：核对发现虚假错报要有出口。
+                    只有已提交的能退回；原因必填（数据库里也校验）。 */}
+                {canReturn && l?.submitted_at && id !== user?.id && (
+                  <button onClick={() => { setRetOpen(id); setRetText(''); setErr('') }}
+                    className="text-xs text-gray-400 hover:text-red-600 border border-gray-200 hover:border-red-300 rounded px-2 py-0.5 shrink-0">
+                    退回重填
+                  </button>
+                )}
               </div>
+
+              {/* 核对材料：评论数 / 关键词 / 截图 —— 以前只能看到「有没有传」，点不开 */}
+              {canReturn && (l?.comment_count != null || l?.comment_shots?.length || l?.b2b_outreach) && (
+                <div className="mt-1.5 bg-gray-50 rounded-lg px-2.5 py-2 text-xs text-gray-600 space-y-1">
+                  {l.comment_count != null && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={l.comment_count >= quota ? 'text-green-700 font-semibold' : 'text-amber-700 font-semibold'}>
+                        小红书 {l.comment_count}/{quota} 条
+                      </span>
+                      {l.comment_keywords && <span className="text-gray-400">关键词：{l.comment_keywords}</span>}
+                      {l.comment_shots?.length
+                        ? <button onClick={() => setShotsOf(shotsOf === id ? null : id)}
+                            className="text-red-700 hover:underline shrink-0">
+                            {shotsOf === id ? '收起' : `看 ${l.comment_shots.length} 张截图`}
+                          </button>
+                        : <span className="text-red-600">没传截图</span>}
+                    </div>
+                  )}
+                  {shotsOf === id && (
+                    <div className="flex gap-2 flex-wrap pt-1">
+                      {l.comment_shots.map((sh, i) => (
+                        <a key={i} href={sh.url || sh.data} target="_blank" rel="noreferrer"
+                          className="block w-20 h-20 rounded-lg overflow-hidden border border-gray-200 hover:border-red-400">
+                          <img src={sh.url || sh.data} alt={sh.name || `截图${i + 1}`}
+                            className="w-full h-full object-cover" />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {l.b2b_outreach && (
+                    <p className="text-gray-500 whitespace-pre-line leading-relaxed">企业开发：{l.b2b_outreach}</p>
+                  )}
+                </div>
+              )}
+
+              {/* 退回原因输入 */}
+              {retOpen === id && (
+                <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-2.5">
+                  <p className="text-xs text-red-800 font-semibold mb-1.5">
+                    退回 {who?.name || id} 今天的日报 —— 写清哪里不对，她要照这个改
+                  </p>
+                  <textarea rows={2} value={retText} onChange={e => setRetText(e.target.value)}
+                    placeholder="例如：小红书截图和上周四的是同一张 / 咨询登记 80 人但微信只加了 2 个，对不上"
+                    className="w-full border border-red-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-red-500 resize-none" />
+                  <div className="flex gap-2 mt-1.5">
+                    <button disabled={busy || retText.trim().length < 4}
+                      onClick={async () => {
+                        setBusy(true); setErr('')
+                        try { await returnWorkLog(date, id, retText); setRetOpen(null); setRetText(''); await reload() }
+                        catch (e) { setErr(e.message) } finally { setBusy(false) }
+                      }}
+                      className="text-xs text-white font-semibold px-3 py-1.5 rounded-lg disabled:opacity-40"
+                      style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
+                      确认退回
+                    </button>
+                    <button onClick={() => { setRetOpen(null); setErr('') }}
+                      className="text-xs text-gray-500 px-2">取消</button>
+                    {retText.trim().length > 0 && retText.trim().length < 4 && (
+                      <span className="text-xs text-red-600 self-center">原因至少 4 个字</span>
+                    )}
+                  </div>
+                  {/* 错误就显示在出错的地方 —— 渲染在页面底部等于没显示 */}
+                  {err && <p className="text-xs text-red-700 font-semibold mt-1.5">{err}</p>}
+                </div>
+              )}
+
+              {/* 今天被退回过 —— 退回记录不覆盖，一次一条 */}
+              {returns.filter(r => r.staff_id === id).map(r => (
+                <div key={r.id} className="mt-1.5 text-xs text-amber-800 bg-amber-50 rounded-lg px-2.5 py-1.5">
+                  ↩ {hhmm(r.returned_at)} 被
+                  {staff.find(x => x.id === r.returned_by)?.name || r.returned_by}
+                  退回：{r.reason}
+                </div>
+              ))}
               <div className="flex gap-2 mt-1.5 flex-wrap">
                 {slots.map(w => {
                   const r = day.breaks.find(b => b.staff_id === id && b.slot_index === w.slot_index)

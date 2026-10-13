@@ -19,11 +19,13 @@ const money = n => `$${(Number(n) || 0).toLocaleString('en-AU', { minimumFractio
 const pct = n => n == null ? '—' : `${(n * 100).toFixed(0)}%`
 
 export default function Summary() {
-  const { user, staff, orders, staffRates, config, getPeriodData, getSummaryNote, saveSummaryNote } = useApp()
+  const { user, staff, orders, staffRates, config, getPeriodData, getSummaryNote, saveSummaryNote,
+          listWorkLogReturns } = useApp()
   const today = sydneyToday()
   const [kind, setKind] = useState('month')
   const [anchor, setAnchor] = useState(() => today.slice(0, 7))
   const [data, setData] = useState({ logs: [], breaks: [], inquiries: [], posts: [], closes: [] })
+  const [returns, setReturns] = useState([])
   const [note, setNote] = useState('')
   const [saved, setSaved] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -40,8 +42,10 @@ export default function Summary() {
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const [d, n] = await Promise.all([getPeriodData(range.from, range.to), getSummaryNote(period)])
-      if (alive) { setData(d); setNote(n?.content || ''); setSaved(false) }
+      const [d, n, rt] = await Promise.all([
+        getPeriodData(range.from, range.to), getSummaryNote(period),
+        listWorkLogReturns(range.from, range.to)])
+      if (alive) { setData(d); setNote(n?.content || ''); setSaved(false); setReturns(rt) }
     })()
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -52,8 +56,8 @@ export default function Summary() {
   const ov = useMemo(() => overview(orders, range.from, range.to, staffRates), [orders, range, staffRates])
   const months = useMemo(() => recentMonths(today, 6), [today])
   const ins = useMemo(() => insights(orders, months), [orders, months])
-  const rows = useMemo(() => staffStats({ ...data, orders, from: range.from, to: range.to, staffIds }),
-    [data, orders, range, staffIds])
+  const rows = useMemo(() => staffStats({ ...data, returns, orders, from: range.from, to: range.to, staffIds }),
+    [data, returns, orders, range, staffIds])
   const problems = useMemo(() => gaps({ ...data, orders, accounts: config.channelAccounts,
     staffIds, from: range.from, to: range.to, staffRates }),
     [data, orders, config.channelAccounts, staffIds, range, staffRates])
@@ -173,6 +177,11 @@ export default function Summary() {
                 <Mini label="日结确认" value={`${r.dayConfirms} 天`} dim={!mgr} />
                 <Mini label="核对订单" value={`${r.ordersChecked} 单`} dim={!mgr} />
                 <Mini label="补录" value={`${r.fixesMade} 笔`} dim={!mgr} />
+                {/* 退回两个方向都显示 —— 「退回了几次别人」是她在核对的证据，
+                    「被退回几次」是她自己的数据质量。只看一个方向会误导。 */}
+                <Mini label="退回别人日报" value={`${r.returnedBy} 次`} dim={!r.returnedBy} />
+                <Mini label="自己被退回" value={`${r.returned} 次`}
+                  dim={!r.returned} warn={r.returned > 0} />
               </div>
             </div>
           )
@@ -299,11 +308,12 @@ function Card({ title, hint, lock, children }) {
   )
 }
 
-function Mini({ label, value, sub, dim }) {
+function Mini({ label, value, sub, dim, warn }) {
   return (
-    <div className={`rounded-lg px-2.5 py-1.5 ${dim ? 'bg-gray-50/60' : 'bg-gray-50'}`}>
-      <p className="text-xs text-gray-400">{label}</p>
-      <p className={`font-mono font-semibold text-sm mt-0.5 ${dim ? 'text-gray-400' : 'text-gray-800'}`}>{value}</p>
+    <div className={`rounded-lg px-2.5 py-1.5 ${warn ? 'bg-amber-50' : dim ? 'bg-gray-50/60' : 'bg-gray-50'}`}>
+      <p className={`text-xs ${warn ? 'text-amber-700' : 'text-gray-400'}`}>{label}</p>
+      <p className={`font-mono font-semibold text-sm mt-0.5 ${
+        warn ? 'text-amber-800' : dim ? 'text-gray-400' : 'text-gray-800'}`}>{value}</p>
       {sub && <p className="text-xs text-gray-400">{sub}</p>}
     </div>
   )

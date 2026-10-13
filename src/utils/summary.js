@@ -58,7 +58,7 @@ export function overview(orders, from, to, staffRates) {
  * 所以把管理工作也算成产出：日结确认、核对订单数、补录笔数。
  */
 export function staffStats(opts) {
-  const { orders, logs, inquiries, posts, breaks, confirms, checks, fixes, from, to, staffIds } = opts
+  const { orders, logs, inquiries, posts, breaks, confirms, checks, fixes, returns, from, to, staffIds } = opts
   return (staffIds || []).map(id => {
     const myLogs = (logs || []).filter(l => l.staff_id === id && inRange(l.work_date, from, to))
     const worked = myLogs.filter(l => l.clock_in)
@@ -100,6 +100,11 @@ export function staffStats(opts) {
       dayConfirms: (confirms || []).filter(c => c.confirmed_by === id).length,
       ordersChecked: (checks || []).filter(c => c.checked_by === id).length,
       fixesMade: (fixes || []).filter(f => f.changed_by === id && !f.undone_at).length,
+      // 日报退回。两个方向都要看：
+      //   returned  = 她自己被退回几次（数据质量）
+      //   returnedBy = 她退回了别人几次（她真的在核对，不是走过场）
+      returned:    (returns || []).filter(r => r.staff_id === id && inRange(r.work_date, from, to)).length,
+      returnedBy:  (returns || []).filter(r => r.returned_by === id && inRange(r.work_date, from, to)).length,
     }
   })
 }
