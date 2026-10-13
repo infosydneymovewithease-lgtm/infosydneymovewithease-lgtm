@@ -661,8 +661,13 @@ export function AppProvider({ children }) {
     return data || null
   }
 
-  async function deleteChannelAccount(id) {
-    const { error } = await supabase.rpc('delete_channel_account', { p_id: id })
+  async function channelUsage(id) {
+    const { data } = await supabase.rpc('channel_account_usage', { p_id: id })
+    return data || { inquiries: 0, people: 0, posts: 0 }
+  }
+
+  async function deleteChannelAccount(id, force = false) {
+    const { error } = await supabase.rpc('delete_channel_account', { p_id: id, p_force: force })
     if (error) throw new Error(error.message || '删除失败，请重试')
     const { data } = await supabase.rpc('list_config')
     if (data) setConfig({ ...EMPTY_CONFIG, ...data })
@@ -988,7 +993,7 @@ export function AppProvider({ children }) {
       markReconciled, unmarkReconciled, markAllReconciled,
       getWorkday, upsertWorkLog, startBreak, endBreak, saveInquiry, addPost, deletePost, getInquiryWeek,
       getPeriodData, getSummaryNote, saveSummaryNote,
-      getPolicyText, confirmTeamDay, getTeamConfirm, addChannelAccount, deleteChannelAccount,
+      getPolicyText, confirmTeamDay, getTeamConfirm, addChannelAccount, deleteChannelAccount, channelUsage,
       orders, confirmOrder, completeOrder, startWork, getMyOrders, finishWorkWithCorrection,
       createOrder, createOrderWithSlotCheck,
       updateOrder, updateOrderTimer, dispatchOrder, updateOrderStatus,

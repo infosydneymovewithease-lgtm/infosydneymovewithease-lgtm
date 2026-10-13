@@ -7,6 +7,7 @@
 // 出勤点一下，业绩系统自己算，平台咨询填个数字。
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { sydneyToday } from '../../utils/date'
 import { currentSeason, tzGapHours } from '../../utils/shifts'
@@ -28,6 +29,7 @@ export default function WorkLog() {
     getWorkday, upsertWorkLog, startBreak, endBreak, saveInquiry, addPost, deletePost, getPolicyText,
     addChannelAccount,
   } = useApp()
+  const navigate = useNavigate()
   const date = sydneyToday()
   const [day, setDay] = useState({ logs: [], breaks: [], inquiries: [], posts: [] })
   const [busy, setBusy] = useState(false)
@@ -235,10 +237,19 @@ export default function WorkLog() {
             <AddChannelAccount busy={busy} onCancel={() => setAdding(false)}
               onAdd={async v => { await run(() => addChannelAccount(v)); setAdding(false) }} />
           ) : (
-            <button onClick={() => setAdding(true)}
-              className="mt-3 w-full border border-dashed border-gray-300 rounded-xl py-2 text-sm text-gray-500 hover:border-red-300 hover:text-red-600">
-              + 新增运营平台 / 账号
-            </button>
+            <div className="flex gap-2 mt-3">
+              <button onClick={() => setAdding(true)}
+                className="flex-1 border border-dashed border-gray-300 rounded-xl py-2 text-sm text-gray-500 hover:border-red-300 hover:text-red-600">
+                + 新增运营平台 / 账号
+              </button>
+              {/* 老板 10-13 在这一页找删除按钮没找到 —— 加个去处，
+                  而不是让他满界面翻。改和删放在系统设置是对的（低频、影响全员），
+                  但得从这里能过去。 */}
+              <button onClick={() => navigate('/admin/settings')}
+                className="px-3 border border-dashed border-gray-300 rounded-xl py-2 text-sm text-gray-400 hover:border-gray-400 hover:text-gray-600 whitespace-nowrap">
+                改 / 删账号
+              </button>
+            </div>
           )
         )}
 

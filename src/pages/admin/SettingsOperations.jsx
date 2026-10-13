@@ -22,7 +22,7 @@ const STATUS = {
 }
 
 export default function SettingsOperations() {
-  const { config, staff, updateChannelAccount, updateStaffSchedule, addChannelAccount, deleteChannelAccount } = useApp()
+  const { config, staff, updateChannelAccount, updateStaffSchedule, addChannelAccount, deleteChannelAccount, channelUsage } = useApp()
   const [busy, setBusy] = useState('')
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -98,7 +98,20 @@ export default function SettingsOperations() {
                 {a.status === 'active' ? '停用' : '启用'}
               </button>
               <button disabled={busy === a.id}
-                onClick={() => { if (confirm(`删除「${a.name}」？\n\n已经有登记记录的账号删不掉 —— 那种情况请用「停用」。`)) run(a.id, () => deleteChannelAccount(a.id)) }}
+                onClick={async () => {
+                  // 删之前先查清楚要删什么 —— 不能让人盲删
+                  const u = await channelUsage(a.id)
+                  if (!u.inquiries && !u.posts) {
+                    if (confirm(`删除「${a.name}」？\n\n它没有任何登记记录，删掉不影响任何数据。`))
+                      run(a.id, () => deleteChannelAccount(a.id))
+                    return
+                  }
+                  const msg = `「${a.name}」有 ${u.inquiries} 条咨询登记（共 ${u.people} 人）`
+                    + `、${u.posts} 条发布记录${u.firstDate ? `，最早 ${u.firstDate}` : ''}。\n\n`
+                    + `建议改成「停用」—— 它会从每日登记里消失，但这些历史数据还查得到。\n\n`
+                    + `确定要【连同这些记录一起删掉】吗？删了就找不回来了。`
+                  if (confirm(msg)) run(a.id, () => deleteChannelAccount(a.id, true))
+                }}
                 className="text-xs px-2 py-1 rounded-lg text-gray-300 hover:text-red-600 disabled:opacity-40 shrink-0">删</button>
             </div>
           ))}
