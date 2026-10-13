@@ -78,10 +78,14 @@ export default function WorkLog() {
   const commentCount = mine?.comment_count ?? 0
   // 客服要达配额才能提交；经理没有日配额（to B 开发按天算没意义）
   const commentOk = isManager || commentCount >= quota
+  // 老板 10-13：「每人每天至少一条，内容不限」—— 和小红书配额同一个道理，
+  // 不指望人主动提问题，给个下限。内容不限，所以「今天挺顺的」也算一条。
+  // 老板自己不填（这一栏是写给他看的）。
+  const issuesOk = isBoss || !!String(mine?.issues || '').trim()
   const gap = tzGapHours()
 
   const [truth, setTruth] = useState(false)
-  const canSubmit = !!mine?.clock_in && prog.ok && commentOk && (!policy.truth_declaration || truth)
+  const canSubmit = !!mine?.clock_in && prog.ok && commentOk && issuesOk && (!policy.truth_declaration || truth)
   const submitted = !!mine?.submitted_at
 
   return (
@@ -357,13 +361,16 @@ export default function WorkLog() {
         </Card>
       )}
 
-      <Card title="今天的问题 · 想改进的地方">
+      <Card title="今天的问题 · 想改进的地方"
+        hint={isBoss ? '客服和经理每天至少写一条。你是老板，这栏不卡你的提交'
+          : issuesOk ? '今天已写，达标' : '⚠️ 每天至少一条，写完才能提交日报'}>
         <div className="bg-blue-50 rounded-xl px-3 py-2.5 mb-2.5">
           <p className="text-sm text-blue-900 font-medium">🔒 这一栏只有老板能看到</p>
           <p className="text-xs text-blue-700 mt-1 leading-relaxed">
             客服经理和其他同事都看不到你写的内容。<br />
-            公司会把大家提的问题整理出来，<b>在每周例会上提出讨论</b>。
-            有什么不顺手的、觉得该改的，直接写。
+            <b>每天至少写一条，内容不限</b> —— 公司上的、操作上的、流程上的都行，
+            今天没遇到问题就写你觉得该改进的地方。<br />
+            公司会把大家提的整理出来，<b>在每周例会上提出讨论，好的方案会一起探讨落地</b>。
           </p>
         </div>
         <textarea rows={3} defaultValue={mine?.issues || ''}
@@ -397,6 +404,7 @@ export default function WorkLog() {
               {!mine?.clock_in ? '先打上班卡'
                 : !prog.ok ? `提交今日记录 · 还差 ${prog.missing.length} 个平台`
                 : !commentOk ? `小红书评论还差 ${quota - commentCount} 条`
+                : !issuesOk ? '还没写今天的问题 · 想改进的地方'
                 : !truth && policy.truth_declaration ? '请先勾选上面的确认'
                 : '提交今日记录'}
             </button>
