@@ -27,7 +27,7 @@ export default function WorkLog() {
   const {
     user, staff, orders, config,
     getWorkday, upsertWorkLog, startBreak, endBreak, saveInquiry, addPost, deletePost, getPolicyText,
-    addChannelAccount,
+    addChannelAccount, updateChannelAccount, deleteChannelAccount, channelUsage,
   } = useApp()
   const navigate = useNavigate()
   const date = sydneyToday()
@@ -38,6 +38,7 @@ export default function WorkLog() {
   const [policy, setPolicy] = useState({})
   const [adding, setAdding] = useState(false)
   const [quickFill, setQuickFill] = useState(false)
+  const [editRow, setEditRow] = useState(null)
 
   const refresh = useCallback(async () => setDay(await getWorkday(date)), [getWorkday, date])
   useEffect(() => {
@@ -72,6 +73,7 @@ export default function WorkLog() {
   const video = weeklyVideo(day.posts, wk.from, wk.to)
   const others = othersOnBreak(day.breaks, user?.id)
   const adds = mine?.wechat_adds ?? null
+  const isManager = user?.role === 'admin' || user?.role === 'manager'
   const gap = tzGapHours()
 
   const [truth, setTruth] = useState(false)
@@ -189,7 +191,7 @@ export default function WorkLog() {
 
       {/* ── 平台咨询登记 ──────────────────────── */}
       <div id="inquiry-section" className="scroll-mt-4" />
-      <Card title="平台咨询登记" hint="7 个触点每天逐个检查，填你自己接待的人数。今天 0 个也要登记 —— 填 0 就行，不填不算。左边显示你在「今天发了什么」里登记的内容，不用重复填">
+      <Card title="平台咨询登记" hint="7 个触点每天逐个检查，填你自己接待的人数。今天 0 个也要登记 —— 填 0 就行，不填不算。左边显示你在「今天发了什么」里登记的内容，不用重复填。鼠标移到行上，右边 ✕ 可以删掉这个号">
         <div className="space-y-1.5">
           {(config.channelAccounts || []).map(a => {
             // 只显示自己填的 —— 两个人在岗时各填各的
@@ -197,6 +199,13 @@ export default function WorkLog() {
             const myPosts = day.posts.filter(p => p.account_id === a.id && p.posted_by === user?.id)
             const planned = a.status !== 'active'
             const done = !!rec
+            // 老板 10-13：「删除或更改某一条信息」—— 每行要能改也能删，
+            // 在看到它的地方处理，不用跑去设置页。只对 admin/manager 开放。
+            if (editRow === a.id) return (
+              <RowEdit key={a.id} account={a} busy={busy}
+                onCancel={() => setEditRow(null)}
+                onSave={async v => { await run(() => updateChannelAccount(a.id, v)); setEditRow(null) }} />
+            )
             return (
               <div key={a.id} className="flex items-center gap-3 py-1">
                 <span className="w-2 h-2 rounded-full shrink-0" style={{
@@ -204,6 +213,27 @@ export default function WorkLog() {
                 <span className="text-xs text-gray-400 w-12 shrink-0">{a.platform}</span>
                 <span className={`text-sm w-20 shrink-0 ${planned ? 'text-gray-400' : 'font-semibold'}`}>{a.name}</span>
                 <span className="text-xs text-gray-400 flex-1 truncate min-w-0">{a.positioning}</span>
+                {/* 老板 10-13：「删除或更改某一条信息」——
+                    在看到它的地方改和删，不用跑去设置页。
+                    只对 admin/manager 开放（改一个号影响全员每天的登记表）。 */}
+                {isManager && (
+                  <span className="flex items-center gap-0.5 shrink-0">
+                    <button onClick={() => setEditRow(a.id)} title={`改「${a.name}」`}
+                      className="text-xs text-gray-200 hover:text-gray-600 px-1">改</button>
+                    <button title={`删除「${a.name}」`}
+                      onClick={async () => {
+                        const u = await channelUsage(a.id)
+                        const msg = (!u.inquiries && !u.posts)
+                          ? `删除「${a.name}」？\n\n它没有任何登记记录，删掉不影响任何数据。`
+                          : `「${a.name}」有 ${u.inquiries} 条咨询登记（共 ${u.people} 人）、${u.posts} 条发布记录`
+                            + `${u.firstDate ? `，最早 ${u.firstDate}` : ''}。\n\n`
+                            + `如果只是暂时不运营，点「改」把状态设成未开通更合适 —— 历史还查得到。\n\n`
+                            + `确定要连同这些记录一起删掉吗？删了就找不回来了。`
+                        if (confirm(msg)) run(() => deleteChannelAccount(a.id, !!(u.inquiries || u.posts)))
+                      }}
+                      className="text-xs text-gray-200 hover:text-red-600 px-1">✕</button>
+                  </span>
+                )}
                 {planned ? (
                   <span className="text-xs text-gray-300 w-24 text-right shrink-0">未开通</span>
                 ) : (
@@ -232,7 +262,7 @@ export default function WorkLog() {
         {/* 老板 10-12：这里要能直接加新平台（抖音、新号…）。
             ⚠️ 只对 admin/manager 显示 —— 加一个账号 = 全团队从此每天必填，
                而且和真实性声明、罚款挂着，那是管理决定不是客服决定。 */}
-        {(user?.role === 'admin' || user?.role === 'manager') && (
+        {isManager && (
           adding ? (
             <AddChannelAccount busy={busy} onCancel={() => setAdding(false)}
               onAdd={async v => { await run(() => addChannelAccount(v)); setAdding(false) }} />
@@ -245,9 +275,9 @@ export default function WorkLog() {
               {/* 老板 10-13 在这一页找删除按钮没找到 —— 加个去处，
                   而不是让他满界面翻。改和删放在系统设置是对的（低频、影响全员），
                   但得从这里能过去。 */}
-              <button onClick={() => navigate('/admin/settings')}
+              <button onClick={() => navigate('/admin/settings?tab=ops')}
                 className="px-3 border border-dashed border-gray-300 rounded-xl py-2 text-sm text-gray-400 hover:border-gray-400 hover:text-gray-600 whitespace-nowrap">
-                改 / 删账号
+                改名 / 停用
               </button>
             </div>
           )
@@ -425,6 +455,34 @@ export default function WorkLog() {
           </>
         )}
       </div>
+    </div>
+  )
+}
+
+function RowEdit({ account, onSave, onCancel, busy }) {
+  const [v, setV] = useState({
+    platform: account.platform, name: account.name,
+    positioning: account.positioning || '', status: account.status,
+  })
+  const set = (k, x) => setV(p => ({ ...p, [k]: x }))
+  return (
+    <div className="flex items-center gap-2 py-2 flex-wrap bg-gray-50 rounded-lg px-2 -mx-2">
+      <input value={v.platform} onChange={e => set('platform', e.target.value)} placeholder="平台"
+        className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm outline-none focus:border-red-400" />
+      <input value={v.name} onChange={e => set('name', e.target.value)} placeholder="账号名" autoFocus
+        className="w-24 border border-gray-200 rounded-lg px-2 py-1 text-sm outline-none focus:border-red-400" />
+      <input value={v.positioning} onChange={e => set('positioning', e.target.value)} placeholder="定位"
+        className="flex-1 min-w-28 border border-gray-200 rounded-lg px-2 py-1 text-sm outline-none focus:border-red-400" />
+      {[['active', '运营中'], ['planned', '未开通']].map(([s, l]) => (
+        <button key={s} onClick={() => set('status', s)}
+          className={`px-2 py-1 rounded-lg text-xs font-semibold border shrink-0 ${
+            v.status === s ? 'border-red-400 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500'}`}>{l}</button>
+      ))}
+      <span className="text-xs text-gray-300 font-mono shrink-0">{account.id}</span>
+      <button onClick={onCancel} className="px-2 py-1 text-sm text-gray-500 shrink-0">取消</button>
+      <button disabled={busy || !v.name.trim()} onClick={() => onSave(v)}
+        className="px-3 py-1 rounded-lg text-white text-sm font-semibold disabled:opacity-40 shrink-0"
+        style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>保存</button>
     </div>
   )
 }

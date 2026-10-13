@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { UserPlus, Save, ToggleLeft, ToggleRight, Pencil } from 'lucide-react'
 import { VEHICLES } from '../../data/vehicles'
@@ -14,7 +15,10 @@ const ROLE_COLOR = {
 
 export default function Settings() {
   const { staff, addStaffMember, updateStaffMember, appSettings, updateAppSettings } = useApp()
-  const [tab, setTab] = useState('staff')
+  // 支持 ?tab=ops 直达运营配置 —— 老板 10-13 从日报点过来落在了员工账号页
+  const [params, setParams] = useSearchParams()
+  const tab = params.get('tab') || 'staff'
+  const setTab = v => setParams(v === 'staff' ? {} : { tab: v })
   const [showAddStaff, setShowAddStaff] = useState(false)
   const [editingStaff, setEditingStaff] = useState(null)
   const [companyForm, setCompanyForm] = useState(appSettings)
