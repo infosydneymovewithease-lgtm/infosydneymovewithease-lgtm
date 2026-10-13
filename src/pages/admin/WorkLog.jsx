@@ -13,6 +13,7 @@ import { sydneyToday } from '../../utils/date'
 import { currentSeason, tzGapHours } from '../../utils/shifts'
 import {
   requiredAccounts, inquiryProgress, myPerformance, weeklyVideo, weekRange,
+  OUTREACH_ACTIONS, outreachDone,
 } from '../../utils/worklog'
 import { Plus, Trash2, Check } from 'lucide-react'
 import AddChannelAccount from '../../components/AddChannelAccount'
@@ -70,10 +71,12 @@ export default function WorkLog() {
   const video = weeklyVideo(day.posts, wk.from, wk.to)
   const adds = mine?.wechat_adds ?? null
   const isManager = user?.role === 'admin' || user?.role === 'manager'
+  const outDone = outreachDone(mine)
+  const outAdds = mine?.outreach_adds ?? 0
   const gap = tzGapHours()
 
   const [truth, setTruth] = useState(false)
-  const canSubmit = !!mine?.clock_in && prog.ok && (!policy.truth_declaration || truth)
+  const canSubmit = !!mine?.clock_in && prog.ok && outDone && (!policy.truth_declaration || truth)
   const submitted = !!mine?.submitted_at
 
   return (
@@ -226,7 +229,9 @@ export default function WorkLog() {
             onClick={() => setQuickFill(v => !v)} />
           <Arrow />
           <Big label="加微信" value={adds} unit="人" tag="手填" accent
-            sub={prog.total > 0 && adds != null ? `平台来的留下 ${Math.round(adds / prog.total * 100)}%` : '微信今天新增好友'}
+            sub={outAdds > 0 ? `其中 ${outAdds} 人来自主动开发`
+              : prog.total > 0 && adds != null ? `平台来的留下 ${Math.round(adds / prog.total * 100)}%`
+              : '微信今天新增好友'}
             onClick={() => document.getElementById('wechat-adds')?.focus()} />
           <Arrow />
           <Big label="下单" value={perf.booked} unit="单" tag="自动"
@@ -309,11 +314,47 @@ export default function WorkLog() {
       </Card>
 
       {/* ── 手填三项 ─────────────────────────── */}
-      <Card title="主动开发 / 其他工作">
+      {/* 老板 10-13：原来是个自由文本框，他担心「没要求没细节会变成没用的东西」——
+          说对了。改成必填 + 可量化，并接进漏斗：
+          能看出微信新增里多少是平台引流来的、多少是主动找来的。 */}
+      <Card title="今天的主动开发"
+        hint={outDone ? `带来 ${mine?.outreach_adds ?? 0} 个微信好友` : '⚠️ 必填 —— 至少选一项你今天做了什么'}>
+        <div className="flex flex-wrap gap-1.5 mb-2.5">
+          {OUTREACH_ACTIONS.map(x => {
+            const on = (mine?.outreach_actions || []).includes(x)
+            return (
+              <button key={x} disabled={busy}
+                onClick={() => {
+                  const cur = mine?.outreach_actions || []
+                  const next = on ? cur.filter(y => y !== x) : [...cur, x]
+                  run(() => upsertWorkLog(date, { outreach_actions: next }))
+                }}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors disabled:opacity-40 ${
+                  on ? 'border-red-400 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                {x}
+              </button>
+            )
+          })}
+        </div>
         <textarea rows={2} defaultValue={mine?.outreach || ''}
-          placeholder="例如：在 3 个租房群发名片，加到 2 个意向客户"
+          placeholder="具体做了什么（例如：在 3 个租房群发了名片）"
           onBlur={e => run(() => upsertWorkLog(date, { outreach: e.target.value }))}
           className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400 resize-none" />
+        <div className="flex items-center gap-3 mt-2.5">
+          <span className="text-sm text-gray-600 shrink-0">带来几个微信好友</span>
+          <input type="number" min="0" step="1" placeholder="0"
+            defaultValue={mine?.outreach_adds ?? ''}
+            onBlur={e => { if (e.target.value !== '') run(() => upsertWorkLog(date, { outreach_adds: Number(e.target.value) })) }}
+            className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm font-mono text-right outline-none focus:border-red-400 shrink-0" />
+          <span className="text-xs text-gray-400 flex-1 min-w-0">
+            这是上面「微信加了 {adds ?? 0} 人」里面的一部分，不是另外加的
+          </span>
+        </div>
+        {outAdds > (adds ?? 0) && (
+          <p className="text-xs text-red-600 mt-2">
+            ⚠️ 主动开发带来 {outAdds} 人，但今天微信总共才加了 {adds ?? 0} 人 —— 其中一个填错了
+          </p>
+        )}
       </Card>
 
       {/* 老板 10-13：「这个是今天的总问题，期待改进相关问题，
@@ -356,7 +397,8 @@ export default function WorkLog() {
               className="w-full text-white font-bold py-3 rounded-xl disabled:opacity-40"
               style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
               {!mine?.clock_in ? '先打上班卡'
-                : !prog.ok ? `提交今日记录 · 还差 ${prog.missing.length} 项`
+                : !prog.ok ? `提交今日记录 · 还差 ${prog.missing.length} 个平台`
+                : !outDone ? '还没填今天的主动开发'
                 : !truth && policy.truth_declaration ? '请先勾选上面的确认'
                 : '提交今日记录'}
             </button>

@@ -247,3 +247,17 @@ export function trustSignals({ today, yesterday, clockIn, orderCount, accounts, 
   out.push(...crossCheck(today, today[0] && String(today[0].log_date), accounts, nameOf))
   return out
 }
+
+
+/** 主动开发的动作选项。老板 10-13 定：必填且要能量化。 */
+export const OUTREACH_ACTIONS = ['发租房群', '回访老客', '发名片', '同行/中介', '其他']
+
+/**
+ * 主动开发填完整了吗。
+ * ⚠️ 判断依据是「选了动作」而不是「带来好友 > 0」——
+ *    今天出去发了名片一个没加到，也是做了工作，不该因为结果不好就算没填。
+ *    把「有没有做」和「做得怎么样」分开，才不会逼人编数字。
+ */
+export function outreachDone(log) {
+  return !!(log?.outreach_actions?.length)
+}
