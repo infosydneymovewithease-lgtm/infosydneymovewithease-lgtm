@@ -95,7 +95,10 @@ export default function Settings() {
           </div>
 
           {/* Group by role */}
-          {['admin','cs','worker'].map(role => {
+          {/* ⚠️ 10-13：原来漏了 manager —— 一旦把佳慧改成客服经理，
+                 她会从这个列表里整个消失（分组里没有她的角色），连改回来都找不到人。
+                 顺序 = 权限从高到低，和 ROLES 里的 rank 一致。 */}
+          {['admin','manager','cs','worker'].map(role => {
             const group = staff.filter(s => s.role === role)
             if (!group.length) return null
             return (
