@@ -84,7 +84,17 @@ export default function WorkLog() {
           {date} · 按{currentSeason() === 'summer' ? '夏令时' : '冬令时'}班次 · 悉尼比北京快 {gap} 小时
         </p>
       </div>
-      {err && <p className="text-red-600 text-sm font-medium">{err}</p>}
+      {/* 浮在屏幕上，不随页面滚走 ——
+          老板 10-13 在页面中间填数字保存失败，报错在最顶部，他根本看不见，
+          只看到「数字不联动」。错误提示必须出现在视线里。 */}
+      {err && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-lg w-[90%]
+                        bg-red-600 text-white rounded-xl px-4 py-3 shadow-lg flex items-start gap-2">
+          <span className="shrink-0">⚠️</span>
+          <span className="text-sm flex-1 leading-relaxed">{err}</span>
+          <button onClick={() => setErr('')} className="shrink-0 opacity-70 hover:opacity-100">✕</button>
+        </div>
+      )}
 
       {/* ── 出勤 ─────────────────────────────── */}
       <Card title="出勤">
