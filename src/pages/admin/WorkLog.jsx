@@ -12,11 +12,11 @@ import { useApp } from '../../context/AppContext'
 import { sydneyToday } from '../../utils/date'
 import { currentSeason, tzGapHours } from '../../utils/shifts'
 import {
-  slotsForDay, startOptions, othersOnBreak, myBreak, breakMinutes,
   requiredAccounts, inquiryProgress, myPerformance, weeklyVideo, weekRange,
 } from '../../utils/worklog'
-import { LogIn, LogOut, Coffee, Plus, Trash2, Check } from 'lucide-react'
+import { Plus, Trash2, Check } from 'lucide-react'
 import AddChannelAccount from '../../components/AddChannelAccount'
+import AttendanceCard from '../../components/AttendanceCard'
 
 const hhmm = iso => iso
   ? new Date(iso).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
@@ -25,8 +25,8 @@ const money = n => `$${(Number(n) || 0).toFixed(2)}`
 
 export default function WorkLog() {
   const {
-    user, staff, orders, config,
-    getWorkday, upsertWorkLog, startBreak, endBreak, saveInquiry, addPost, deletePost, getPolicyText,
+    user, orders, config,
+    getWorkday, upsertWorkLog, saveInquiry, addPost, deletePost, getPolicyText,
     addChannelAccount, updateChannelAccount, deleteChannelAccount, channelUsage,
   } = useApp()
   const navigate = useNavigate()
@@ -62,16 +62,12 @@ export default function WorkLog() {
   }
 
   const mine = day.logs.find(l => l.staff_id === user?.id)
-  const slots = useMemo(
-    () => slotsForDay(config.breakWindows, config.staffSchedules, date),
-    [config.breakWindows, config.staffSchedules, date])
   const prog = useMemo(
     () => inquiryProgress(config.channelAccounts, day.inquiries, date, user?.id),
     [config.channelAccounts, day.inquiries, date, user?.id])
   const perf = useMemo(() => myPerformance(orders, user?.id, date), [orders, user?.id, date])
   const wk = weekRange(date)
   const video = weeklyVideo(day.posts, wk.from, wk.to)
-  const others = othersOnBreak(day.breaks, user?.id)
   const adds = mine?.wechat_adds ?? null
   const isManager = user?.role === 'admin' || user?.role === 'manager'
   const gap = tzGapHours()
@@ -100,93 +96,10 @@ export default function WorkLog() {
         </div>
       )}
 
-      {/* ── 出勤 ─────────────────────────────── */}
+      {/* 出勤只显示不操作 —— 打卡在工作台首页，那里一进来就看得到。
+          老板 10-13：「我的日报只要自动同步数据就好了」 */}
       <Card title="出勤">
-        <div className="flex items-center gap-3 flex-wrap">
-          {!mine?.clock_in ? (
-            <Btn icon={LogIn} disabled={busy} onClick={() => run(() => upsertWorkLog(date, { clock_in: new Date().toISOString() }))}>
-              上班打卡
-            </Btn>
-          ) : (
-            <span className="text-sm text-gray-600">
-              上班 <b className="font-mono">{hhmm(mine.clock_in)}</b>
-            </span>
-          )}
-          {mine?.clock_in && !mine?.clock_out && (
-            <Btn icon={LogOut} ghost disabled={busy || !prog.ok}
-              onClick={() => run(() => upsertWorkLog(date, { clock_out: new Date().toISOString() }))}>
-              {prog.ok ? '下班打卡' : `还差 ${prog.missing.length} 个平台没登记`}
-            </Btn>
-          )}
-          {mine?.clock_out && (
-            <span className="text-sm text-gray-600">下班 <b className="font-mono">{hhmm(mine.clock_out)}</b></span>
-          )}
-        </div>
-
-        {/* 三段休息 */}
-        <div className="mt-4 space-y-2">
-          {slots.map(w => {
-            const rec = myBreak(day.breaks, user?.id, w.slot_index)
-            const on = rec?.started_at && !rec?.ended_at
-            const mins = breakMinutes(rec)
-            const over = on && mins > (w.duration_min || 60)
-            const taken = day.breaks.filter(b => b.slot_index === w.slot_index && b.staff_id !== user?.id)
-            return (
-              <div key={w.slot_index} className={`rounded-xl px-3 py-2.5 ${over ? 'bg-red-50' : on ? 'bg-amber-50' : 'bg-gray-50'}`}>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <span className="font-semibold text-sm w-16 shrink-0">{w.slot_name}</span>
-                  <span className="text-xs text-gray-400 font-mono">
-                    {w.window_start?.slice(0, 5)}–{w.window_end?.slice(0, 5)} 北京 · 任选 {w.duration_min} 分钟
-                  </span>
-                  <span className="flex-1" />
-                  {rec?.ended_at ? (
-                    <span className={`text-xs ${rec.overtime ? 'text-red-600 font-semibold' : 'text-green-600'}`}>
-                      {hhmm(rec.started_at)}–{hhmm(rec.ended_at)} · {rec.minutes} 分钟
-                      {rec.overtime && ' 超时'}
-                    </span>
-                  ) : on ? (
-                    <>
-                      <span className={`text-xs font-mono ${over ? 'text-red-600 font-bold' : 'text-amber-700'}`}>
-                        休息中 {mins} 分钟{over && ' · 该回岗了'}
-                      </span>
-                      <Btn small disabled={busy} onClick={() => run(() => endBreak(date, w.slot_index, w.duration_min))}>
-                        回来了
-                      </Btn>
-                    </>
-                  ) : (
-                    <Btn small ghost icon={Coffee} disabled={busy || !mine?.clock_in}
-                      onClick={() => run(() => startBreak(date, w.slot_index))}>
-                      去休息
-                    </Btn>
-                  )}
-                </div>
-                {/* 哪些时段还空着 —— 比固定排班表灵活 */}
-                {!rec && (
-                  <p className="text-xs text-gray-400 mt-1.5">
-                    可选起点 {startOptions(w).join(' · ')}
-                    {taken.length > 0 && (
-                      <span className="text-amber-600 ml-2">
-                        · {taken.map(b => staff.find(s => s.id === b.staff_id)?.name || b.staff_id).join('、')}
-                        {taken.some(b => !b.ended_at) ? ' 正在休息' : ` 已休 ${hhmm(taken[0].started_at)}`}
-                      </span>
-                    )}
-                  </p>
-                )}
-              </div>
-            )
-          })}
-          {slots.length < 3 && (
-            <p className="text-xs text-amber-600">
-              今天只有你一个人在岗，不排下午休息（只有一个人看平台，休 3 小时没人接电话）
-            </p>
-          )}
-          {others.length > 0 && (
-            <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
-              ⚠️ {others.map(b => staff.find(s => s.id === b.staff_id)?.name || b.staff_id).join('、')}
-              正在休息。两人错开是为了始终有人看平台 —— 但特殊情况你还是可以去，只是要知道。
-            </p>
-          )}
-        </div>
+        <AttendanceCard compact />
       </Card>
 
       {/* ── 平台咨询登记 ──────────────────────── */}
@@ -561,14 +474,3 @@ function Stat({ label, value }) {
   )
 }
 
-function Btn({ children, icon: Icon, onClick, disabled, ghost, small }) {
-  return (
-    <button onClick={onClick} disabled={disabled}
-      className={`flex items-center gap-1.5 rounded-lg font-semibold disabled:opacity-40 ${
-        small ? 'px-3 py-1 text-xs' : 'px-4 py-2 text-sm'} ${
-        ghost ? 'border border-gray-200 text-gray-600 hover:bg-gray-50' : 'text-white'}`}
-      style={ghost ? {} : { background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
-      {Icon && <Icon size={small ? 12 : 14} />}{children}
-    </button>
-  )
-}
