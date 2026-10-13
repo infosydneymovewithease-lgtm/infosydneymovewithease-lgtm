@@ -13,11 +13,11 @@ import { sydneyToday } from '../../utils/date'
 import { currentSeason, tzGapHours } from '../../utils/shifts'
 import {
   requiredAccounts, inquiryProgress, myPerformance, weeklyVideo, weekRange,
-  OUTREACH_ACTIONS, outreachDone,
 } from '../../utils/worklog'
 import { Plus, Trash2, Check } from 'lucide-react'
 import AddChannelAccount from '../../components/AddChannelAccount'
 import AttendanceCard from '../../components/AttendanceCard'
+import { uploadImage } from '../../utils/upload'
 
 const hhmm = iso => iso
   ? new Date(iso).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
@@ -71,12 +71,14 @@ export default function WorkLog() {
   const video = weeklyVideo(day.posts, wk.from, wk.to)
   const adds = mine?.wechat_adds ?? null
   const isManager = user?.role === 'admin' || user?.role === 'manager'
-  const outDone = outreachDone(mine)
-  const outAdds = mine?.outreach_adds ?? 0
+  const quota = Number(policy.comment_quota) || 3
+  const commentCount = mine?.comment_count ?? 0
+  // 客服要达配额才能提交；经理没有日配额（to B 开发按天算没意义）
+  const commentOk = isManager || commentCount >= quota
   const gap = tzGapHours()
 
   const [truth, setTruth] = useState(false)
-  const canSubmit = !!mine?.clock_in && prog.ok && outDone && (!policy.truth_declaration || truth)
+  const canSubmit = !!mine?.clock_in && prog.ok && commentOk && (!policy.truth_declaration || truth)
   const submitted = !!mine?.submitted_at
 
   return (
@@ -229,9 +231,7 @@ export default function WorkLog() {
             onClick={() => setQuickFill(v => !v)} />
           <Arrow />
           <Big label="加微信" value={adds} unit="人" tag="手填" accent
-            sub={outAdds > 0 ? `其中 ${outAdds} 人来自主动开发`
-              : prog.total > 0 && adds != null ? `平台来的留下 ${Math.round(adds / prog.total * 100)}%`
-              : '微信今天新增好友'}
+            sub={prog.total > 0 && adds != null ? `平台来的留下 ${Math.round(adds / prog.total * 100)}%` : '微信今天新增好友'}
             onClick={() => document.getElementById('wechat-adds')?.focus()} />
           <Arrow />
           <Big label="下单" value={perf.booked} unit="单" tag="自动"
@@ -314,51 +314,42 @@ export default function WorkLog() {
       </Card>
 
       {/* ── 手填三项 ─────────────────────────── */}
-      {/* 老板 10-13：原来是个自由文本框，他担心「没要求没细节会变成没用的东西」——
-          说对了。改成必填 + 可量化，并接进漏斗：
-          能看出微信新增里多少是平台引流来的、多少是主动找来的。 */}
-      <Card title="今天的主动开发"
-        hint={outDone ? `带来 ${mine?.outreach_adds ?? 0} 个微信好友` : '⚠️ 必填 —— 至少选一项你今天做了什么'}>
-        <div className="flex flex-wrap gap-1.5 mb-2.5">
-          {OUTREACH_ACTIONS.map(x => {
-            const on = (mine?.outreach_actions || []).includes(x)
-            return (
-              <button key={x} disabled={busy}
-                onClick={() => {
-                  const cur = mine?.outreach_actions || []
-                  const next = on ? cur.filter(y => y !== x) : [...cur, x]
-                  run(() => upsertWorkLog(date, { outreach_actions: next }))
-                }}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors disabled:opacity-40 ${
-                  on ? 'border-red-400 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
-                {x}
-              </button>
-            )
-          })}
-        </div>
-        <textarea rows={2} defaultValue={mine?.outreach || ''}
-          placeholder="具体做了什么（例如：在 3 个租房群发了名片）"
-          onBlur={e => run(() => upsertWorkLog(date, { outreach: e.target.value }))}
-          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400 resize-none" />
-        <div className="flex items-center gap-3 mt-2.5">
-          <span className="text-sm text-gray-600 shrink-0">带来几个微信好友</span>
-          <input type="number" min="0" step="1" placeholder="0"
-            defaultValue={mine?.outreach_adds ?? ''}
-            onBlur={e => { if (e.target.value !== '') run(() => upsertWorkLog(date, { outreach_adds: Number(e.target.value) })) }}
-            className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm font-mono text-right outline-none focus:border-red-400 shrink-0" />
-          <span className="text-xs text-gray-400 flex-1 min-w-0">
-            这是上面「微信加了 {adds ?? 0} 人」里面的一部分，不是另外加的
-          </span>
-        </div>
-        {outAdds > (adds ?? 0) && (
-          <p className="text-xs text-red-600 mt-2">
-            ⚠️ 主动开发带来 {outAdds} 人，但今天微信总共才加了 {adds ?? 0} 人 —— 其中一个填错了
-          </p>
-        )}
-      </Card>
+      {/* 老板 10-13 把要求说具体了，而且两个角色是两种工作：
+            客服  小红书搜关键词留评论，每天至少 3 条，截图为证 —— 日配额、可核验
+            经理  to B 企业开发，联系了哪家、什么形式、到哪一步 —— 长线，按天算没意义
+          所以不是一个字段，是分开两块。 */}
+      {isManager ? (
+        <Card title="企业开发（to B）" hint="长线工作，不按天算数量。联系了哪家、什么形式、到哪一步">
+          <textarea rows={3} defaultValue={mine?.b2b_outreach || ''}
+            placeholder={'例如：\n· 给 2 家中介发了合作方案，Hurstville 那家约了周四见面\n· staging 的 ruby 介绍了一家同行，加了微信还没聊'}
+            onBlur={e => run(() => upsertWorkLog(date, { b2b_outreach: e.target.value }))}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400 resize-none leading-relaxed" />
+        </Card>
+      ) : (
+        <Card title="小红书评论引流"
+          hint={commentOk ? `今天 ${commentCount} 条，达标（目标 ${quota} 条）`
+            : `⚠️ 今天 ${commentCount} 条，还差 ${quota - commentCount} 条才能提交日报`}>
+          {policy.comment_hint && (
+            <p className="text-xs text-gray-500 bg-gray-50 rounded-xl px-3 py-2 mb-2.5 whitespace-pre-line leading-relaxed">
+              {policy.comment_hint}
+            </p>
+          )}
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-sm text-gray-600 shrink-0">今天留了几条评论</span>
+            <input type="number" min="0" step="1" placeholder="0"
+              defaultValue={mine?.comment_count ?? ''}
+              onBlur={e => { if (e.target.value !== '') run(() => upsertWorkLog(date, { comment_count: Number(e.target.value) })) }}
+              className={`w-20 border rounded-lg px-2 py-1 text-sm font-mono text-right outline-none focus:border-red-400 shrink-0 ${
+                commentOk ? 'border-green-200 bg-green-50' : 'border-amber-300 bg-amber-50'}`} />
+            <input defaultValue={mine?.comment_keywords || ''} placeholder="搜的关键词，如 搬家、长途、留学生搬家"
+              onBlur={e => run(() => upsertWorkLog(date, { comment_keywords: e.target.value }))}
+              className="flex-1 min-w-40 border border-gray-200 rounded-lg px-2 py-1 text-sm outline-none focus:border-red-400" />
+          </div>
+          <ShotUploader shots={mine?.comment_shots || []} busy={busy}
+            onChange={next => run(() => upsertWorkLog(date, { comment_shots: next }))} />
+        </Card>
+      )}
 
-      {/* 老板 10-13：「这个是今天的总问题，期待改进相关问题，
-          也告诉她们这个是除了我他人不可见的，公司会整理在每周的会议上提出」 */}
       <Card title="今天的问题 · 想改进的地方">
         <div className="bg-blue-50 rounded-xl px-3 py-2.5 mb-2.5">
           <p className="text-sm text-blue-900 font-medium">🔒 这一栏只有老板能看到</p>
@@ -398,7 +389,7 @@ export default function WorkLog() {
               style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
               {!mine?.clock_in ? '先打上班卡'
                 : !prog.ok ? `提交今日记录 · 还差 ${prog.missing.length} 个平台`
-                : !outDone ? '还没填今天的主动开发'
+                : !commentOk ? `小红书评论还差 ${quota - commentCount} 条`
                 : !truth && policy.truth_declaration ? '请先勾选上面的确认'
                 : '提交今日记录'}
             </button>
@@ -410,6 +401,42 @@ export default function WorkLog() {
           </>
         )}
       </div>
+    </div>
+  )
+}
+
+function ShotUploader({ shots, onChange, busy }) {
+  const [up, setUp] = useState(false)
+  async function pick(e) {
+    const files = [...(e.target.files || [])]
+    if (!files.length) return
+    setUp(true)
+    try {
+      const added = []
+      for (const f of files) added.push(await uploadImage(f, 'deposit-screenshots'))
+      onChange([...(shots || []), ...added])
+    } finally { setUp(false); e.target.value = '' }
+  }
+  return (
+    <div className="mt-2.5">
+      <div className="flex items-center gap-2 flex-wrap">
+        <label className={`px-3 py-1.5 rounded-lg border border-dashed text-sm cursor-pointer shrink-0 ${
+          shots?.length ? 'border-gray-200 text-gray-500' : 'border-amber-300 text-amber-700 bg-amber-50'}`}>
+          {up ? '上传中…' : shots?.length ? '+ 再加截图' : '+ 评论截图'}
+          <input type="file" accept="image/*" multiple className="hidden" onChange={pick} disabled={busy || up} />
+        </label>
+        {(shots || []).map((s, i) => (
+          <span key={i} className="flex items-center gap-1 bg-gray-50 rounded-lg px-2 py-1 text-xs shrink-0">
+            <a href={s.url || s.data} target="_blank" rel="noreferrer"
+              className="text-gray-600 hover:text-red-600 max-w-24 truncate">{s.name || `截图 ${i + 1}`}</a>
+            <button onClick={() => onChange(shots.filter((_, x) => x !== i))} disabled={busy}
+              className="text-gray-300 hover:text-red-600">✕</button>
+          </span>
+        ))}
+      </div>
+      <p className="text-xs text-gray-400 mt-1.5">
+        数字能编，截图不好编 —— Annie 和老板会点开看。一次可以选多张
+      </p>
     </div>
   )
 }

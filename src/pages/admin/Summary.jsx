@@ -157,8 +157,7 @@ export default function Summary() {
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-2">
                 <Mini label="平台咨询" value={`${r.inquiries} 人`} sub="应接待" />
                 <Mini label="加微信" value={`${r.wechatAdds} 人`}
-                  sub={r.outreachAdds ? `其中主动开发 ${r.outreachAdds}` 
-                    : r.inquiries ? `留下 ${Math.round(r.wechatAdds / r.inquiries * 100)}%` : '实际接待'} />
+                  sub={r.inquiries ? `留下 ${Math.round(r.wechatAdds / r.inquiries * 100)}%` : '实际接待'} />
                 <Mini label="接单" value={`${r.created} 单`}
                   sub={r.wechatAdds ? `成交 ${Math.round(r.created / r.wechatAdds * 100)}%` : null} />
                 <Mini label="接单金额" value={money(r.amount)} />
@@ -166,10 +165,11 @@ export default function Summary() {
               </div>
 
               <p className="text-xs text-gray-400 mb-1">运营与管理</p>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <Mini label="发布" value={`${r.posts} 条`} sub={r.videos ? `含视频 ${r.videos}` : null} />
-                <Mini label="主动开发" value={`${r.outreachDays}/${r.days} 天`}
-                  sub={r.outreachAdds ? `带来 ${r.outreachAdds} 人` : null} />
+                <Mini label="小红书评论" value={`${r.comments} 条`}
+                  sub={`${r.commentDays}/${r.days} 天 · 截图 ${r.shotDays} 天`} />
+                <Mini label="企业开发" value={`${r.b2bDays} 天`} dim={!r.b2bDays} />
                 <Mini label="日结确认" value={`${r.dayConfirms} 天`} dim={!mgr} />
                 <Mini label="核对订单" value={`${r.ordersChecked} 单`} dim={!mgr} />
                 <Mini label="补录" value={`${r.fixesMade} 笔`} dim={!mgr} />

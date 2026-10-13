@@ -85,6 +85,15 @@ export default function TeamToday() {
     //    老板在周月汇总里统一看，每周例会上提出讨论。
   }
   if (slots.length && videoThisWeek === 0) todo.push({ sev: 'mid', text: '本周还没出视频 —— 目标每周至少 1 条' })
+  // 小红书评论配额 —— 客服每天至少 3 条，没达标 Annie 要知道
+  for (const id of onDuty) {
+    const l = day.logs.find(x => x.staff_id === id)
+    const who = staff.find(s => s.id === id)
+    if (!l?.clock_in || who?.role === 'manager' || who?.role === 'admin') continue
+    const n = l.comment_count ?? 0
+    if (n < 3) todo.push({ sev: 'mid', text: `${who?.name || id} 小红书评论 ${n}/3 条，还没达标` })
+    else if (!l.comment_shots?.length) todo.push({ sev: 'low', text: `${who?.name || id} 填了 ${n} 条评论但没传截图` })
+  }
 
   // 咨询登记的可信度信号。⚠️ 只在这里显示，客服自己那页不提示 ——
   // 提示了等于教她怎么绕过。而且这些是「看起来不像真实数据」，不是证据。

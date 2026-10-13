@@ -85,9 +85,11 @@ export function staffStats(opts) {
       inquiries: myInq,
       // 实际接待 —— 真的加上微信的人。和平台咨询的差额就是流失
       wechatAdds: myLogs.reduce((s, l) => s + (l.wechat_adds ?? 0), 0),
-      // 主动开发 —— 和平台引流并列的另一条获客路径
-      outreachDays: myLogs.filter(l => l.outreach_actions?.length).length,
-      outreachAdds: myLogs.reduce((s, l) => s + (l.outreach_adds ?? 0), 0),
+      // 主动开发。客服是小红书评论配额，经理是 to B 开发 —— 两种口径分开记
+      comments: myLogs.reduce((s, l) => s + (l.comment_count ?? 0), 0),
+      commentDays: myLogs.filter(l => (l.comment_count ?? 0) > 0).length,
+      shotDays: myLogs.filter(l => l.comment_shots?.length).length,
+      b2bDays: myLogs.filter(l => l.b2b_outreach?.trim()).length,
       rate: myInq ? myOrders.length / myInq : null,
       posts: (posts || []).filter(p => p.posted_by === id && inRange(p.post_date, from, to)).length,
       submitted: myLogs.filter(l => l.submitted_at).length,
