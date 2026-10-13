@@ -79,7 +79,10 @@ export default function TeamToday() {
     const name = staff.find(s => s.id === id)?.name || id
     if (!l?.clock_in) todo.push({ sev: 'mid', text: `${name} 还没打上班卡` })
     else if (!l?.submitted_at) todo.push({ sev: 'mid', text: `${name} 的日报还没提交` })
-    if (l?.issues) todo.push({ sev: 'high', text: `${name} 提了问题：${l.issues}` })
+    // ⚠️ 不在这里显示 issues。老板 10-13：「这个是除了我他人不可见的」——
+    //    客服写的问题只有老板看得到，经理也不行。
+    //    这是为了让客服敢写真话：如果经理看得到，涉及经理的问题就永远不会被提。
+    //    老板在周月汇总里统一看，每周例会上提出讨论。
   }
   if (slots.length && videoThisWeek === 0) todo.push({ sev: 'mid', text: '本周还没出视频 —— 目标每周至少 1 条' })
 

@@ -362,11 +362,21 @@ export default function WorkLog() {
           className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400 resize-none" />
       </Card>
 
-      <Card title="问题 / 明天注意" hint="交给明天的人">
-        <textarea rows={2} defaultValue={mine?.issues || ''}
-          placeholder="例如：盼达号有个客人问长途报价，我不确定，明天问一下老板"
+      {/* 老板 10-13：「这个是今天的总问题，期待改进相关问题，
+          也告诉她们这个是除了我他人不可见的，公司会整理在每周的会议上提出」 */}
+      <Card title="今天的问题 · 想改进的地方">
+        <div className="bg-blue-50 rounded-xl px-3 py-2.5 mb-2.5">
+          <p className="text-sm text-blue-900 font-medium">🔒 这一栏只有老板能看到</p>
+          <p className="text-xs text-blue-700 mt-1 leading-relaxed">
+            客服经理和其他同事都看不到你写的内容。<br />
+            公司会把大家提的问题整理出来，<b>在每周例会上提出讨论</b>。
+            有什么不顺手的、觉得该改的，直接写。
+          </p>
+        </div>
+        <textarea rows={3} defaultValue={mine?.issues || ''}
+          placeholder={'今天遇到的问题，或者你觉得该改进的地方。例如：\n· 盼达号有客人问长途报价，我不确定该怎么回\n· 派单后师傅没收到通知，我又打电话确认了一遍\n· 希望能批量改订单时间，现在一单一单改太慢'}
           onBlur={e => run(() => upsertWorkLog(date, { issues: e.target.value }))}
-          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400 resize-none" />
+          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400 resize-none leading-relaxed" />
       </Card>
 
       {/* ── 提交 ─────────────────────────────── */}

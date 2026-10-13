@@ -59,6 +59,10 @@ export default function Summary() {
     [data, orders, config.channelAccounts, staffIds, range, staffRates])
 
   const visibleRows = isBoss ? rows : rows.filter(r => r.id === user?.id)
+  // 客服提的问题 —— 只有 admin 能看，经理也不行
+  const issueList = useMemo(() => (data.logs || [])
+    .filter(l => l.issues && l.issues.trim())
+    .sort((a, b) => String(b.work_date).localeCompare(String(a.work_date))), [data.logs])
   const maxRev = Math.max(...ins.trend.map(t => t.revenue), 1)
 
   async function save() {
@@ -233,7 +237,28 @@ export default function Summary() {
         </div>
       </Card>
 
-      {/* ⑥ 下阶段调整 */}
+      {/* ⑥ 大家提的问题 —— 只有老板能看 */}
+      {user?.role === 'admin' && (
+        <Card title="大家提的问题 · 想改进的地方"
+          hint="客服在日报里写的，只有你能看到（客服经理也看不到）。每周例会上提出讨论">
+          {issueList.length === 0 ? (
+            <p className="text-sm text-gray-400">这期间没人提问题</p>
+          ) : (
+            <div className="space-y-2.5">
+              {issueList.map((x, i) => (
+                <div key={i} className="border-l-2 border-blue-200 pl-3">
+                  <p className="text-xs text-gray-400">
+                    {staff.find(s => s.id === x.staff_id)?.name || x.staff_id} · {x.work_date}
+                  </p>
+                  <p className="text-sm text-gray-800 whitespace-pre-line leading-relaxed mt-0.5">{x.issues}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* ⑦ 下阶段调整 */}
       <Card title="下阶段调整" hint="整份报告唯一需要人工写的地方">
         <textarea rows={4} value={note} onChange={e => { setNote(e.target.value); setSaved(false) }}
           placeholder={'例如：\n1. 复购率 13% → 年底目标 20%，开始做老客回访\n2. 视频号产出不达标，Annie 专项负责'}
