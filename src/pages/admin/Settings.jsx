@@ -48,12 +48,17 @@ export default function Settings() {
     setEditingStaff({ id: s.id, name: s.name, username: s.username, password: '', role: s.role })
   }
 
-  function handleSaveEdit() {
+  // 10-14：原来是 fire-and-forget，写失败了也照样关弹窗、照样显示新名字。
+  // 现在等结果，失败就把错误显示在弹窗里，不关。
+  const [staffErr, setStaffErr] = useState('')
+
+  async function handleSaveEdit() {
     if (!editingStaff) return
     const updates = { name: editingStaff.name, role: editingStaff.role, username: editingStaff.username }
     if (editingStaff.password) updates.password = editingStaff.password
-    updateStaffMember(editingStaff.id, updates)
-    setEditingStaff(null)
+    setStaffErr('')
+    try { await updateStaffMember(editingStaff.id, updates); setEditingStaff(null) }
+    catch (e) { setStaffErr(e.message) }
   }
 
   function handleSaveCompany() {
@@ -130,7 +135,7 @@ export default function Settings() {
                             className="p-1.5 rounded-lg text-gray-300 hover:text-gray-600 hover:bg-gray-100 transition-colors">
                             <Pencil size={15} />
                           </button>
-                          <button onClick={() => updateStaffMember(s.id, { active: !active })}
+                          <button onClick={() => updateStaffMember(s.id, { active: !active }).catch(e => setStaffErr(e.message))}
                             className="text-gray-300 hover:text-gray-500 transition-colors">
                             {active ? <ToggleRight size={24} className="text-green-500" /> : <ToggleLeft size={24} />}
                           </button>
@@ -185,9 +190,19 @@ export default function Settings() {
                   </Field>
                   <div className="pt-1 text-xs text-gray-400 bg-gray-50 rounded-xl px-3 py-2 space-y-0.5">
                     <p><span className="font-semibold text-red-700">管理员</span> — 可看全部菜单，含工资/客户主档/系统设置</p>
+                    <p><span className="font-semibold text-purple-600">客服经理</span> — 客服全部 + 团队今日/每日对账/客户主档/工资结算</p>
                     <p><span className="font-semibold text-blue-600">客服</span> — 订单管理、派单、账单，隐藏敏感功能</p>
                     <p><span className="font-semibold text-green-600">师傅</span> — 仅工人端口</p>
                   </div>
+                  {staffErr && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 mt-2">
+                      <p className="text-sm text-red-700 font-semibold leading-relaxed">{staffErr}</p>
+                      <p className="text-xs text-red-600 mt-1">
+                        改密码/改角色要在 Supabase SQL Editor 里跑：
+                        <code className="bg-white px-1 rounded mx-1">UPDATE staff SET password='新密码' WHERE username='xxx';</code>
+                      </p>
+                    </div>
+                  )}
                   <button onClick={handleSaveEdit}
                     className="w-full py-3 rounded-xl text-white font-semibold mt-2"
                     style={{ background: 'linear-gradient(135deg, #6b1414, #c0392b)' }}>

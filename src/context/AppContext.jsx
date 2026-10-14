@@ -938,12 +938,32 @@ export function AppProvider({ children }) {
   function addStaffMember(data) {
     const newStaff = { ...data, id: data.username, active: true, stars: 1, isDriver: !!(data.canDrive?.length) }
     setStaff(prev => [...prev, newStaff])
-    bg(supabase.rpc('add_staff', { p_data: newStaff }), '添加员工')
+    // 同上：add_staff 也被 REVOKE 了，而且 PostgREST 里连签名都找不到了。
+    // 仍然乐观更新是为了不改调用方，但失败必须让人看见。
+    supabase.rpc('add_staff', { p_data: newStaff }).then(({ error }) => {
+      if (error) {
+        setStaff(prev => prev.filter(s => s.id !== newStaff.id))
+        notifyBgError('添加员工（写权限 7/13 已收回，需在 Supabase 跑 SQL）', error)
+      }
+    })
   }
 
-  function updateStaffMember(id, updates) {
+  // ⚠️ 2026-10-14：add_staff / update_staff 在 7/13 安全加固里被 REVOKE 了
+  //    （supabase/migrations/2026_07_13_revoke_anon_staff_write.sql）。
+  //    原来是乐观更新 + bg() 后台写：界面上名字已经改了、密码框也清空了，
+  //    看着像成功，实际 permission denied，数据库一个字没动。
+  //    老板 10-14 就是栽在这儿 —— 以为能从后台重设晨曦的密码。
+  //    改成等结果：失败就把本地状态回滚，并明确说要去 Supabase 跑 SQL。
+  async function updateStaffMember(id, updates) {
+    const before = staff.find(s => s.id === id)
     setStaff(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s))
-    bg(supabase.rpc('update_staff', { p_id: id, p_updates: updates }), '更新员工信息')
+    const { error } = await supabase.rpc('update_staff', { p_id: id, p_updates: updates })
+    if (error) {
+      if (before) setStaff(prev => prev.map(s => s.id === id ? before : s))
+      throw new Error(error.code === '42501'
+        ? '改不了 —— 员工信息的写权限 7/13 已收回，只能在 Supabase 里跑 SQL 改'
+        : (error.message || '更新员工信息失败'))
+    }
   }
 
   function updateAppSettings(updates) {
