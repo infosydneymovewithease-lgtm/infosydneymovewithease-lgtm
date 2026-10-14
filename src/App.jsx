@@ -26,6 +26,8 @@ import Settings from './pages/admin/Settings'
 import Reconcile from './pages/admin/Reconcile'
 import WorkLog from './pages/admin/WorkLog'
 import TeamToday from './pages/admin/TeamToday'
+import ContentSchedule from './pages/admin/ContentSchedule'
+import ContentToday from './pages/admin/ContentToday'
 import Summary from './pages/admin/Summary'
 import { FEATURES } from './config/features'
 import StorageList from './pages/admin/StorageList'
@@ -155,6 +157,8 @@ function AppRoutes() {
         {FEATURES.reconcile && <Route path="reconcile" element={<Reconcile />} />}
         {FEATURES.worklog && <Route path="worklog" element={<WorkLog />} />}
         {FEATURES.worklog && <Route path="team-today" element={<TeamToday />} />}
+        {FEATURES.content && <Route path="content" element={<ContentSchedule />} />}
+        {FEATURES.content && <Route path="content-today" element={<ContentToday />} />}
         {FEATURES.summary && <Route path="summary" element={<Summary />} />}
         <Route path="settings" element={<Settings />} />
         <Route path="storage" element={<StorageList />} />

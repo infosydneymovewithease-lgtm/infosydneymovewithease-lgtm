@@ -9,4 +9,5 @@ export const FEATURES = {
   reconcile: true,   // 每日对账（/admin/reconcile）
   worklog:   true,   // 客服工作台（/admin/worklog · /admin/team-today）
   summary:   true,   // 周月汇总（/admin/summary）
+  content:   true,   // 内容排期（/admin/content · /admin/content-today）
 }

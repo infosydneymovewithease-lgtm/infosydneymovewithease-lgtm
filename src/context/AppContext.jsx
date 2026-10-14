@@ -658,6 +658,58 @@ export function AppProvider({ children }) {
     if (error) throw new Error(error.message || '退回失败，请重试')
   }
 
+  // ── 内容排期（2026-10-14 第 7 步）────────────────────────
+  // 老板要的：整月计划好每个号每天发几条，经理按格子生产，客服照着发。
+  // 格子自动生成，一条内容可挂多个格子（朋友圈 7 条全是复用）。
+
+  async function getContentRange(from, to) {
+    const { data, error } = await supabase.rpc('get_content_range', { p_from: from, p_to: to })
+    if (error) { console.warn('[content] 读取失败：', error.message); return { slots: [], items: [], rules: [] } }
+    return { slots: data?.slots || [], items: data?.items || [], rules: data?.rules || [] }
+  }
+
+  async function generateWeekSlots(monday) {
+    const { data, error } = await supabase.rpc('generate_week_slots', { p_monday: monday })
+    if (error) throw new Error(error.message || '生成本周格子失败')
+    return data
+  }
+
+  async function autolinkWeek(monday) {
+    const { data, error } = await supabase.rpc('autolink_week', { p_monday: monday })
+    if (error) throw new Error(error.message || '自动关联失败')
+    return data
+  }
+
+  async function saveContentItem(id, patch) {
+    if (id) {
+      const { error } = await supabase.from('content_item')
+        .update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id)
+      if (error) throw new Error(error.message || '保存失败')
+      return id
+    }
+    const { data, error } = await supabase.from('content_item')
+      .insert({ ...patch, created_by: user?.id }).select('id').single()
+    if (error) throw new Error(error.message || '新建失败')
+    return data.id
+  }
+
+  async function updateSlot(id, patch) {
+    const { error } = await supabase.from('content_slot').update(patch).eq('id', id)
+    if (error) throw new Error(error.message || '保存失败')
+  }
+
+  // 一个动作写两处（content_slot + content_post），在数据库函数里保证 ——
+  // 发完再去日报手填一遍，忙的时候一定漏一边，然后数字对不上，然后没人信这张表
+  async function markSlotPosted(slotId) {
+    const { error } = await supabase.rpc('mark_slot_posted', { p_slot_id: slotId, p_by: user?.id || null })
+    if (error) throw new Error(error.message || '标记失败')
+  }
+
+  async function skipSlot(slotId, reason) {
+    const { error } = await supabase.rpc('skip_slot', { p_slot_id: slotId, p_reason: reason })
+    if (error) throw new Error(error.message || '跳过失败')
+  }
+
   // 我有哪几天的日报被退回了还没改 —— 只开这几天给客服编辑，
   // 不给自由翻页（那等于开了补填口子）
   async function pendingReturns(since) {
@@ -1045,6 +1097,8 @@ export function AppProvider({ children }) {
       getPeriodData, getSummaryNote, saveSummaryNote,
       getPolicyText, confirmTeamDay, getTeamConfirm, addChannelAccount, deleteChannelAccount, channelUsage,
       returnWorkLog, listWorkLogReturns, pendingReturns, openDays,
+      getContentRange, generateWeekSlots, autolinkWeek, saveContentItem,
+      updateSlot, markSlotPosted, skipSlot,
       orders, confirmOrder, completeOrder, startWork, getMyOrders, finishWorkWithCorrection,
       createOrder, createOrderWithSlotCheck,
       updateOrder, updateOrderTimer, dispatchOrder, updateOrderStatus,
