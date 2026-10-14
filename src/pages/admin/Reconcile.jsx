@@ -8,6 +8,7 @@
 // 否则她要为每单跳进订单详情页改一遍 —— 一半订单有问题，一天得跳几十次。
 
 import { useState, useEffect, useMemo, Fragment } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { sydneyToday, addDays } from '../../utils/date'
 import {
@@ -41,7 +42,11 @@ const toISO = v => {
 export default function Reconcile() {
   const { orders, staffRates, staff, reconcileOrder, undoReconcile, closeDay, reopenDay,
           getReconcile, markReconciled, unmarkReconciled, markAllReconciled, b2bCustomers } = useApp()
-  const [date, setDate] = useState(() => sydneyToday())
+  // 从「团队今日」的「去对账」跳过来时带着 ?date= ——
+  // 老板定的流程是第二天早上核前一天，落地页必须直接是那一天，
+  // 不能让她跳过来还要自己翻日期。
+  const [params] = useSearchParams()
+  const [date, setDate] = useState(() => params.get('date') || sydneyToday())
   const [close, setClose] = useState(null)
   const [logs, setLogs] = useState([])
   const [checked, setChecked] = useState([])

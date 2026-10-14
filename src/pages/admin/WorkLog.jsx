@@ -9,7 +9,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
-import { sydneyToday } from '../../utils/date'
+import { sydneyToday, addDays } from '../../utils/date'
 import { currentSeason, tzGapHours } from '../../utils/shifts'
 import {
   requiredAccounts, inquiryProgress, myPerformance, weeklyVideo, weekRange,
@@ -29,10 +29,16 @@ export default function WorkLog() {
     user, orders, config, staff,
     getWorkday, upsertWorkLog, saveInquiry, addPost, deletePost, getPolicyText,
     addChannelAccount, updateChannelAccount, deleteChannelAccount, channelUsage,
-    listWorkLogReturns,
+    listWorkLogReturns, pendingReturns,
   } = useApp()
   const navigate = useNavigate()
-  const date = sydneyToday()
+  // ⚠️ 默认今天。只有【被退回的日子】可以切过去改 ——
+  //    不给自由日期选择器：那等于开了补填口子，她可以周五把
+  //    周一到周四空着的日报全补上，「当下填写」就全废了。
+  const today = sydneyToday()
+  const [date, setDate] = useState(today)
+  const [pending, setPending] = useState([])   // 被退回还没改完的日子
+  const editingPast = date !== today
   const [day, setDay] = useState({ logs: [], breaks: [], inquiries: [], posts: [] })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -53,6 +59,7 @@ export default function WorkLog() {
   useEffect(() => { getPolicyText().then(setPolicy) /* eslint-disable-next-line */ }, [])
   // 被经理退回过就要看到原因，否则她不知道该改哪里
   useEffect(() => { listWorkLogReturns(date, date).then(setReturns) /* eslint-disable-next-line */ }, [date])
+  useEffect(() => { pendingReturns(addDays(today, -14)).then(setPending) /* eslint-disable-next-line */ }, [today, date])
   // 休息中每分钟刷新一次计时
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 30000)
@@ -118,6 +125,42 @@ export default function WorkLog() {
       {/* 被退回了 —— 放在最上面，一进来就看到。
           老板 10-13：经理核对发现问题要退回重填，客服得知道哪里不对。
           退回时 submitted_at 被清空，所以「有退回记录 + 当前未提交」= 要改。 */}
+      {/* 别的日子被退回了还没改 —— 一进来就看见，点进去改 */}
+      {pending.filter(r => r.work_date !== date).length > 0 && (
+        <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-4">
+          <p className="font-bold text-red-900 text-sm mb-2">
+            ↩ 有 {pending.filter(r => r.work_date !== date).length} 天的日报被退回了，还没改
+          </p>
+          {pending.filter(r => r.work_date !== date).map(r => (
+            <div key={r.id} className="flex items-start gap-3 bg-white/70 rounded-xl px-3 py-2 mb-1.5 last:mb-0">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-red-900">{r.work_date}</p>
+                <p className="text-sm text-red-800 leading-relaxed">{r.reason}</p>
+              </div>
+              <button onClick={() => setDate(r.work_date)}
+                className="shrink-0 text-xs text-white font-semibold px-3 py-1.5 rounded-lg"
+                style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
+                去修改
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 正在改历史日 —— 必须一眼看出不是在填今天，否则会填错日子 */}
+      {editingPast && (
+        <div className="bg-amber-100 border-2 border-amber-400 rounded-2xl px-4 py-3 flex items-center gap-3 flex-wrap">
+          <span className="text-sm font-bold text-amber-900">
+            正在修改 {date} 的日报（不是今天）
+          </span>
+          <span className="flex-1" />
+          <button onClick={() => setDate(today)}
+            className="text-xs font-semibold text-amber-900 border border-amber-500 rounded-lg px-3 py-1.5 hover:bg-amber-200">
+            回到今天
+          </button>
+        </div>
+      )}
+
       {!submitted && myReturns.length > 0 && (
         <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4">
           <p className="font-bold text-amber-900 text-sm mb-1.5">

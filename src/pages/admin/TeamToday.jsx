@@ -7,6 +7,7 @@
 //   谁交了日报 · 今天的咨询→成单漏斗 · 本周视频出了没 · 哪些事要她处理
 
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { sydneyToday, addDays } from '../../utils/date'
 import { slotsForDay, breakMinutes, requiredAccounts, weekRange, trustSignals, bookedOn, inquiryByStaff } from '../../utils/worklog'
@@ -21,7 +22,8 @@ const WEEK = ['一', '二', '三', '四', '五', '六', '日']
 export default function TeamToday() {
   const { user, staff, orders, config, getWorkday, getInquiryWeek,
           getPolicyText, confirmTeamDay, getTeamConfirm,
-          returnWorkLog, listWorkLogReturns } = useApp()
+          returnWorkLog, listWorkLogReturns, openDays } = useApp()
+  const navigate = useNavigate()
   const [date, setDate] = useState(() => sydneyToday())
   const [day, setDay] = useState({ logs: [], breaks: [], inquiries: [], posts: [] })
   const [week, setWeek] = useState([])
@@ -35,6 +37,7 @@ export default function TeamToday() {
   const [retOpen, setRetOpen] = useState(null) // 正在写退回原因的 staff_id
   const [retText, setRetText] = useState('')
   const [shotsOf, setShotsOf] = useState(null) // 正在看谁的截图
+  const [open, setOpen] = useState([])         // 前几天还没闭环的
 
   const wk = useMemo(() => weekRange(date), [date])
   useEffect(() => {
@@ -42,19 +45,23 @@ export default function TeamToday() {
     ;(async () => {
       const [d, w, p] = await Promise.all([
         getWorkday(date), getInquiryWeek(wk.from, wk.to), getWorkday(addDays(date, -1))])
-      const [pol, cf, rt] = await Promise.all([
-        getPolicyText(), getTeamConfirm(date), listWorkLogReturns(date, date)])
+      const [pol, cf, rt, op] = await Promise.all([
+        getPolicyText(), getTeamConfirm(date), listWorkLogReturns(date, date),
+        // 老板定的流程是第二天早上核前一天 —— 她北京 08:00 打开看到的是空白的今天，
+        // 昨天那两件没做的事一个都看不见。往前查 7 天。
+        openDays(addDays(date, -7), addDays(date, -1))])
       if (alive) { setDay(d); setWeek(w); setPrevDay(p.inquiries || []); setPolicy(pol)
-                   setConfirm(cf); setChecked(false); setReturns(rt) }
+                   setConfirm(cf); setChecked(false); setReturns(rt); setOpen(op) }
     })()
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, wk.from, wk.to])
 
   async function reload() {
-    const [d, cf, rt] = await Promise.all([
-      getWorkday(date), getTeamConfirm(date), listWorkLogReturns(date, date)])
-    setDay(d); setConfirm(cf); setReturns(rt); setChecked(false)
+    const [d, cf, rt, op] = await Promise.all([
+      getWorkday(date), getTeamConfirm(date), listWorkLogReturns(date, date),
+      openDays(addDays(date, -7), addDays(date, -1))])
+    setDay(d); setConfirm(cf); setReturns(rt); setOpen(op); setChecked(false)
   }
 
   // 今天该上班的人
@@ -136,6 +143,45 @@ export default function TeamToday() {
           <button onClick={() => setDate(addDays(date, 1))} className="p-2 text-gray-500 hover:bg-gray-50 rounded-lg"><ChevronRight size={18} /></button>
         </div>
       </div>
+
+      {/* ── 前几天还没闭环的 ─────────────────── */}
+      {/* 老板定的流程：第二天早上核前一天的账和客服日报
+            「如果小洁 8:00 填写，经理 8:15 看，而后草草了事；
+              师傅当天没发，第二天上午经理可以通过电话要到数据」
+          所以她上班第一眼该看到的是【昨天】没做完的，不是今天的空白。 */}
+      {open.length > 0 && (
+        <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-4">
+          <h2 className="font-bold text-sm mb-2 text-red-900">前几天还没处理完</h2>
+          <div className="space-y-1.5">
+            {open.map(o => (
+              <div key={o.work_date} className="flex items-center gap-3 flex-wrap bg-white/70 rounded-xl px-3 py-2">
+                <span className="font-semibold text-sm text-red-900 shrink-0">
+                  {o.work_date}{o.work_date === addDays(date, -1) ? '（昨天）' : ''}
+                </span>
+                <span className="text-xs text-gray-600">
+                  {!o.team_confirmed && <span className="text-red-700 font-semibold mr-2">日报未审核</span>}
+                  {!o.day_closed && <span className="text-red-700 font-semibold mr-2">账未日结</span>}
+                  <span className="text-gray-400">{o.submitted_cnt}/{o.worked_cnt} 人交了日报</span>
+                </span>
+                <span className="flex-1" />
+                {!o.team_confirmed && (
+                  <button onClick={() => setDate(o.work_date)}
+                    className="text-xs text-white font-semibold px-3 py-1.5 rounded-lg shrink-0"
+                    style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
+                    去审核
+                  </button>
+                )}
+                {!o.day_closed && (
+                  <button onClick={() => navigate(`/admin/reconcile?date=${o.work_date}`)}
+                    className="text-xs font-semibold text-red-700 border border-red-300 rounded-lg px-3 py-1.5 shrink-0 hover:bg-red-100">
+                    去对账
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── 要处理的 ─────────────────────────── */}
       {todo.length > 0 && (

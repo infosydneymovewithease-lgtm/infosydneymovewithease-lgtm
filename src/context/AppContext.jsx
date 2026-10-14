@@ -658,6 +658,22 @@ export function AppProvider({ children }) {
     if (error) throw new Error(error.message || '退回失败，请重试')
   }
 
+  // 我有哪几天的日报被退回了还没改 —— 只开这几天给客服编辑，
+  // 不给自由翻页（那等于开了补填口子）
+  async function pendingReturns(since) {
+    const { data, error } = await supabase.rpc('pending_returns', {
+      p_staff_id: user?.id || null, p_since: since })
+    if (error) { console.warn('[worklog] 待处理退回读取失败：', error.message); return [] }
+    return data || []
+  }
+
+  // 哪几天还没经理确认 / 还没日结 —— 经理早上一进来就该看见
+  async function openDays(from, to) {
+    const { data, error } = await supabase.rpc('open_days', { p_from: from, p_to: to })
+    if (error) { console.warn('[worklog] 未闭环日期读取失败：', error.message); return [] }
+    return data || []
+  }
+
   async function listWorkLogReturns(from, to) {
     const { data, error } = await supabase.rpc('list_work_log_returns', { p_from: from, p_to: to })
     if (error) { console.warn('[worklog] 退回记录读取失败：', error.message); return [] }
@@ -1008,7 +1024,7 @@ export function AppProvider({ children }) {
       getWorkday, upsertWorkLog, startBreak, endBreak, saveInquiry, addPost, deletePost, getInquiryWeek,
       getPeriodData, getSummaryNote, saveSummaryNote,
       getPolicyText, confirmTeamDay, getTeamConfirm, addChannelAccount, deleteChannelAccount, channelUsage,
-      returnWorkLog, listWorkLogReturns,
+      returnWorkLog, listWorkLogReturns, pendingReturns, openDays,
       orders, confirmOrder, completeOrder, startWork, getMyOrders, finishWorkWithCorrection,
       createOrder, createOrderWithSlotCheck,
       updateOrder, updateOrderTimer, dispatchOrder, updateOrderStatus,
