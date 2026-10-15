@@ -853,7 +853,14 @@ export function AppProvider({ children }) {
 
   // 派单 — async + throw 版
   // Why: 派单失败不能让客服误以为派出去了，导致漏单
-  async function dispatchOrder(orderId, workerIds) {
+  // 老板 10-15：「这个派单管理我感觉大家都没怎么用过似的」
+  // 查数据：92–94% 的单都派了，而且间隔是双峰的 ——
+  //   24% 在 2 分钟内（建完单顺手派，订单详情页）
+  //   51% 隔了一天以上（批量派，这正是派单板的用法）
+  // 但【两个页面写的是同一个字段】，分不出来用的哪一页。
+  // audit_log 10-11 就建好了，理由写的是「今天不记以后永远没有今天的数据」，
+  // 结果建完一直没接（0 条记录）。从派单这一处开始接上。
+  async function dispatchOrder(orderId, workerIds, source = 'unknown') {
     const ids = Array.isArray(workerIds) ? workerIds : [workerIds]
     const updates = {
       assignedTo: ids[0],
@@ -867,6 +874,12 @@ export function AppProvider({ children }) {
       console.error('[Supabase] dispatchOrder failed:', error)
       throw new Error(error.message || '派单失败，请重试')
     }
+    // 写日志失败不能影响派单本身 —— fire and forget
+    supabase.from('audit_log').insert({
+      staff_id: user?.id || null, action: 'dispatch',
+      target_type: 'order', target_id: String(orderId),
+      detail: { source, workers: ids },
+    }).then(({ error: e }) => { if (e) console.warn('[audit] 派单日志写入失败：', e.message) })
   }
 
   function updateOrderStatus(orderId, status) {

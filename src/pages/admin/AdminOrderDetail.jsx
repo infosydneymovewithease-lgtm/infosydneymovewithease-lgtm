@@ -192,7 +192,7 @@ export default function AdminOrderDetail() {
   async function handleDispatch() {
     if (!selectedWorkers.length) return
     try {
-      await dispatchOrder(id, selectedWorkers)
+      await dispatchOrder(id, selectedWorkers, 'detail')
       setShowDispatch(false)
     } catch (err) {
       alert(err.message || '派单失败，请重试')

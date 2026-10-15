@@ -82,7 +82,7 @@ export default function DispatchBoard() {
   async function handleConfirmDispatch() {
     if (!selectedWorkers.length) return
     try {
-      await dispatchOrder(dispatchTarget.id, selectedWorkers)
+      await dispatchOrder(dispatchTarget.id, selectedWorkers, 'board')
       setDispatchTarget(null)
       setSelectedWorkers([])
     } catch (err) {
