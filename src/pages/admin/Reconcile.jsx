@@ -40,13 +40,12 @@ const toISO = v => {
 }
 
 export default function Reconcile() {
-  const { user, orders, staffRates, staff, reconcileOrder, undoReconcile, closeDay, reopenDay,
+  const { orders, staffRates, staff, reconcileOrder, undoReconcile, closeDay, reopenDay,
           getReconcile, markReconciled, unmarkReconciled, markAllReconciled, b2bCustomers } = useApp()
   // 从「团队今日」的「去对账」跳过来时带着 ?date= ——
   // 老板定的流程是第二天早上核前一天，落地页必须直接是那一天，
   // 不能让她跳过来还要自己翻日期。
   const [params] = useSearchParams()
-  const isAdmin = user?.role === 'admin'
   const [date, setDate] = useState(() => params.get('date') || sydneyToday())
   const [close, setClose] = useState(null)
   const [logs, setLogs] = useState([])
@@ -165,13 +164,8 @@ export default function Reconcile() {
           <Stat label="已收" value={money(sum.paid)} good
             sub={sum.paid > 0 ? `现金 ${money(sum.cash)} · 转账 ${money(sum.transfer)}` : null} />
           <Stat label="未收" value={money(sum.unpaid)} warn={sum.unpaid > 0} />
-          {/* 老板 10-15：工资不给经理看（菜单里也去掉了工资结算）。
-              她的活是核工时和收款对不对，不需要知道工资；
-              而知道同事时薪会制造管理问题。 */}
-          {isAdmin && (
-            <Stat label="工资支出" value={money(sum.wages)}
-              sub={sum.wageList.length ? sum.wageList.map(w => `${w.name} ${money(w.amount)}`).join(' · ') : null} />
-          )}
+          <Stat label="工资支出" value={money(sum.wages)}
+            sub={sum.wageList.length ? sum.wageList.map(w => `${w.name} ${money(w.amount)}`).join(' · ') : null} />
         </div>
       </div>
 
@@ -196,7 +190,7 @@ export default function Reconcile() {
         {dayOrders.map(o => (
           <OrderRow key={`${o.id}:${openId === o.id}`} order={o}
             issues={issuesBy[o.id] || []}
-            staffRates={staffRates} staff={staff} medians={medians} isAdmin={isAdmin}
+            staffRates={staffRates} staff={staff} medians={medians}
             checkedBy={checked.find(c => c.order_id === o.id)} b2b={b2bCustomers}
             open={openId === o.id} onToggle={() => setOpenId(openId === o.id ? null : o.id)}
             disabled={busy}
@@ -308,7 +302,7 @@ function Stat({ label, value, good, warn, sub }) {
 
 // key 里带了 open 状态 —— 开合时组件重新挂载，草稿自然清空。
 // 比用 effect 清 state 干净：没有「渲染完再 setState」那一拍级联渲染。
-function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, open, onToggle, onSave, onCheck, onDirty, disabled, isAdmin }) {
+function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, open, onToggle, onSave, onCheck, onDirty, disabled }) {
   const [draft, setDraft] = useState({})
   // auto 记录哪些值是系统算出来的（而不是人手敲的）——
   // 界面上标「自动」，并且后续重算时可以放心覆盖它们
@@ -576,14 +570,9 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, o
                   ⚠️ {hoursWarn}
                 </p>
               )}
-              {/* 经理看得到「会影响谁的工资」，但看不到金额 ——
-                  她需要知道改这单有后果（会不会误改别人的钱），
-                  不需要知道具体多少。 */}
               {impact.wages.map(w => (
                 <p key={w.id} className="text-amber-800">
-                  {isAdmin
-                    ? `${w.name} 工资 ${w.delta > 0 ? '+' : ''}${money(w.delta)}`
-                    : `会影响 ${w.name} 的工资`}
+                  {w.name} 工资 {w.delta > 0 ? '+' : ''}{money(w.delta)}
                 </p>
               ))}
             </div>

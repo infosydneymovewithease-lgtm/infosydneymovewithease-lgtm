@@ -115,10 +115,7 @@ export default function Summary() {
             <Stat label="订单" value={`${ov.orders} 单`} sub={`完成 ${ov.completed} · 取消 ${ov.cancelled}`} />
             <Stat label="营收" value={money(ov.revenue)} />
             <Stat label="客单价" value={money(ov.avgOrder)} sub="只算已完成的单" />
-            {/* 工资只给老板 —— 和菜单里去掉「工资结算」一致 */}
-            {user?.role === 'admin' && (
-              <Stat label="工资支出" value={money(ov.wages)} sub={`占营收 ${pct(ov.wageRatio)}`} />
-            )}
+            <Stat label="工资支出" value={money(ov.wages)} sub={`占营收 ${pct(ov.wageRatio)}`} />
           </div>
           {/* 近 6 个月趋势 */}
           <div className="flex items-end gap-2 h-24 mt-5 px-1">

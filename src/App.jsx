@@ -169,7 +169,7 @@ function AppRoutes() {
         {FEATURES.content && <Route path="content" element={<ContentSchedule />} />}
         {FEATURES.content && <Route path="content-today" element={<ContentToday />} />}
         {FEATURES.summary && <Route path="summary" element={<Summary />} />}
-        <Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} />
+        <Route path="settings" element={<Settings />} />
         <Route path="storage" element={<StorageList />} />
         <Route path="storage/new" element={<NewStorage />} />
         <Route path="storage/:id" element={<StorageDetail />} />
