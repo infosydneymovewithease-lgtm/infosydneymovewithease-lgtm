@@ -1,5 +1,6 @@
 import { useApp } from '../../context/AppContext'
 import AttendanceCard from '../../components/AttendanceCard'
+import DailyProgress from '../../components/DailyProgress'
 import { FEATURES } from '../../config/features'
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
@@ -167,6 +168,9 @@ export default function Dashboard() {
       {/* 出勤打卡 —— 老板 10-13：「加在首页工作台的上方，方便工人打卡」
           一进后台就能打，不用先点进日报。和日报读写同一份数据。 */}
       {FEATURES.worklog && <AttendanceCard />}
+      {/* 老板 10-15 指定的位置：打卡下面、统计卡上面 ——
+          打卡完了，接下来就是「那我今天要干嘛」，正好接上。 */}
+      {FEATURES.worklog && <DailyProgress />}
 
       {/* Stats cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
