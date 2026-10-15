@@ -205,3 +205,46 @@ export function mondayOf(dateStr) {
   const dow = (dt.getUTCDay() + 6) % 7
   return addDaysLocal(dateStr, -dow)
 }
+
+/**
+ * 经理今天编辑了什么 —— 她的产出是「做出来的内容」，不是「发出去的条数」。
+ *
+ * 老板 10-15：「我觉得她应该是我今天编辑了什么」
+ * 分工定下来之后这里一直没跟着改：佳慧设计 → 小洁发布。
+ * 给经理看「今天发了什么」是记错了人的活。
+ *
+ * @param sydneyDateOf  把 timestamptz 换算成悉尼日期的函数（避免这里依赖 utils/date）
+ */
+export function myEditsToday(items, slots, staffId, dateStr, sydneyDateOf) {
+  const mine = (items || []).filter(i => i.created_by === staffId)
+  const touched = mine.filter(i =>
+    sydneyDateOf(i.updated_at) === dateStr || sydneyDateOf(i.created_at) === dateStr)
+
+  return touched.map(i => ({
+    ...i,
+    ready: itemReady(i),
+    isNew: sydneyDateOf(i.created_at) === dateStr,
+    // 这条内容挂在哪几个格子上 —— 一条文案可能同时发迁喜号和朋友圈
+    slots: (slots || []).filter(s => s.item_id === i.id)
+      .sort((a, b) => a.slot_date.localeCompare(b.slot_date)),
+  })).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))
+}
+
+/**
+ * 本周原创产出进度。
+ * ⚠️ 只数 source_type='original' 的格子 ——
+ *    朋友圈 7 条全是复用，算进去会让产出看起来比实际多一倍。
+ */
+export function weekOutput(slots, items) {
+  const byId = new Map((items || []).map(i => [i.id, i]))
+  const orig = (slots || []).filter(s => s.source_type === 'original')
+  const count = kind => {
+    const inKind = orig.filter(s => s.kind === kind)
+    const done = new Set()
+    for (const s of inKind) {
+      if (s.item_id && itemReady(byId.get(s.item_id))) done.add(s.item_id)
+    }
+    return { done: done.size, total: inKind.length }
+  }
+  return { text: count('image'), video: count('video') }
+}

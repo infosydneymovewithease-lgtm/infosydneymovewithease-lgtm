@@ -9,11 +9,12 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
-import { sydneyToday, addDays } from '../../utils/date'
+import { sydneyToday, addDays, sydneyDateOf } from '../../utils/date'
 import { currentSeason, tzGapHours } from '../../utils/shifts'
 import {
   requiredAccounts, inquiryProgress, myPerformance, weeklyVideo, weekRange,
 } from '../../utils/worklog'
+import { myEditsToday, weekOutput } from '../../utils/content'
 import { Plus, Check } from 'lucide-react'
 import AddChannelAccount from '../../components/AddChannelAccount'
 import AttendanceCard from '../../components/AttendanceCard'
@@ -29,7 +30,7 @@ export default function WorkLog() {
     user, orders, config, staff,
     getWorkday, upsertWorkLog, saveInquiry, addPost, getPolicyText,
     addChannelAccount, updateChannelAccount, deleteChannelAccount, channelUsage,
-    listWorkLogReturns, pendingReturns,
+    listWorkLogReturns, pendingReturns, getContentRange,
   } = useApp()
   const navigate = useNavigate()
   // ⚠️ 默认今天。只有【被退回的日子】可以切过去改 ——
@@ -49,6 +50,7 @@ export default function WorkLog() {
   const [editRow, setEditRow] = useState(null)
   const [returns, setReturns] = useState([])
   const [extraAdd, setExtraAdd] = useState(false)
+  const [content, setContent] = useState({ slots: [], items: [] })
 
   const refresh = useCallback(async () => setDay(await getWorkday(date)), [getWorkday, date])
   useEffect(() => {
@@ -61,6 +63,13 @@ export default function WorkLog() {
   // 被经理退回过就要看到原因，否则她不知道该改哪里
   useEffect(() => { listWorkLogReturns(date, date).then(setReturns) /* eslint-disable-next-line */ }, [date])
   useEffect(() => { pendingReturns(addDays(today, -14)).then(setPending) /* eslint-disable-next-line */ }, [today, date])
+  // 经理的产出是「做出来的内容」，不是「发出去的条数」—— 取本周排期来算
+  useEffect(() => {
+    if (!isManager) return
+    const wk = weekRange(date)
+    getContentRange(wk.from, wk.to).then(setContent)
+    // eslint-disable-next-line
+  }, [date, isManager])
   // 休息中每分钟刷新一次计时
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 30000)
@@ -98,6 +107,7 @@ export default function WorkLog() {
 
   const myReturns = returns.filter(r => r.staff_id === user?.id)
   const staffName = id => staff?.find?.(x => x.id === id)?.name || id
+  const nameOfAccount = id => (config.channelAccounts || []).find(a => a.id === id)?.name || id
 
   const [truth, setTruth] = useState(false)
   const canSubmit = !!mine?.clock_in && prog.ok && commentOk && issuesOk && (!policy.truth_declaration || truth)
@@ -371,13 +381,54 @@ export default function WorkLog() {
       </div>
 
       {/* ── 发布内容 ─────────────────────────── */}
+      {/* 老板 10-15：「我觉得她应该是我今天编辑了什么」
+          分工定下来之后这里一直没跟着改 —— 佳慧设计、小洁发布，
+          给经理看「今天发了什么」是记错了人的活。 */}
+      {isManager && (() => {
+        const edits = myEditsToday(content.items, content.slots, user?.id, date, sydneyDateOf)
+        const out = weekOutput(content.slots, content.items)
+        return (
+          <Card title="今天编辑了什么"
+            hint={`本周原创产出 文案 ${out.text.done}/${out.text.total} · 视频 ${out.video.done}/${out.video.total} 就绪`}>
+            <div className="space-y-1.5">
+              {edits.map(it => (
+                <div key={it.id} className="flex items-start gap-2 py-1">
+                  <span className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${
+                    it.ready ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {it.ready ? '就绪' : '草稿'}
+                  </span>
+                  <span className="text-xs text-gray-400 shrink-0 w-7">{it.isNew ? '新建' : '修改'}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm truncate">{it.title || '（还没写标题）'}</p>
+                    {it.slots.length > 0 && (
+                      <p className="text-xs text-gray-400 truncate">
+                        {it.slots.map(sl => `${sl.slot_date.slice(5)} ${nameOfAccount(sl.account_id)}`).join(' · ')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {edits.length === 0 && (
+                <p className="text-sm text-gray-400 py-1">
+                  今天还没编辑内容 —— 去<button onClick={() => navigate('/admin/content')}
+                    className="text-red-700 font-semibold underline mx-0.5">内容排期</button>看本周排了什么
+                </p>
+              )}
+            </div>
+            <p className="text-xs text-gray-400 mt-2.5 pt-2.5 border-t border-dashed border-gray-200 leading-relaxed">
+              只数原创 —— 朋友圈 7 条全是复用，算进去会让产出看起来比实际多一倍。
+            </p>
+          </Card>
+        )
+      })()}
+
       {/* 老板 10-15：「有了内容排期和今天要发，日报里今天发了什么还要留下吗，
             标题是不是可以自动填写上去」—— 他说对了。
           原来这里能手填，而 mark_slot_posted 也写 content_post，
           同一条会被记两遍，统计直接翻倍。这正是做排期时想避免的双重录入。
           改成：主体只读，从排期自动来；补登记留着但弱化 ——
           排期外的发布真的会发生（师傅拍了张好照片随手发朋友圈），堵死了她就不发了。 */}
-      <Card title="今天发了什么"
+      <Card title={isManager ? '今天发了什么（顶班时才有）' : '今天发了什么'}
         hint={video.ok ? `本周视频 ${video.video} 条 · 图文 ${video.image} 条 · 从「今天要发」自动来的`
           : '⚠️ 本周还没出视频 —— 每周至少 1 条'}>
         <div className="space-y-1">
