@@ -16,6 +16,7 @@ import {
   SOURCE_LABEL, STATUS_LABEL, mondayOf, addDaysLocal,
 } from '../../utils/content'
 import { uploadImage } from '../../utils/upload'
+import PromptLibrary from '../../components/PromptLibrary'
 import { ChevronLeft, ChevronRight, Plus, Check } from 'lucide-react'
 
 const WEEK = ['一', '二', '三', '四', '五', '六', '日']
@@ -173,6 +174,9 @@ export default function ContentSchedule() {
           </p>
         </div>
       )}
+
+      {/* 写作提示词 —— 放在格子下面。她先看待办知道要写什么，再翻这里拿提示词 */}
+      <PromptLibrary />
 
       {open && (
         <SlotEditor slot={open} data={data} nameOf={nameOf} busy={busy}

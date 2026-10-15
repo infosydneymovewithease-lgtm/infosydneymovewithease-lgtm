@@ -668,6 +668,12 @@ export function AppProvider({ children }) {
     return { slots: data?.slots || [], items: data?.items || [], rules: data?.rules || [] }
   }
 
+  async function listContentPrompts() {
+    const { data, error } = await supabase.rpc('list_content_prompts')
+    if (error) { console.warn('[content] 提示词读取失败：', error.message); return [] }
+    return data || []
+  }
+
   async function generateWeekSlots(monday) {
     const { data, error } = await supabase.rpc('generate_week_slots', { p_monday: monday })
     if (error) throw new Error(error.message || '生成本周格子失败')
@@ -1098,7 +1104,7 @@ export function AppProvider({ children }) {
       getPolicyText, confirmTeamDay, getTeamConfirm, addChannelAccount, deleteChannelAccount, channelUsage,
       returnWorkLog, listWorkLogReturns, pendingReturns, openDays,
       getContentRange, generateWeekSlots, autolinkWeek, saveContentItem,
-      updateSlot, markSlotPosted, skipSlot,
+      updateSlot, markSlotPosted, skipSlot, listContentPrompts,
       orders, confirmOrder, completeOrder, startWork, getMyOrders, finishWorkWithCorrection,
       createOrder, createOrderWithSlotCheck,
       updateOrder, updateOrderTimer, dispatchOrder, updateOrderStatus,
