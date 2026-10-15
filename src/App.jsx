@@ -108,6 +108,15 @@ function AdminRoute({ children }) {
   return children
 }
 
+// 老板 10-15：客户主档和工资结算不给经理。
+// ⚠️ 只藏菜单是不够的 —— 直接在地址栏敲 /admin/wages 照样进得去。
+//    藏菜单 ≠ 控制访问，权限必须在路由上也挡一道。
+function AdminOnly({ children }) {
+  const { user } = useApp()
+  if (user?.role !== 'admin') return <Navigate to="/admin" replace />
+  return children
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -147,10 +156,10 @@ function AppRoutes() {
         <Route path="orders" element={<OrderList />} />
         <Route path="orders/new" element={<NewOrder />} />
         <Route path="orders/:id" element={<AdminOrderDetail />} />
-        <Route path="customers" element={<CustomerList />} />
-        <Route path="customers/:phone" element={<CustomerDetail />} />
+        <Route path="customers" element={<AdminOnly><CustomerList /></AdminOnly>} />
+        <Route path="customers/:phone" element={<AdminOnly><CustomerDetail /></AdminOnly>} />
         <Route path="bills" element={<BillRecords />} />
-        <Route path="wages" element={<WageRecords />} />
+        <Route path="wages" element={<AdminOnly><WageRecords /></AdminOnly>} />
         <Route path="dispatch" element={<DispatchBoard />} />
         <Route path="b2b" element={<B2BList />} />
         <Route path="b2b/:id" element={<B2BDetail />} />
@@ -160,7 +169,7 @@ function AppRoutes() {
         {FEATURES.content && <Route path="content" element={<ContentSchedule />} />}
         {FEATURES.content && <Route path="content-today" element={<ContentToday />} />}
         {FEATURES.summary && <Route path="summary" element={<Summary />} />}
-        <Route path="settings" element={<Settings />} />
+        <Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} />
         <Route path="storage" element={<StorageList />} />
         <Route path="storage/new" element={<NewStorage />} />
         <Route path="storage/:id" element={<StorageDetail />} />

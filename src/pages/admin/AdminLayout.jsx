@@ -18,7 +18,8 @@ const NAV_ITEMS = [
   { label: '取消历史',     icon: Ban,             to: '/admin/cancelled' },
   { label: '派单管理',     icon: Truck,           to: '/admin/dispatch' },
   { divider: true },
-  { label: '客户主档', icon: Users,            to: '/admin/customers',  roles: ['admin', 'manager'] },
+  // 老板 10-15：「这两项不用在经理的菜单里」—— 客户全量名单和工资只给老板
+  { label: '客户主档', icon: Users,            to: '/admin/customers',  roles: ['admin'] },
   { label: '企业客户', icon: Building2,        to: '/admin/b2b' },
   { divider: true },
   { label: '我的日报', icon: NotebookPen,      to: '/admin/worklog',    feature: 'worklog' },
@@ -28,7 +29,7 @@ const NAV_ITEMS = [
   { label: '每日对账', icon: ClipboardCheck,   to: '/admin/reconcile',  roles: ['admin', 'manager'], feature: 'reconcile' },
   { label: '周月汇总', icon: TrendingUp,       to: '/admin/summary',    feature: 'summary' },
   { label: '收款记录', icon: DollarSign,       to: '/admin/bills' },
-  { label: '工资结算', icon: DollarSign,       to: '/admin/wages',      roles: ['admin', 'manager'] },
+  { label: '工资结算', icon: DollarSign,       to: '/admin/wages',      roles: ['admin'] },
   { divider: true },
   { label: '提货安装', icon: Truck,            to: '/admin/orders?service=IKEA',
     isActive: loc => new URLSearchParams(loc.search).get('service') === 'IKEA' },
