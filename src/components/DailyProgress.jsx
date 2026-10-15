@@ -10,7 +10,7 @@ import { sydneyToday, addDays, sydneyDateOf } from '../utils/date'
 import { requiredAccounts, inquiryProgress, weeklyVideo, weekRange } from '../utils/worklog'
 import { todayToPost, weekOutput, myEditsToday } from '../utils/content'
 import { todayTasks, weekTasks, progressOf, S } from '../utils/tasks'
-import { Check, ChevronRight } from 'lucide-react'
+import { Check, ChevronRight, Clock } from 'lucide-react'
 
 export default function DailyProgress() {
   const { user, config, getWorkday, getContentRange, openDays, getPolicyText } = useApp()
@@ -48,6 +48,7 @@ export default function DailyProgress() {
     role: user?.role, log, inquiryOk: prog.ok, inquiryMissing: prog.missing,
     slotsToday, quota: Number(policy.comment_quota) || 3,
     openDays: open, editedToday: edits,
+    nameOfAccount: id => (config.channelAccounts || []).find(a => a.id === id)?.name || id,
   })
   const week = weekTasks({
     role: user?.role,
@@ -59,67 +60,123 @@ export default function DailyProgress() {
   // 没打卡之前不显示 —— 那时候她还没开始上班，摆一堆未完成只是噪音
   if (!log?.clock_in) return null
 
+  const todo = tasks.filter(t => t.state === S.todo)
+  const rest = tasks.filter(t => t.state !== S.todo)
+
   return (
-    <div className="bg-white rounded-xl shadow-sm p-4">
-      <div className="flex items-baseline justify-between gap-2 mb-2.5 flex-wrap">
-        <h2 className="font-semibold text-gray-800 text-sm">今天的进度</h2>
-        <span className="text-xs text-gray-400">
-          {p.allDone
-            ? <span className="text-green-700 font-semibold">今天的都做完了 👏</span>
-            : <>已完成 {p.done}/{p.total}
-                {p.minutesLeft > 0 && <> · 剩下的大约 <b className="text-gray-600">{p.minutesLeft} 分钟</b></>}
-              </>}
-        </span>
+    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      {/* 头部：进度 + 剩余时间。老板 10-15 说原来「有点画质和一般的感觉」，
+          重做了视觉层次 —— 数字放大、圆环指示器、行有底色和 hover。 */}
+      <div className="px-4 pt-3.5 pb-3">
+        <div className="flex items-end justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="font-semibold text-gray-800 text-sm">今天的进度</h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {p.allDone ? '今天安排的都做完了' : `还有 ${todo.length} 件事`}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="font-bold text-gray-900 leading-none">
+              <span className="text-2xl">{p.done}</span>
+              <span className="text-sm text-gray-400"> / {p.total}</span>
+            </p>
+            {!p.allDone && p.minutesLeft > 0 && (
+              <p className="text-xs text-gray-400 mt-1">大约还要 <b className="text-gray-600">{p.minutesLeft}</b> 分钟</p>
+            )}
+          </div>
+        </div>
+
+        <div className="h-2 bg-gray-100 rounded-full overflow-hidden mt-2.5">
+          <div className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${p.total ? Math.max(4, p.done / p.total * 100) : 0}%`,
+                     background: p.allDone
+                       ? 'linear-gradient(90deg,#1e9e5a,#22c55e)'
+                       : 'linear-gradient(90deg,#6b1414,#c0392b)' }} />
+        </div>
       </div>
 
-      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mb-3">
-        <div className="h-full rounded-full transition-all"
-          style={{ width: `${p.total ? p.done / p.total * 100 : 0}%`,
-                   background: p.allDone ? '#22c55e' : 'linear-gradient(90deg,#6b1414,#c0392b)' }} />
-      </div>
+      {p.allDone ? (
+        <div className="px-4 pb-4">
+          <div className="bg-green-50 rounded-xl px-3.5 py-3 flex items-center gap-2.5">
+            <span className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center shrink-0">
+              <Check size={15} className="text-white" />
+            </span>
+            <p className="text-sm text-green-800 font-medium">今天安排的事都做完了，辛苦了 👏</p>
+          </div>
+        </div>
+      ) : (
+        <div className="px-2 pb-1.5">
+          {/* 没做的排前面 —— 她打开就该看见要干什么，不是先看自己做过什么 */}
+          {todo.map(t => (
+            <Row key={t.key} t={t} onGo={() => t.to && navigate(t.to)} />
+          ))}
+        </div>
+      )}
 
-      <div className="grid sm:grid-cols-2 gap-x-5 gap-y-0.5">
-        {tasks.map(t => (
-          <button key={t.key} onClick={() => t.to && navigate(t.to)}
-            disabled={!t.to || t.state === S.done}
-            className={`flex items-start gap-2 py-1 text-left rounded ${
-              t.to && t.state !== S.done ? 'hover:bg-gray-50' : ''}`}>
-            <span className="shrink-0 w-4 pt-0.5 text-center text-xs">
-              {t.state === S.done ? <Check size={13} className="text-green-600 inline" />
-               : t.state === S.wait ? <span className="text-gray-300">⏳</span>
-               : t.state === S.skip ? <span className="text-gray-300">—</span>
-               : <span className="inline-block w-2.5 h-2.5 border border-gray-300 rounded-sm" />}
-            </span>
-            <span className="flex-1 min-w-0">
-              <span className={`text-sm ${
-                t.state === S.done ? 'text-gray-400 line-through'
-                : t.state === S.wait || t.state === S.skip ? 'text-gray-400' : 'text-gray-800'}`}>
-                {t.label}
-              </span>
-              {t.hint && t.state !== S.done && (
-                <span className="block text-xs text-gray-400 leading-snug">{t.hint}</span>
-              )}
-            </span>
-            {t.state === S.todo && t.minutes > 0 && (
-              <span className="shrink-0 text-xs text-gray-300 pt-0.5">约 {t.minutes} 分</span>
-            )}
-            {t.to && t.state === S.todo && (
-              <ChevronRight size={13} className="shrink-0 text-gray-300 mt-1" />
-            )}
-          </button>
-        ))}
-      </div>
+      {/* 已完成 / 等待 / 选填 收在下面，压暗 */}
+      {!p.allDone && rest.length > 0 && (
+        <div className="px-2 pb-1.5">
+          {rest.map(t => <Row key={t.key} t={t} dim />)}
+        </div>
+      )}
 
       {week.length > 0 && (
-        <div className="flex items-center gap-3 flex-wrap mt-2.5 pt-2.5 border-t border-dashed border-gray-200">
-          <span className="text-xs text-gray-400">本周</span>
+        <div className="flex items-center gap-2 flex-wrap px-4 py-2.5 bg-gray-50 border-t border-gray-100">
+          <span className="text-xs text-gray-400 shrink-0">本周</span>
           {week.map(w => (
-            <span key={w.key} className={`text-xs font-semibold ${w.ok ? 'text-green-700' : 'text-amber-700'}`}>
-              {w.ok ? '✓ ' : '⚠️ '}{w.label}
+            <span key={w.key}
+              className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                w.ok ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+              {w.label}
             </span>
           ))}
         </div>
       )}
     </div>
+  )
+}
+
+function Row({ t, onGo, dim }) {
+  const clickable = !!onGo && t.state === S.todo
+  return (
+    <button onClick={onGo} disabled={!clickable}
+      className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-xl text-left transition-colors ${
+        clickable ? 'hover:bg-gray-50 cursor-pointer' : 'cursor-default'}`}>
+      <Dot state={t.state} />
+      <span className="flex-1 min-w-0">
+        <span className={`block text-sm leading-tight ${
+          t.state === S.done ? 'text-gray-400'
+          : t.state === S.wait || t.state === S.skip ? 'text-gray-400'
+          : 'text-gray-800 font-medium'}`}>{t.label}</span>
+        {t.hint && t.state !== S.done && (
+          <span className="block text-xs text-gray-400 mt-0.5 leading-snug truncate">{t.hint}</span>
+        )}
+      </span>
+      {t.state === S.todo && t.minutes > 0 && (
+        <span className="shrink-0 text-xs text-gray-400 bg-gray-50 rounded-full px-2 py-0.5">
+          {t.minutes} 分
+        </span>
+      )}
+      {clickable && <ChevronRight size={14} className="shrink-0 text-gray-300" />}
+    </button>
+  )
+}
+
+function Dot({ state }) {
+  if (state === S.done) return (
+    <span className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center shrink-0">
+      <Check size={12} className="text-white" strokeWidth={3} />
+    </span>
+  )
+  if (state === S.wait) return (
+    <span className="w-5 h-5 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
+      <Clock size={11} className="text-amber-500" />
+    </span>
+  )
+  if (state === S.skip) return (
+    <span className="w-5 h-5 rounded-full border border-dashed border-gray-200 shrink-0" />
+  )
+  return (
+    <span className="w-5 h-5 rounded-full border-2 shrink-0" style={{ borderColor: '#c0392b' }} />
   )
 }

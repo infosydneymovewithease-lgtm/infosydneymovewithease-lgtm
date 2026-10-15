@@ -26,7 +26,7 @@ export const S = { done: 'done', todo: 'todo', wait: 'wait', skip: 'skip' }
 export function todayTasks(ctx) {
   const {
     role, log, inquiryOk, inquiryMissing, slotsToday, quota,
-    openDays, editedToday,
+    openDays, editedToday, nameOfAccount,
   } = ctx
   const isManager = role === 'admin' || role === 'manager'
   const t = []
@@ -73,10 +73,16 @@ export function todayTasks(ctx) {
       minutes: 45, to: '/admin/content',
     })
   }
+  // 老板 10-15：「感觉还少内容啊，需要发布的小红书」——
+  // 原来只写「还有 N 条没发」，她得点进去才知道发哪个号。把账号名带出来。
+  const who = nameOfAccount
+    ? [...new Set(ready.map(s => nameOfAccount(s.account_id)))].join(' · ')
+    : ''
   t.push({
-    key: 'post', label: '发布今天排的内容',
+    key: 'post',
+    label: ready.length ? `发布 ${who || '今天排的内容'}` : '发布今天排的内容',
     state: ready.length === 0 ? (posted.length ? S.done : S.wait) : S.todo,
-    hint: ready.length ? `还有 ${ready.length} 条没发`
+    hint: ready.length ? `${ready.length} 条待发`
       : posted.length ? `今天发了 ${posted.length} 条`
       : '等内容准备好 —— 不是你的事',
     minutes: ready.length * 5, to: '/admin/content-today',
