@@ -363,42 +363,6 @@ export default function TeamToday() {
         })}
       </div>
 
-      {/* ── 经理每日确认 ─────────────────────── */}
-      {(user?.role === 'admin' || user?.role === 'manager') && (
-        <div className={`rounded-2xl p-4 shadow-sm ${confirm ? 'bg-green-50' : 'bg-white border border-amber-200'}`}>
-          <h2 className="font-bold text-sm mb-1">经理每日确认</h2>
-          {confirm ? (
-            <p className="text-sm text-green-700 flex items-center gap-1.5">
-              <Check size={14} /> {staff.find(s => s.id === confirm.confirmed_by)?.name || confirm.confirmed_by}
-              已于 {hhmm(confirm.confirmed_at)} 确认
-            </p>
-          ) : (
-            <>
-              {policy.manager_declaration && (
-                <label className="flex items-start gap-2 my-2 cursor-pointer">
-                  <input type="checkbox" checked={checked} onChange={e => setChecked(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 accent-red-700 shrink-0" />
-                  <span className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">
-                    {policy.manager_declaration}
-                  </span>
-                </label>
-              )}
-              {err && <p className="text-red-600 text-xs mb-2">{err}</p>}
-              <button disabled={busy || !checked}
-                onClick={async () => {
-                  setBusy(true); setErr('')
-                  try { await confirmTeamDay(date); setConfirm(await getTeamConfirm(date)) }
-                  catch (e) { setErr(e.message) } finally { setBusy(false) }
-                }}
-                className="w-full text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-40"
-                style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
-                {checked ? '确认今日已核对' : '请先勾选上面的确认'}
-              </button>
-            </>
-          )}
-        </div>
-      )}
-
       {/* ── 今日漏斗 ─────────────────────────── */}
       <div className="bg-white rounded-2xl p-4 shadow-sm">
         <h2 className="font-bold text-sm mb-3">今天接待了多少 · 下了几单</h2>
@@ -516,6 +480,47 @@ export default function TeamToday() {
               )
             })}
       </div>
+
+      {/* ── 经理每日确认 ───────────────────────
+          老板 10-15：「这里经理每日确认可不可以放在页面的最下面」
+          对的 —— 签字应该在【看完所有东西之后】。
+          原来卡在中间，下面还有漏斗、本周平台咨询、今日发布，
+          等于她还没看完就签了。 */}
+      {(user?.role === 'admin' || user?.role === 'manager') && (
+        <div className={`rounded-2xl p-4 shadow-sm ${confirm ? 'bg-green-50' : 'bg-white border border-amber-200'}`}>
+          <h2 className="font-bold text-sm mb-1">经理每日确认</h2>
+          {confirm ? (
+            <p className="text-sm text-green-700 flex items-center gap-1.5">
+              <Check size={14} /> {staff.find(s => s.id === confirm.confirmed_by)?.name || confirm.confirmed_by}
+              已于 {hhmm(confirm.confirmed_at)} 确认
+            </p>
+          ) : (
+            <>
+              {policy.manager_declaration && (
+                <label className="flex items-start gap-2 my-2 cursor-pointer">
+                  <input type="checkbox" checked={checked} onChange={e => setChecked(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-red-700 shrink-0" />
+                  <span className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">
+                    {policy.manager_declaration}
+                  </span>
+                </label>
+              )}
+              {err && <p className="text-red-600 text-xs mb-2">{err}</p>}
+              <button disabled={busy || !checked}
+                onClick={async () => {
+                  setBusy(true); setErr('')
+                  try { await confirmTeamDay(date); setConfirm(await getTeamConfirm(date)) }
+                  catch (e) { setErr(e.message) } finally { setBusy(false) }
+                }}
+                className="w-full text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-40"
+                style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
+                {checked ? '确认今日已核对' : '请先勾选上面的确认'}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
     </div>
   )
 }
