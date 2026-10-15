@@ -7,7 +7,7 @@
 //   谁交了日报 · 今天的咨询→成单漏斗 · 本周视频出了没 · 哪些事要她处理
 
 import { useState, useEffect, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { sydneyToday, addDays } from '../../utils/date'
 import { slotsForDay, breakMinutes, requiredAccounts, weekRange, trustSignals, bookedOn, inquiryByStaff } from '../../utils/worklog'
@@ -24,7 +24,10 @@ export default function TeamToday() {
           getPolicyText, confirmTeamDay, getTeamConfirm,
           returnWorkLog, listWorkLogReturns, openDays } = useApp()
   const navigate = useNavigate()
-  const [date, setDate] = useState(() => sydneyToday())
+  // 从日报「去审核」跳过来时带 ?date= —— 落地页必须直接是那一天，
+  // 不能让她跳过来还要自己翻日期
+  const [params] = useSearchParams()
+  const [date, setDate] = useState(() => params.get('date') || sydneyToday())
   const [day, setDay] = useState({ logs: [], breaks: [], inquiries: [], posts: [] })
   const [week, setWeek] = useState([])
   const [prevDay, setPrevDay] = useState([])

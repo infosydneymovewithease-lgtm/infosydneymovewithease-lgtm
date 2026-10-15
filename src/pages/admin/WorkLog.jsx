@@ -30,7 +30,7 @@ export default function WorkLog() {
     user, orders, config, staff,
     getWorkday, upsertWorkLog, saveInquiry, addPost, getPolicyText,
     addChannelAccount, updateChannelAccount, deleteChannelAccount, channelUsage,
-    listWorkLogReturns, pendingReturns, getContentRange,
+    listWorkLogReturns, pendingReturns, getContentRange, openDays,
   } = useApp()
   const navigate = useNavigate()
   // ⚠️ 默认今天。只有【被退回的日子】可以切过去改 ——
@@ -51,6 +51,7 @@ export default function WorkLog() {
   const [returns, setReturns] = useState([])
   const [extraAdd, setExtraAdd] = useState(false)
   const [content, setContent] = useState({ slots: [], items: [] })
+  const [openD, setOpenD] = useState([])
 
   const refresh = useCallback(async () => setDay(await getWorkday(date)), [getWorkday, date])
   useEffect(() => {
@@ -94,6 +95,10 @@ export default function WorkLog() {
     if (!isManager) return
     const wk = weekRange(date)
     getContentRange(wk.from, wk.to).then(setContent)
+    // 老板 10-15：「经理应该是早上先核对账目吧，这个应该加到经理的日报里」
+    // 按他定的 T+1 流程，她早上核的是【昨天】的账和客服日报。
+    // 这两件事原来只在「团队今日」「每日对账」里，日报上一点痕迹没有。
+    openDays(addDays(date, -7), addDays(date, -1)).then(setOpenD)
     // eslint-disable-next-line
   }, [date, isManager])
   const quota = Number(policy.comment_quota) || 3
@@ -382,6 +387,47 @@ export default function WorkLog() {
       </div>
 
       {/* ── 发布内容 ─────────────────────────── */}
+      {/* 老板 10-15：「经理应该是早上先核对账目吧，这个应该加到经理的日报里」
+          这是她每天第一件事，放在最上面。T+1 —— 核的是昨天的。 */}
+      {isManager && (
+        <Card title="昨天的账核完了吗"
+          hint={openD.length === 0 ? '前 7 天都核完了' : `还有 ${openD.length} 天没闭环 —— 这是你每天第一件事`}>
+          {openD.length === 0 ? (
+            <p className="text-sm text-green-700 flex items-center gap-1.5 py-1">
+              <Check size={14} /> 前 7 天的账和客服日报都核完确认了
+            </p>
+          ) : (
+            <div className="space-y-1.5">
+              {openD.map(o => (
+                <div key={o.work_date} className="flex items-center gap-2.5 flex-wrap bg-amber-50 rounded-xl px-3 py-2">
+                  <span className="font-semibold text-sm shrink-0">
+                    {o.work_date}{o.work_date === addDays(date, -1) ? '（昨天）' : ''}
+                  </span>
+                  <span className="text-xs flex-1 min-w-0">
+                    {!o.team_confirmed && <span className="text-red-700 font-semibold mr-2">客服日报未审核</span>}
+                    {!o.day_closed && <span className="text-red-700 font-semibold mr-2">账未日结</span>}
+                    <span className="text-gray-400">{o.submitted_cnt}/{o.worked_cnt} 人交了日报</span>
+                  </span>
+                  {!o.team_confirmed && (
+                    <button onClick={() => navigate(`/admin/team-today?date=${o.work_date}`)}
+                      className="text-xs text-white font-semibold px-2.5 py-1 rounded-lg shrink-0"
+                      style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>去审核</button>
+                  )}
+                  {!o.day_closed && (
+                    <button onClick={() => navigate(`/admin/reconcile?date=${o.work_date}`)}
+                      className="text-xs font-semibold text-red-700 border border-red-300 rounded-lg px-2.5 py-1 shrink-0 hover:bg-red-100">去对账</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-gray-400 mt-2.5 pt-2.5 border-t border-dashed border-gray-200 leading-relaxed">
+            核的是<b className="text-gray-600">昨天</b>的 —— 小洁 20:00 才交日报，你 20:15 看必然草草了事；
+            师傅当天没发的数据，第二天上午打个电话就能要到。
+          </p>
+        </Card>
+      )}
+
       {/* 老板 10-15：「我觉得她应该是我今天编辑了什么」
           分工定下来之后这里一直没跟着改 —— 佳慧设计、小洁发布，
           给经理看「今天发了什么」是记错了人的活。 */}
