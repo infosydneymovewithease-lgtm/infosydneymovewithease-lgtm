@@ -24,6 +24,7 @@ export default function AttendanceCard({ compact = false }) {
   const [day, setDay] = useState({ logs: [], breaks: [] })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const [confirmOut, setConfirmOut] = useState(false)
   const [, setTick] = useState(0)
 
   const refresh = useCallback(async () => setDay(await getWorkday(date)), [getWorkday, date])
@@ -103,11 +104,33 @@ export default function AttendanceCard({ compact = false }) {
               上班 <b className="font-mono">{hhmm(mine.clock_in)}</b>
               {mine.clock_out && <> · 下班 <b className="font-mono">{hhmm(mine.clock_out)}</b></>}
             </span>
-            {!mine.clock_out && (
+            {/* 老板 10-15 测试时上班下班点在了同一分钟，露出两个问题：
+                ① 下班之后休息那排就不显示了（行为是对的，但他以为没做）
+                ② 下班打卡【点错了没法撤销】—— 早上手滑点一下，
+                   这一天的出勤就毁了，界面上没有任何办法改回来，
+                   只能来找老板跑 SQL。两个都补上。 */}
+            {!mine.clock_out ? (
+              confirmOut ? (
+                <span className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">现在下班？下班后不能再登记休息</span>
+                  <button disabled={busy}
+                    onClick={() => { setConfirmOut(false); run(() => upsertWorkLog(date, { clock_out: new Date().toISOString() })) }}
+                    className="px-3 py-1.5 rounded-xl text-white text-sm font-bold disabled:opacity-40"
+                    style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>确认下班</button>
+                  <button onClick={() => setConfirmOut(false)}
+                    className="text-sm text-gray-400 px-1">取消</button>
+                </span>
+              ) : (
+                <button disabled={busy} onClick={() => setConfirmOut(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50 disabled:opacity-40">
+                  <LogOut size={14} /> 下班打卡
+                </button>
+              )
+            ) : (
               <button disabled={busy}
-                onClick={() => run(() => upsertWorkLog(date, { clock_out: new Date().toISOString() }))}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50 disabled:opacity-40">
-                <LogOut size={14} /> 下班打卡
+                onClick={() => run(() => upsertWorkLog(date, { clock_out: null }))}
+                className="text-xs text-gray-400 hover:text-red-600 underline px-1">
+                点错了？撤销下班
               </button>
             )}
           </>
