@@ -10,7 +10,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useApp } from '../../context/AppContext'
 import { sydneyToday } from '../../utils/date'
 import { todayToPost, bodyFor, SOURCE_LABEL } from '../../utils/content'
-import { Check, Copy, Download } from 'lucide-react'
+import { uploadImage } from '../../utils/upload'
+import { Check, Copy, Download, Plus } from 'lucide-react'
 
 const hhmm = iso => iso
   ? new Date(iso).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
@@ -18,6 +19,7 @@ const hhmm = iso => iso
 
 export default function ContentToday() {
   const { config, getContentRange, markSlotPosted } = useApp()
+  const [proof, setProof] = useState({})   // slotId → {url, shots}
   const date = sydneyToday()
   const [data, setData] = useState({ slots: [], items: [] })
   const [busy, setBusy] = useState(false)
@@ -38,9 +40,15 @@ export default function ContentToday() {
 
   async function markPosted(id) {
     setBusy(true); setErr('')
-    try { await markSlotPosted(id); await refresh() }
+    const p = proof[id] || {}
+    try { await markSlotPosted(id, p.url, p.shots); await refresh() }
     catch (e) { setErr(e.message) } finally { setBusy(false) }
   }
+
+  const accOf = id => (config.channelAccounts || []).find(a => a.id === id)
+  // 小红书和视频号要笔记链接 —— 能点开验证，而且以后能回填赞藏评。
+  // 朋友圈没有链接可复制，而且内容是复用的，不值得加这个负担。
+  const needsLink = s => { const a = accOf(s.account_id); return a?.platform !== '微信' || s.account_id === 'channels' }
 
   return (
     <div className="p-5 max-w-3xl mx-auto space-y-3">
@@ -122,10 +130,41 @@ export default function ContentToday() {
               </div>
             )}
 
+            {!done && (
+              <div className="px-4 pb-3">
+                {needsLink(s) ? (
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">
+                      笔记链接 <span className="text-red-600">必填</span>
+                      <span className="text-gray-300"> · App 里「分享 → 复制链接」</span>
+                    </label>
+                    <input value={proof[s.id]?.url || ''}
+                      onChange={e => setProof(p => ({ ...p, [s.id]: { ...p[s.id], url: e.target.value } }))}
+                      placeholder="粘贴刚发出去那条笔记的链接"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400" />
+                    <p className="text-xs text-gray-400 mt-1">
+                      贴了链接，三个月后才能回头看哪条选题真的带来了咨询 —— 截图给不了这个。
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">发布截图 <span className="text-gray-300">选填</span></label>
+                    <ShotRow shots={proof[s.id]?.shots || []}
+                      onChange={next => setProof(p => ({ ...p, [s.id]: { ...p[s.id], shots: next } }))}
+                      onErr={setErr} />
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 border-t border-gray-100">
               {done ? (
-                <p className="flex-1 text-center text-sm font-semibold text-green-700 flex items-center justify-center gap-1.5">
+                <p className="flex-1 text-center text-sm font-semibold text-green-700 flex items-center justify-center gap-1.5 flex-wrap">
                   <Check size={15} /> {hhmm(s.posted_at)} 已发
+                  {s.proof_url && (
+                    <a href={s.proof_url} target="_blank" rel="noreferrer"
+                      className="text-xs font-normal text-gray-500 underline">看笔记</a>
+                  )}
                 </p>
               ) : (
                 <>
@@ -170,6 +209,36 @@ function Field({ label, children, onCopy, copied }) {
         style={copied ? undefined : { background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
         {copied ? <><Check size={11} />已复制</> : <><Copy size={11} />复制</>}
       </button>
+    </div>
+  )
+}
+
+
+// 朋友圈用：没有笔记链接可复制，只能截图
+function ShotRow({ shots, onChange, onErr }) {
+  const [up, setUp] = useState(false)
+  async function add(files) {
+    setUp(true)
+    try {
+      const next = [...shots]
+      for (const f of files) next.push({ name: f.name, url: await uploadImage(f) })
+      onChange(next)
+    } catch (e) { onErr(e.message || '上传失败') } finally { setUp(false) }
+  }
+  return (
+    <div className="flex gap-1.5 flex-wrap">
+      {shots.map((sh, i) => (
+        <div key={i} className="relative w-14 h-14 rounded-lg overflow-hidden border border-gray-200">
+          <img src={sh.url || sh.data} alt="" className="w-full h-full object-cover" />
+          <button onClick={() => onChange(shots.filter((_, j) => j !== i))}
+            className="absolute top-0 right-0 bg-black/60 text-white text-xs w-4 h-4 leading-4 text-center">✕</button>
+        </div>
+      ))}
+      <label className="w-14 h-14 rounded-lg border border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-red-400 text-gray-400">
+        {up ? '…' : <Plus size={16} />}
+        <input type="file" multiple accept="image/*" className="hidden"
+          onChange={e => { add([...e.target.files]); e.target.value = '' }} />
+      </label>
     </div>
   )
 }

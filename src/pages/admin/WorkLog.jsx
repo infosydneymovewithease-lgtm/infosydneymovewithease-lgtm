@@ -14,7 +14,7 @@ import { currentSeason, tzGapHours } from '../../utils/shifts'
 import {
   requiredAccounts, inquiryProgress, myPerformance, weeklyVideo, weekRange,
 } from '../../utils/worklog'
-import { Plus, Trash2, Check } from 'lucide-react'
+import { Plus, Check } from 'lucide-react'
 import AddChannelAccount from '../../components/AddChannelAccount'
 import AttendanceCard from '../../components/AttendanceCard'
 import { uploadImage } from '../../utils/upload'
@@ -27,7 +27,7 @@ const money = n => `$${(Number(n) || 0).toFixed(2)}`
 export default function WorkLog() {
   const {
     user, orders, config, staff,
-    getWorkday, upsertWorkLog, saveInquiry, addPost, deletePost, getPolicyText,
+    getWorkday, upsertWorkLog, saveInquiry, addPost, getPolicyText,
     addChannelAccount, updateChannelAccount, deleteChannelAccount, channelUsage,
     listWorkLogReturns, pendingReturns,
   } = useApp()
@@ -48,6 +48,7 @@ export default function WorkLog() {
   const [quickFill, setQuickFill] = useState(false)
   const [editRow, setEditRow] = useState(null)
   const [returns, setReturns] = useState([])
+  const [extraAdd, setExtraAdd] = useState(false)
 
   const refresh = useCallback(async () => setDay(await getWorkday(date)), [getWorkday, date])
   useEffect(() => {
@@ -370,28 +371,53 @@ export default function WorkLog() {
       </div>
 
       {/* ── 发布内容 ─────────────────────────── */}
+      {/* 老板 10-15：「有了内容排期和今天要发，日报里今天发了什么还要留下吗，
+            标题是不是可以自动填写上去」—— 他说对了。
+          原来这里能手填，而 mark_slot_posted 也写 content_post，
+          同一条会被记两遍，统计直接翻倍。这正是做排期时想避免的双重录入。
+          改成：主体只读，从排期自动来；补登记留着但弱化 ——
+          排期外的发布真的会发生（师傅拍了张好照片随手发朋友圈），堵死了她就不发了。 */}
       <Card title="今天发了什么"
-        hint={video.ok ? `本周视频 ${video.video} 条 · 图文 ${video.image} 条` : '⚠️ 本周还没出视频 —— 每周至少 1 条'}>
-        <PostAdder accounts={requiredAccounts(config.channelAccounts)} disabled={busy}
-          onAdd={v => run(() => addPost(date, v))} />
-        <div className="mt-2 space-y-1">
+        hint={video.ok ? `本周视频 ${video.video} 条 · 图文 ${video.image} 条 · 从「今天要发」自动来的`
+          : '⚠️ 本周还没出视频 —— 每周至少 1 条'}>
+        <div className="space-y-1">
           {day.posts.map(p => {
             const a = (config.channelAccounts || []).find(x => x.id === p.account_id)
             return (
               <div key={p.id} className="flex items-center gap-2 text-sm py-1">
+                <Check size={13} className="text-green-600 shrink-0" />
                 <span className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${
                   p.kind === 'video' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                   {p.kind === 'video' ? '视频' : '图文'}
                 </span>
                 <span className="font-semibold text-xs w-16 shrink-0">{a?.name || p.account_id}</span>
                 <span className="text-gray-600 flex-1 truncate">{p.title || '（没写标题）'}</span>
-                <button onClick={() => run(() => deletePost(p.id))} disabled={busy}
-                  className="text-gray-300 hover:text-red-500 shrink-0"><Trash2 size={13} /></button>
+                <span className="text-xs text-gray-300 shrink-0">{hhmm(p.created_at)}</span>
               </div>
             )
           })}
-          {day.posts.length === 0 && <p className="text-sm text-gray-400 py-1">今天还没登记发布内容</p>}
+          {day.posts.length === 0 && (
+            <p className="text-sm text-gray-400 py-1">
+              今天还没发内容 —— 去<button onClick={() => navigate('/admin/content-today')}
+                className="text-red-700 font-semibold underline mx-0.5">今天要发</button>看排了几条
+            </p>
+          )}
         </div>
+
+        {/* 补登记：排期外临时发的。弱化成一行，不是主路径 */}
+        {extraAdd ? (
+          <div className="mt-2.5 pt-2.5 border-t border-dashed border-gray-200">
+            <p className="text-xs text-gray-400 mb-1.5">补登记排期外临时发的内容</p>
+            <PostAdder accounts={requiredAccounts(config.channelAccounts)} disabled={busy}
+              onAdd={async v => { await run(() => addPost(date, v)); setExtraAdd(false) }} />
+            <button onClick={() => setExtraAdd(false)} className="text-xs text-gray-400 mt-1.5">取消</button>
+          </div>
+        ) : (
+          <button onClick={() => setExtraAdd(true)}
+            className="text-xs text-gray-400 hover:text-gray-600 mt-2.5 pt-2.5 border-t border-dashed border-gray-200 w-full text-left">
+            ＋ 补登记排期外发的（比如随手发的朋友圈）
+          </button>
+        )}
       </Card>
 
       {/* ── 手填三项 ─────────────────────────── */}

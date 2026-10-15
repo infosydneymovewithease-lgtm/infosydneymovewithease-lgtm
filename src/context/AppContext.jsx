@@ -706,8 +706,10 @@ export function AppProvider({ children }) {
 
   // 一个动作写两处（content_slot + content_post），在数据库函数里保证 ——
   // 发完再去日报手填一遍，忙的时候一定漏一边，然后数字对不上，然后没人信这张表
-  async function markSlotPosted(slotId) {
-    const { error } = await supabase.rpc('mark_slot_posted', { p_slot_id: slotId, p_by: user?.id || null })
+  async function markSlotPosted(slotId, proofUrl, proofShots) {
+    const { error } = await supabase.rpc('mark_slot_posted', {
+      p_slot_id: slotId, p_by: user?.id || null,
+      p_proof_url: proofUrl || null, p_proof_shots: proofShots || null })
     if (error) throw new Error(error.message || '标记失败')
   }
 
