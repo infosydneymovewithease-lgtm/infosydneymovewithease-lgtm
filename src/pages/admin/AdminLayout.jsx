@@ -27,7 +27,9 @@ const NAV_ITEMS = [
   { label: '今天要发', icon: Send,              to: '/admin/content-today', feature: 'content' },
   { label: '内容排期', icon: CalendarRange,     to: '/admin/content',    roles: ['admin', 'manager'], feature: 'content' },
   { label: '每日对账', icon: ClipboardCheck,   to: '/admin/reconcile',  roles: ['admin', 'manager'], feature: 'reconcile' },
-  { label: '周月汇总', icon: TrendingUp,       to: '/admin/summary',    feature: 'summary' },
+  // 老板 10-15：「周汇总这个我就觉得用的话鸡肋」—— 对客服关掉。
+  // 这是新加的功能，不是线上已有的，关掉不会有「被收走」的感觉。
+  { label: '周月汇总', icon: TrendingUp,       to: '/admin/summary',    roles: ['admin', 'manager'], feature: 'summary' },
   { label: '收款记录', icon: DollarSign,       to: '/admin/bills' },
   { label: '工资结算', icon: DollarSign,       to: '/admin/wages',      roles: ['admin'] },
   { divider: true },

@@ -373,15 +373,20 @@ export default function WorkLog() {
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-3 mt-4 pt-3 border-t border-gray-100">
-          <Stat label="接单金额" value={money(perf.bookedAmount)} />
+        {/* 老板 10-15：「和钱有关的记录客服没太大必要看」
+            去掉金额、留下单数。真正的理由不是保密（她在收款记录里全看得到），
+            而是【按金额衡量客服会诱导她推销】——
+            同样接一单，面包车和大卡车金额差三倍，但她的工作量差不多。
+            表上天天挂着金额，她自然会往贵的车型引，而客人只需要小车。
+            这对复购是直接伤害。单数才是她真实的产出。 */}
+        <div className="grid grid-cols-2 gap-3 mt-4 pt-3 border-t border-gray-100">
           <Stat label="今天搬的（我接的）" value={`${perf.served} 单`} />
-          <Stat label="完成金额" value={money(perf.servedAmount)} />
+          {isManager && <Stat label="完成金额" value={money(perf.servedAmount)} />}
         </div>
         <p className="text-xs text-gray-400 mt-2 leading-relaxed">
           <b>两个数要你填</b>：平台咨询（分平台登记）和加微信人数。
           微信、小红书里发生的事系统看不见，只能你报。<br />
-          「下单」和下面三个金额都是系统按你的账号自动算的，不用管。
+          「下单」和「今天搬的」都是系统按你的账号自动算的，不用管。
           多数单几天后才搬，所以「今天搬的」和「今天下单的」不是同一批。
         </p>
       </div>
