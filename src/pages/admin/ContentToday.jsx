@@ -95,7 +95,9 @@ export default function ContentToday() {
               </span>
               <span className="flex-1" />
               <span className="text-xs text-gray-400">
-                {done ? `${hhmm(s.posted_at)} 已发` : `${s.kind === 'video' ? '视频' : '图文'} · ${s.item?.materials?.length || 0} 个素材`}
+                {done ? `${hhmm(s.posted_at)} 已发`
+                  : s.kind === 'video' ? `视频 · ${s.item?.materials?.length || 0} 个文件`
+                  : '图文 · 配图在微信素材群'}
               </span>
             </div>
 
@@ -109,16 +111,33 @@ export default function ContentToday() {
                 <Field label="正文" onCopy={() => copy(body, `b${s.id}`)} copied={copied === `b${s.id}`}>
                   <p className="text-sm leading-relaxed whitespace-pre-line">{body}</p>
                 </Field>
-                {s.item?.materials?.length > 0 && (
+                {/* 图片不在系统里 —— 老板 10-15：素材在微信素材群，
+                    传进系统再下载是重复搬运。这里只给封面图认人 + 告诉她去群里哪儿找。
+                    视频例外，群里会过期，所以仍然在系统里能直接下载。 */}
+                {(s.item?.cover || s.item?.material_note) && s.kind !== 'video' && (
                   <div className="flex items-start gap-2.5">
-                    <span className="w-10 shrink-0 text-xs text-gray-400 pt-1.5">素材</span>
+                    <span className="w-10 shrink-0 text-xs text-gray-400 pt-1.5">配图</span>
+                    <div className="flex-1 flex items-start gap-2.5 bg-gray-50 rounded-xl px-3 py-2">
+                      {s.item.cover && (
+                        <img src={s.item.cover.url || s.item.cover.data} alt=""
+                          className="w-14 h-14 rounded-lg object-cover border border-gray-200 shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm leading-relaxed">{s.item.material_note || '（没写素材在哪）'}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">左边是封面图，其余去微信素材群里存</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {s.kind === 'video' && s.item?.materials?.length > 0 && (
+                  <div className="flex items-start gap-2.5">
+                    <span className="w-10 shrink-0 text-xs text-gray-400 pt-1.5">视频</span>
                     <div className="flex gap-1.5 flex-wrap items-center">
                       {s.item.materials.map((m, i) => (
                         <a key={i} href={m.url || m.data} target="_blank" rel="noreferrer" download={m.name}
-                          className="w-14 h-14 rounded-lg overflow-hidden border border-gray-200 hover:border-red-400 bg-gray-100 flex items-center justify-center">
-                          {s.kind === 'video'
-                            ? <span className="text-xl">🎬</span>
-                            : <img src={m.url || m.data} alt="" className="w-full h-full object-cover" />}
+                          className="w-14 h-14 rounded-lg border border-gray-200 hover:border-red-400 bg-gray-100 flex items-center justify-center">
+                          <span className="text-xl">🎬</span>
                         </a>
                       ))}
                       <span className="text-xs text-red-700 font-semibold flex items-center gap-1 ml-1">

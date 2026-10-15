@@ -20,12 +20,30 @@ export const SOURCE_LABEL = {
 // 复刻/转发直接用原文；改写要经理另写一版
 export const NEEDS_OVERRIDE = 'rewrite'
 
-/** 这条内容算不算「做好了」—— 正文和素材都要有 */
+/**
+ * 这条内容算不算「做好了」。
+ *
+ * 老板 10-15：「我们有一个素材群，就是微信里，图片要上传吗，
+ *              倒是可以上传一张封面图片」
+ * 原来要求把所有图传进系统，那是重复搬运 ——
+ *   师傅发到素材群 → 佳慧存下来传系统 → 小洁再下载 → 传小红书
+ *   中间两趟白跑，小洁直接去群里存最快。
+ *
+ * 所以图文只要：正文 + 封面图 + 素材在群里哪儿。
+ * ⚠️ 视频仍然要求上传文件 —— 群里的视频会过期，
+ *    而视频 2–4 小时才出一条，重拍代价和图片完全不是一回事。
+ */
 export function itemReady(item) {
   if (!item) return false
-  const hasBody = !!String(item.body || '').trim()
-  const hasMat  = Array.isArray(item.materials) && item.materials.length > 0
-  return hasBody && hasMat
+  if (!String(item.body || '').trim()) return false
+  if (item.kind === 'video') {
+    return Array.isArray(item.materials) && item.materials.length > 0
+  }
+  const hasCover = !!(item.cover?.url || item.cover?.data)
+  const hasWhere = !!String(item.material_note || '').trim()
+  // 全都传进系统了也算做好（她想传就随她）
+  const hasMat = Array.isArray(item.materials) && item.materials.length > 0
+  return (hasCover && hasWhere) || hasMat
 }
 
 /**

@@ -235,6 +235,8 @@ function SlotEditor({ slot, data, nameOf, busy, onClose, onSaveItem, onUpdateSlo
   const [title, setTitle] = useState(item?.title || '')
   const [body, setBody] = useState(item?.body || '')
   const [mats, setMats] = useState(item?.materials || [])
+  const [cover, setCover] = useState(item?.cover || null)
+  const [matNote, setMatNote] = useState(item?.material_note || '')
   const [override, setOverride] = useState(slot.body_override || '')
   const [pickId, setPickId] = useState(slot.item_id || '')
   const [skipping, setSkipping] = useState(false)
@@ -262,7 +264,9 @@ function SlotEditor({ slot, data, nameOf, busy, onClose, onSaveItem, onUpdateSlo
           ...(isRewrite ? { body_override: override } : {}),
         })
       } else {
-        const id = await onSaveItem(slot.item_id, { kind: slot.kind, title, body, materials: mats })
+        const id = await onSaveItem(slot.item_id, {
+          kind: slot.kind, title, body, materials: mats,
+          cover, material_note: matNote })
         if (!slot.item_id) await onUpdateSlot(slot.id, { item_id: id })
       }
       await onDone()
@@ -342,31 +346,81 @@ function SlotEditor({ slot, data, nameOf, busy, onClose, onSaveItem, onUpdateSlo
                   placeholder={'正文…\n\n#悉尼搬家 #留学生搬家'}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400 resize-none leading-relaxed" />
               </div>
+              {/* 老板 10-15：「我们有一个素材群，就是微信里，图片要上传吗，
+                    倒是可以上传一张封面图片」—— 原来要把所有图传进来是重复搬运：
+                    师傅发群里 → 佳慧存下来传系统 → 小洁再下载 → 传小红书。
+                    中间两趟白跑。改成只传封面 + 写清在群里哪儿。 */}
               <div>
                 <label className="text-xs text-gray-400 block mb-1">
-                  {slot.kind === 'video' ? '视频素材' : '图片'}
-                  {slot.kind === 'video' && <span className="text-amber-700"> · 提前 3 天，当天传来不及</span>}
+                  封面图 <span className="text-red-600">必填 · 1 张</span>
+                  <span className="text-gray-300"> · 排期表和「今天要发」靠它认出是哪条</span>
                 </label>
-                <div className="flex gap-2 flex-wrap items-center">
-                  {mats.map((m, i) => (
-                    <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center">
-                      {slot.kind === 'video' ? <span className="text-xl">🎬</span>
-                        : <img src={m.url || m.data} alt="" className="w-full h-full object-cover" />}
+                <div className="flex gap-2 items-center">
+                  {cover ? (
+                    <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200">
+                      <img src={cover.url || cover.data} alt="" className="w-full h-full object-cover" />
                       {!slot.posted_at && (
-                        <button onClick={() => setMats(mats.filter((_, j) => j !== i))}
+                        <button onClick={() => setCover(null)}
                           className="absolute top-0 right-0 bg-black/60 text-white text-xs w-4 h-4 leading-4 text-center">✕</button>
                       )}
                     </div>
-                  ))}
-                  {!slot.posted_at && (
+                  ) : !slot.posted_at && (
                     <label className="w-16 h-16 rounded-lg border border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-red-400 text-gray-400">
                       {up ? '…' : <Plus size={18} />}
-                      <input type="file" multiple accept={slot.kind === 'video' ? 'video/*' : 'image/*'} className="hidden"
-                        onChange={e => { addFiles([...e.target.files]); e.target.value = '' }} />
+                      <input type="file" accept="image/*" className="hidden"
+                        onChange={async e => { const f = e.target.files[0]; e.target.value = ''
+                          if (!f) return
+                          setUp(true)
+                          try { setCover({ name: f.name, url: await uploadImage(f) }) }
+                          catch (err) { onErr(err.message || '上传失败') } finally { setUp(false) } }} />
                     </label>
                   )}
                 </div>
               </div>
+
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  素材在群里哪儿 <span className="text-red-600">必填</span>
+                </label>
+                <input value={matNote} onChange={e => setMatNote(e.target.value)} disabled={!!slot.posted_at}
+                  placeholder="例：素材群 10/14 老王发的那组，共 8 张"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400" />
+                <p className="text-xs text-gray-400 mt-1">
+                  图片不用传进来 —— 小洁照这句话直接去微信素材群里存，少两趟搬运。
+                </p>
+              </div>
+
+              {/* 视频仍然要传文件：群里会过期，而视频 2–4 小时才出一条，
+                  重拍代价和图片完全不是一回事。贵的东西留底。 */}
+              {slot.kind === 'video' && (
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">
+                    视频文件 <span className="text-red-600">必传</span>
+                    <span className="text-amber-700"> · 提前 3 天，当天传来不及</span>
+                  </label>
+                  <div className="flex gap-2 flex-wrap items-center">
+                    {mats.map((m, i) => (
+                      <div key={i} className="relative w-16 h-16 rounded-lg border border-gray-200 bg-gray-100 flex items-center justify-center">
+                        <span className="text-xl">🎬</span>
+                        {!slot.posted_at && (
+                          <button onClick={() => setMats(mats.filter((_, j) => j !== i))}
+                            className="absolute top-0 right-0 bg-black/60 text-white text-xs w-4 h-4 leading-4 text-center">✕</button>
+                        )}
+                      </div>
+                    ))}
+                    {!slot.posted_at && (
+                      <label className="w-16 h-16 rounded-lg border border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-red-400 text-gray-400">
+                        {up ? '…' : <Plus size={18} />}
+                        <input type="file" multiple accept="video/*" className="hidden"
+                          onChange={e => { addFiles([...e.target.files]); e.target.value = '' }} />
+                      </label>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    微信群里的视频会过期，而视频 2–4 小时才出一条 —— 这个必须留底。
+                  </p>
+                </div>
+              )}
             </>
           )}
         </div>
