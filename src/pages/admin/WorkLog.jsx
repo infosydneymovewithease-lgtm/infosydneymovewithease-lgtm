@@ -63,13 +63,6 @@ export default function WorkLog() {
   // 被经理退回过就要看到原因，否则她不知道该改哪里
   useEffect(() => { listWorkLogReturns(date, date).then(setReturns) /* eslint-disable-next-line */ }, [date])
   useEffect(() => { pendingReturns(addDays(today, -14)).then(setPending) /* eslint-disable-next-line */ }, [today, date])
-  // 经理的产出是「做出来的内容」，不是「发出去的条数」—— 取本周排期来算
-  useEffect(() => {
-    if (!isManager) return
-    const wk = weekRange(date)
-    getContentRange(wk.from, wk.to).then(setContent)
-    // eslint-disable-next-line
-  }, [date, isManager])
   // 休息中每分钟刷新一次计时
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 30000)
@@ -95,6 +88,14 @@ export default function WorkLog() {
   // 老板两边都管，而且他是唯一要检查客服那张卡长什么样的人 —— 看不到就没法验。
   // 所以三档：客服只看小红书、经理只看企业开发、老板两个都看（都不卡他）。
   const isBoss    = user?.role === 'admin'
+
+  // 经理的产出是「做出来的内容」，不是「发出去的条数」—— 取本周排期来算
+  useEffect(() => {
+    if (!isManager) return
+    const wk = weekRange(date)
+    getContentRange(wk.from, wk.to).then(setContent)
+    // eslint-disable-next-line
+  }, [date, isManager])
   const quota = Number(policy.comment_quota) || 3
   const commentCount = mine?.comment_count ?? 0
   // 客服要达配额才能提交；经理没有日配额（to B 开发按天算没意义）
