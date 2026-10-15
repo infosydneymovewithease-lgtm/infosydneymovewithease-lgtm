@@ -9,7 +9,7 @@ import { isDepositPaid } from '../../utils/orderHelpers'
 dayjs.locale('zh-cn')
 import {
   AlertTriangle, CheckCircle, Clock, DollarSign,
-  Truck, UserX, FileX, CreditCard, PlusCircle, ArrowRight,
+  Truck, UserX, FileX, CreditCard, PlusCircle, ArrowRight, ChevronDown, ChevronRight,
   Bell, BellOff, Sparkles, Package, CalendarClock,
 } from 'lucide-react'
 
@@ -30,6 +30,8 @@ const STATUS_COLOR = {
 export default function Dashboard() {
   const { orders, storageOrders, user } = useApp()
   const navigate = useNavigate()
+  // 老板 10-15：最近7天默认折叠 —— 今日订单才是每天要看的
+  const [showRecent, setShowRecent] = useState(false)
   const today = dayjs().format('YYYY-MM-DD')
 
   const todayOrders = orders
@@ -246,19 +248,28 @@ export default function Dashboard() {
 
       {/* Recent 7 days — grouped by date */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        {/* 老板 10-15：「最近7天应该默认折叠状态」——
+            今日订单才是她每天要看的，最近7天是偶尔回头查。
+            默认展开会把今天的事推到屏幕外面去。
+            注意这是【折叠】不是【去掉】，点一下就开，不算收走功能。 */}
         <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
-          <h2 className="font-semibold text-gray-800 text-sm">最近7天</h2>
-          <span className="text-xs bg-gray-100 text-gray-500 font-bold px-2 py-0.5 rounded-full ml-1">
-            {recentOrders.length}
-          </span>
+          <button onClick={() => setShowRecent(v => !v)}
+            className="flex items-center gap-2 flex-1 min-w-0 text-left">
+            {showRecent ? <ChevronDown size={14} className="text-gray-400 shrink-0" />
+                        : <ChevronRight size={14} className="text-gray-400 shrink-0" />}
+            <h2 className="font-semibold text-gray-800 text-sm">最近7天</h2>
+            <span className="text-xs bg-gray-100 text-gray-500 font-bold px-2 py-0.5 rounded-full">
+              {recentOrders.length}
+            </span>
+          </button>
           <button
             onClick={() => navigate('/admin/orders')}
-            className="ml-auto text-red-600 text-xs font-medium hover:underline flex items-center gap-1"
+            className="text-red-600 text-xs font-medium hover:underline flex items-center gap-1 shrink-0"
           >
             全部订单 <ArrowRight size={12} />
           </button>
         </div>
-        {recentOrders.length === 0 ? (
+        {showRecent && (recentOrders.length === 0 ? (
           <div className="px-4 py-8 text-center text-gray-400 text-sm">近7天无历史订单</div>
         ) : (
           <div>
@@ -277,7 +288,7 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-        )}
+        ))}
       </div>
     </div>
   )
