@@ -434,7 +434,7 @@ export default function WorkLog() {
       )}
 
       {/* 老板 10-15：「我觉得她应该是我今天编辑了什么」
-          分工定下来之后这里一直没跟着改 —— 佳慧设计、小洁发布，
+          分工定下来之后这里一直没跟着改 —— Annie设计、小洁发布，
           给经理看「今天发了什么」是记错了人的活。 */}
       {isManager && (() => {
         const edits = myEditsToday(content.items, content.slots, user?.id, date, sydneyDateOf)

@@ -97,7 +97,7 @@ export function impactOf(order, changes, staffRates) {
 }
 
 /** 当日汇总。随补录实时变。
- *  工资按人拆开 —— 佳慧要拿这个和每个师傅核工资，只给总数等于没给。 */
+ *  工资按人拆开 —— Annie要拿这个和每个师傅核工资，只给总数等于没给。 */
 export function daySummary(orders, staffRates) {
   let due = 0, paid = 0, cash = 0, transfer = 0
   const byStaff = new Map()

@@ -1,6 +1,6 @@
 // 角色与可见性 —— 配置驱动，不在组件里写死 if 分支
 //
-// 2026-10-11 新增 manager（客服经理，佳慧 Annie）。
+// 2026-10-11 新增 manager（客服经理，Annie Annie）。
 // 背景：原来只有 admin / cs 两级，判断写成一句
 //   if (item.adminOnly && user?.role !== 'admin') return null
 // 非黑即白，没有中间层 —— 客服经理和她管的人看到的是同一个界面，「监管」无从谈起。

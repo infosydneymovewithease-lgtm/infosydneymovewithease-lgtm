@@ -7,7 +7,7 @@ import { roleLabel } from '../../utils/roles'
 import SettingsOperations from './SettingsOperations'
 
 // 角色名统一走 utils/roles.js ——
-// 10/11 加 manager（客服经理）时这里漏了，佳慧会显示成「客服」。
+// 10/11 加 manager（客服经理）时这里漏了，Annie会显示成「客服」。
 const ROLE_COLOR = {
   admin: 'bg-red-100 text-red-700', manager: 'bg-purple-100 text-purple-700',
   cs: 'bg-blue-100 text-blue-700',  worker: 'bg-green-100 text-green-700',
@@ -100,7 +100,7 @@ export default function Settings() {
           </div>
 
           {/* Group by role */}
-          {/* ⚠️ 10-13：原来漏了 manager —— 一旦把佳慧改成客服经理，
+          {/* ⚠️ 10-13：原来漏了 manager —— 一旦把Annie改成客服经理，
                  她会从这个列表里整个消失（分组里没有她的角色），连改回来都找不到人。
                  顺序 = 权限从高到低，和 ROLES 里的 rank 一致。 */}
           {['admin','manager','cs','worker'].map(role => {

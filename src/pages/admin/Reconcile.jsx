@@ -70,7 +70,7 @@ export default function Reconcile() {
     done.map(o => [o.id, detectIssues(o, { medians, staffRates })])), [done, medians, staffRates])
 
   // ⚠️ 进度按【人工勾选】算，不按「系统查不出异常」算。
-  // 这一页的存在理由是佳慧和师傅在微信核对完再回写系统 ——
+  // 这一页的存在理由是Annie和师傅在微信核对完再回写系统 ——
   // 系统能查的只有字段齐不齐、数字离不离谱，
   // 它不可能知道她有没有问过晨曦这单几点收的工。
   const checkedIds = useMemo(() => new Set(checked.map(c => c.order_id)), [checked])
@@ -390,7 +390,7 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, o
         </span>
 
         {/* 不展开就能对 —— 老板 10-11：「要减少劳动力简单高效」。
-            佳慧手里拿着师傅微信报的时间，这一行要能直接比，
+            Annie手里拿着师傅微信报的时间，这一行要能直接比，
             逼她每单点开 = 这一页还不如订单详情页。 */}
         <span className="text-sm text-gray-600 w-40 shrink-0 truncate">
           {order.customerName}

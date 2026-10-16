@@ -108,7 +108,7 @@ export default function Roster() {
             </button>
           )}
           <p className="text-xs text-gray-400 mt-2.5">
-            小洁 A=日一二三 B=四五 休=六 · 佳慧 A=四五六 B=二三 休=日一<br />
+            小洁 A=日一二三 B=四五 休=六 · Annie A=四五六 B=二三 休=日一<br />
             中国法定假期自动标「假」，谁顶由你们手动改
           </p>
         </div>
