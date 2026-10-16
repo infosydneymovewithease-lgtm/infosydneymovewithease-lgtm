@@ -64,10 +64,15 @@ export default function DailyProgress() {
   //     不需要的时候才出现」。而且第一件事就是打卡，它本该是清单第一条。
   //
   //    现在：今天不该上班的人才不显示（她休息，摆一堆任务才是噪音）。
-  const onDutyToday = roster.length
-    ? roster.some(r => r.staff_id === user?.id && (r.shift === 'A' || r.shift === 'B'))
-    : true          // 还没排班的日子不拦，否则新用户永远看不到
-  if (!onDutyToday) return null
+  //    ⚠️ 2026-10-16 二次修正：第一版写的是「排班表里是 A/B 才显示」，
+  //       结果把老板自己挡在外面了 —— roster_rule 里只有小洁和 Annie，
+  //       没有 phill，所以一旦那天有排班数据，他就被判成「不该上班」。
+  //
+  //       正确的判断是反过来：【只有排班表明确写着今天休息才隐藏】。
+  //       压根不在排班表里的人（老板、以后新加的人）不等于不上班。
+  const myShift = roster.find(r => r.staff_id === user?.id)?.shift
+  const offToday = myShift === 'off' || myShift === 'leave' || myShift === 'holiday'
+  if (offToday) return null
 
   const todo = tasks.filter(t => t.state === S.todo)
   const rest = tasks.filter(t => t.state !== S.todo)
