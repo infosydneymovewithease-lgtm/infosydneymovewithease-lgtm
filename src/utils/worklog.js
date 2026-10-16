@@ -16,10 +16,10 @@ import { currentSeason, toMinutes, toHHMM, isWorkingOn } from './shifts'
 import { sydneyDateOf } from './date'
 
 /** 某天该开放哪几段休息。单人日自动砍掉 single_day=false 的那段。 */
-export function slotsForDay(breakWindows, staffSchedules, dateStr, now = new Date()) {
+export function slotsForDay(breakWindows, staffSchedules, dateStr, now = new Date(), roster) {
   const season = currentSeason(now)
   const ids = [...new Set((staffSchedules || []).map(s => s.staff_id))]
-  const onDuty = ids.filter(id => isWorkingOn(staffSchedules, id, dateStr))
+  const onDuty = ids.filter(id => isWorkingOn(staffSchedules, id, dateStr, roster))
   const alone = onDuty.length <= 1
   return (breakWindows || [])
     .filter(w => w.season === season)

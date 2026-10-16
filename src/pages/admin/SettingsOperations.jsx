@@ -59,8 +59,16 @@ export default function SettingsOperations() {
   // 每个星期几有几个人在岗。1 人 = 单人日，下午那段休息不排。
   // 判断复用 utils/shifts 的 isWorkingOn —— 同一个规则不要在组件里再写一遍，
   // 否则以后改规则会漏掉这里。
+  //
+  // ⚠️ 2026-10-16：这里【故意不传 roster】。
+  //    这块展示的是「按星期规则每天几个人」，也就是规则本身；
+  //    而 shift_roster 是某一天的实际排班（含补休、临时调整）。
+  //    这两者不该混 —— 这里混进实际排班，规则预览就会随着某天的调整跳动。
+  //    其余所有「谁在岗」的判断都已改为优先读 shift_roster（唯一真相）。
   const staffIds = [...new Set(staffSchedules.map(s => s.staff_id))]
   const headcount = WEEK.map((_, dow) => {
+    // 硬编码一周样本日期（2026-10-11 是周日，和 dow 0=周日 对齐）。
+    // 只用来取星期几，不依赖具体日期。
     const probe = ['2026-10-11','2026-10-12','2026-10-13','2026-10-14','2026-10-15','2026-10-16','2026-10-17'][dow]
     return staffIds.filter(id => isWorkingOn(staffSchedules, id, probe)).length
   })

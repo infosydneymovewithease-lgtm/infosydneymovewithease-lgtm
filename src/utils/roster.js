@@ -70,10 +70,16 @@ export function rosterStats(rows, staffIds) {
   return { zero, single, double, per, edited: (rows || []).filter(r => r.auto === false).length }
 }
 
-/** 月历需要的格子（含前面补空） */
+/**
+ * 月历需要的格子（含前面补空）。
+ *
+ * ⚠️ 这里的 (getUTCDay()+6)%7 是【渲染】需要 —— 月历第一列要是周一。
+ *    它不是规则。全系统的星期【规则】一律用线上的 weekdayOf()（0=周日），
+ *    见 utils/date.js:49 和 staff_schedule / roster_rule / content_rule。
+ */
 export function monthCells(year, month) {
   const first = new Date(Date.UTC(year, month - 1, 1))
-  const lead = (first.getUTCDay() + 6) % 7
+  const lead = (first.getUTCDay() + 6) % 7   // 渲染偏移，非规则
   const days = new Date(Date.UTC(year, month, 0)).getUTCDate()
   const out = []
   for (let i = 0; i < lead; i++) out.push(null)

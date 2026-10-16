@@ -22,7 +22,7 @@ const WEEK = ['一', '二', '三', '四', '五', '六', '日']
 export default function TeamToday() {
   const { user, staff, orders, config, getWorkday, getInquiryWeek,
           getPolicyText, confirmTeamDay, getTeamConfirm,
-          returnWorkLog, listWorkLogReturns, openDays } = useApp()
+          returnWorkLog, listWorkLogReturns, openDays, getRoster } = useApp()
   const navigate = useNavigate()
   // 从日报「去审核」跳过来时带 ?date= —— 落地页必须直接是那一天，
   // 不能让她跳过来还要自己翻日期
@@ -41,6 +41,7 @@ export default function TeamToday() {
   const [retText, setRetText] = useState('')
   const [shotsOf, setShotsOf] = useState(null) // 正在看谁的截图
   const [open, setOpen] = useState([])         // 前几天还没闭环的
+  const [roster, setRoster] = useState([])     // 当天排班 —— 唯一真相
 
   const wk = useMemo(() => weekRange(date), [date])
   useEffect(() => {
@@ -53,6 +54,8 @@ export default function TeamToday() {
         // 老板定的流程是第二天早上核前一天 —— 她北京 08:00 打开看到的是空白的今天，
         // 昨天那两件没做的事一个都看不见。往前查 7 天。
         openDays(addDays(date, -7), addDays(date, -1))])
+      const rs = await getRoster(date, date)
+      if (alive) setRoster(rs.roster || [])
       if (alive) { setDay(d); setWeek(w); setPrevDay(p.inquiries || []); setPolicy(pol)
                    setConfirm(cf); setChecked(false); setReturns(rt); setOpen(op) }
     })()
@@ -70,10 +73,11 @@ export default function TeamToday() {
   // 今天该上班的人
   const onDuty = useMemo(() => {
     const ids = [...new Set((config.staffSchedules || []).map(s => s.staff_id))]
-    return ids.filter(id => isWorkingOn(config.staffSchedules, id, date))
-  }, [config.staffSchedules, date])
+    // 2026-10-16：排班表是唯一真相，没排班才回退到星期规则
+    return ids.filter(id => isWorkingOn(config.staffSchedules, id, date, roster))
+  }, [config.staffSchedules, date, roster])
 
-  const slots = slotsForDay(config.breakWindows, config.staffSchedules, date)
+  const slots = slotsForDay(config.breakWindows, config.staffSchedules, date, new Date(), roster)
   // 退回是管理动作，客服之间不能互退；也不能退自己的
   const canReturn = user?.role === 'admin' || user?.role === 'manager'
   const quota = Number(policy.comment_quota) || 3

@@ -19,18 +19,22 @@ const hhmm = iso => iso
   : '—'
 
 export default function AttendanceCard({ compact = false }) {
-  const { user, staff, config, getWorkday, upsertWorkLog, startBreak, endBreak } = useApp()
+  const { user, staff, config, getWorkday, upsertWorkLog, startBreak, endBreak, getRoster } = useApp()
   const date = sydneyToday()
   const [day, setDay] = useState({ logs: [], breaks: [] })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [confirmOut, setConfirmOut] = useState(false)
+  const [roster, setRoster] = useState([])
   const [, setTick] = useState(0)
 
   const refresh = useCallback(async () => setDay(await getWorkday(date)), [getWorkday, date])
   useEffect(() => {
     let alive = true
-    ;(async () => { const d = await getWorkday(date); if (alive) setDay(d) })()
+    ;(async () => {
+      const [d, rs] = await Promise.all([getWorkday(date), getRoster(date, date)])
+      if (alive) { setDay(d); setRoster(rs.roster || []) }
+    })()
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date])
@@ -48,7 +52,7 @@ export default function AttendanceCard({ compact = false }) {
   }
 
   const mine = day.logs.find(l => l.staff_id === user?.id)
-  const slots = slotsForDay(config.breakWindows, config.staffSchedules, date)
+  const slots = slotsForDay(config.breakWindows, config.staffSchedules, date, new Date(), roster)
   const others = othersOnBreak(day.breaks, user?.id)
   const onBreakNow = slots.find(w => {
     const r = myBreak(day.breaks, user?.id, w.slot_index)

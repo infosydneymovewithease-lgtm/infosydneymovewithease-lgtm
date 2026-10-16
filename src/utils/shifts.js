@@ -65,17 +65,30 @@ export function beijingToSydney(hhmm, date = new Date()) {
 }
 
 /** 某人某天上不上班。weekday 用 0=周日…6=周六，和 Postgres extract(dow) 一致 */
-export function isWorkingOn(staffSchedules, staffId, dateStr) {
+export function isWorkingOn(staffSchedules, staffId, dateStr, roster) {
+  // 2026-10-16 收口：排班表 shift_roster 是【唯一真相】。
+  //
+  // 老板指出的不一致：原来「谁在岗」有两套 ——
+  //   staff_schedule（星期 × 上/休）：团队今日、周月汇总、休息时段、运营配置在用
+  //   shift_roster（日期 × A/B/休/补休）：只有排班表在用
+  // 后果是在排班表里改成补休，团队今日照样显示她在岗、照样报「日报没交」。
+  //
+  // 现在：有排班就读排班；那天还没生成排班才回退到星期规则。
+  // staff_schedule 从此只是 roster_rule 的同义物，不再单独作数。
+  if (roster && roster.length) {
+    const row = roster.find(r => r.work_date === dateStr && r.staff_id === staffId)
+    if (row) return row.shift === 'A' || row.shift === 'B'
+  }
   const [y, m, d] = String(dateStr).split('-').map(Number)
-  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay()   // 0=周日，线上基准
   const row = (staffSchedules || []).find(s => s.staff_id === staffId && s.weekday === dow)
   return row ? row.is_working : true   // 没配过的人默认上班，不要凭空把人排休
 }
 
 /** 某天在岗的人。用来判断「单人日」—— 单人日下午那段休息不开放 */
-export function workingStaffOn(staffSchedules, dateStr) {
+export function workingStaffOn(staffSchedules, dateStr, roster) {
   const ids = [...new Set((staffSchedules || []).map(s => s.staff_id))]
-  return ids.filter(id => isWorkingOn(staffSchedules, id, dateStr))
+  return ids.filter(id => isWorkingOn(staffSchedules, id, dateStr, roster))
 }
 
 /** 某天实际可用的休息窗口（单人日自动砍掉 single_day=false 的那段） */

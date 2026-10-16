@@ -10,6 +10,8 @@
 //   视频     → 视频号（原文）+ 朋友圈（转发）
 // 所以朋友圈 7 条一条都不用新写，真正要产出的只有 6 条文案 + 2 个视频。
 
+import { weekdayOf } from './date'
+
 export const SOURCE_LABEL = {
   original: '原文',
   clone:    '复刻',
@@ -199,11 +201,15 @@ export function addDaysLocal(dateStr, n) {
   return dt.toISOString().slice(0, 10)
 }
 
+/**
+ * 这一周的周一。
+ * ⚠️ 用线上的星期口径（weekdayOf → 0=周日），不要自己算 ——
+ *    自己算就会出现第二套口径，而且不报错，只会静默差一天。
+ */
 export function mondayOf(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number)
-  const dt = new Date(Date.UTC(y, m - 1, d))
-  const dow = (dt.getUTCDay() + 6) % 7
-  return addDaysLocal(dateStr, -dow)
+  const dow = weekdayOf(dateStr)          // 0=周日 … 6=周六（线上基准）
+  const back = dow === 0 ? 6 : dow - 1    // 周日往回退 6 天，其余退 dow-1
+  return addDaysLocal(dateStr, -back)
 }
 
 /**
