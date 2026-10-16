@@ -167,7 +167,11 @@ export default function Dashboard() {
 
       {/* 出勤打卡 —— 老板 10-13：「加在首页工作台的上方，方便工人打卡」
           一进后台就能打，不用先点进日报。和日报读写同一份数据。 */}
-      {FEATURES.worklog && <AttendanceCard />}
+      {/* ⚠️ 2026-10-16：打卡卡片和「我的日报」拆成两个开关。
+          独立页面坏了只影响那一页；而这个是【注入工作台】的，
+          工作台是全公司用得最多的页，注入出错会整页白屏。
+          所以先开独立页面，确认没问题再开这个。 */}
+      {FEATURES.attendanceCard && <AttendanceCard />}
       {/* 老板 10-15 指定的位置：打卡下面、统计卡上面 ——
           打卡完了，接下来就是「那我今天要干嘛」，正好接上。 */}
       {FEATURES.dashboardProgress && <DailyProgress />}
