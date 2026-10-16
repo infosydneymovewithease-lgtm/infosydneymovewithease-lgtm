@@ -34,7 +34,9 @@ export function todayTasks(ctx) {
   t.push({
     key: 'clock', label: '上班打卡',
     state: log?.clock_in ? S.done : S.todo,
-    hint: log?.clock_in ? null : '先打卡，不然交不了日报',
+    // 打卡按钮就在这块面板【上面那张出勤卡】里，所以不给跳转链接，
+    // 而是直接告诉她往上看 —— 跳到别的页反而绕远。
+    hint: log?.clock_in ? null : '点上面那张卡的「上班打卡」· 不打卡交不了日报',
     minutes: 0,
   })
 

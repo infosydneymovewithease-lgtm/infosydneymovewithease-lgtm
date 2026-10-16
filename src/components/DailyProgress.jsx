@@ -13,7 +13,7 @@ import { todayTasks, weekTasks, progressOf, S } from '../utils/tasks'
 import { Check, ChevronRight, Clock } from 'lucide-react'
 
 export default function DailyProgress() {
-  const { user, config, getWorkday, getContentRange, openDays, getPolicyText } = useApp()
+  const { user, config, getWorkday, getContentRange, openDays, getPolicyText, getRoster } = useApp()
   const navigate = useNavigate()
   const date = sydneyToday()
   const isManager = user?.role === 'admin' || user?.role === 'manager'
@@ -22,15 +22,16 @@ export default function DailyProgress() {
   const [content, setContent] = useState({ slots: [], items: [] })
   const [open, setOpen] = useState([])
   const [policy, setPolicy] = useState({})
+  const [roster, setRoster] = useState([])   // 排班表是「谁今天在岗」的唯一真相
 
   const wk = useMemo(() => weekRange(date), [date])
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const [d, c, p] = await Promise.all([
-        getWorkday(date), getContentRange(wk.from, wk.to), getPolicyText()])
+      const [d, c, p, rs] = await Promise.all([
+        getWorkday(date), getContentRange(wk.from, wk.to), getPolicyText(), getRoster(date, date)])
       if (!alive) return
-      setDay(d); setContent(c); setPolicy(p)
+      setDay(d); setContent(c); setPolicy(p); setRoster(rs.roster || [])
       if (isManager) openDays(addDays(date, -7), addDays(date, -1)).then(o => alive && setOpen(o))
     })()
     return () => { alive = false }
@@ -57,8 +58,16 @@ export default function DailyProgress() {
   })
   const p = progressOf(tasks)
 
-  // 没打卡之前不显示 —— 那时候她还没开始上班，摆一堆未完成只是噪音
-  if (!log?.clock_in) return null
+  // ⚠️ 2026-10-16 改：原来写的是「没打卡之前不显示」，理由是「摆一堆未完成只是噪音」。
+  //    老板上线后指出看不到引导 —— 那个判断是错的：
+  //    【这块面板本身就是引导】，打卡前藏起来等于「要引导的时候没有，
+  //     不需要的时候才出现」。而且第一件事就是打卡，它本该是清单第一条。
+  //
+  //    现在：今天不该上班的人才不显示（她休息，摆一堆任务才是噪音）。
+  const onDutyToday = roster.length
+    ? roster.some(r => r.staff_id === user?.id && (r.shift === 'A' || r.shift === 'B'))
+    : true          // 还没排班的日子不拦，否则新用户永远看不到
+  if (!onDutyToday) return null
 
   const todo = tasks.filter(t => t.state === S.todo)
   const rest = tasks.filter(t => t.state !== S.todo)
