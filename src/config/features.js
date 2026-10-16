@@ -20,7 +20,7 @@
 
 export const FEATURES = {
   // ── 纯新增页面：不碰任何现有数据，影响最小 ──────────────
-  roster:    false,   // 排班表（/admin/roster）—— 只读新表
+  roster:    true,    // ✅ 2026-10-16 22:40 开启 · 排班表（/admin/roster）—— 只读新表
   worklog:   false,   // 客服工作台（/admin/worklog · /admin/team-today）
 
   // ── 改现有页面的显示 ────────────────────────────────────
