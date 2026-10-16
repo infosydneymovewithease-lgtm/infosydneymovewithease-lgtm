@@ -1,3 +1,5 @@
+import { FEATURES } from '../config/features'
+
 import { VEHICLES, STAIRS_FEE, VAN_PROMO_DISCOUNT } from '../data/vehicles'
 
 // 由 timer 状态算实际工时（墙上时钟为准，免疫手机锁屏 JS 暂停）
@@ -71,7 +73,10 @@ export function overtimeDetail(startTime, endTime, people) {
 
   const overtimeHours = overtimeMs / 3600000
 
-  if (overtimeHours > OVERTIME_HOURS_CAP) {
+  // ⚠️ 封顶会改变金额，所以挂在开关上。
+  //    关掉时算法和线上完全一致（不封顶），只是不再有防护。
+  //    开关在 src/config/features.js —— overtimeCap
+  if (FEATURES.overtimeCap && overtimeHours > OVERTIME_HOURS_CAP) {
     return { fee: 0, hours: overtimeHours, capped: true }
   }
   return {
@@ -162,7 +167,8 @@ export function calcTotal({
     overtimeCapped:   ot.capped,
     overtimeRawHours: Math.round(ot.hours * 10) / 10,
     workHours:        Math.round(((Number(workSeconds) || 0) / 3600) * 10) / 10,
-    timerSuspect:     ot.capped || ((Number(workSeconds) || 0) / 3600) > WORK_HOURS_SUSPECT,
+    timerSuspect:     FEATURES.overtimeCap &&
+                      (ot.capped || ((Number(workSeconds) || 0) / 3600) > WORK_HOURS_SUSPECT),
     highwayFee,
     parkingFee,
     miscFee:       Math.round(miscFee * 100) / 100,

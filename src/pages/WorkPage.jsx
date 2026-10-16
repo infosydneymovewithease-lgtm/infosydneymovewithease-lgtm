@@ -5,6 +5,7 @@ import { formatDuration, billedHours, computeElapsed } from '../utils/pricing'
 import { scheduledTimeLabel } from '../utils/orderTime'
 import { VEHICLES, VAN_PROMO_DISCOUNT } from '../data/vehicles'
 import { findStaleWork, isLateStop } from '../utils/staleWork'
+import { FEATURES } from '../config/features'
 import EndFixModal from '../components/EndFixModal'
 import { ArrowLeft, Play, Pause, StopCircle, Clock, CheckCircle } from 'lucide-react'
 
@@ -54,7 +55,9 @@ export default function WorkPage() {
     // 【开工闸门 10/11】上一单没结束不让开新单。
     // 老板原话：「不可以开始下一单，需要上一单结束」
     // 挡住的同时必须给出路 —— 直接弹补填，师傅自己 15 秒解开，不用找客服。
-    const stale = findStaleWork(orders, user?.id, id)
+    // ⚠️ 这是整批里唯一会【挡住人干活】的改动，必须能一键关掉。
+    //    关掉后行为和线上完全一致（不挡，直接开工）。
+    const stale = FEATURES.workerGate ? findStaleWork(orders, user?.id, id) : []
     if (stale.length > 0) {
       setFix({ order: stale[0], mode: 'gate' })
       return
@@ -95,7 +98,7 @@ export default function WorkPage() {
     // 这时候不能静默写「现在」当收工时间，那就是 QX2608021 变成 $21,364 的原因。
     // 数据说明必须单独挡这一条：那 10 单跑飞的里只有 3 单会被开工闸门拦到，
     // 其余的是挂了几天、期间没开新单，直接来点结束。
-    if (isLateStop(elapsed)) {
+    if (FEATURES.workerGate && isLateStop(elapsed)) {
       setFix({ order, mode: 'late' })
       return
     }

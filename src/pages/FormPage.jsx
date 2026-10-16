@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { FEATURES } from '../config/features'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { calcTotal, billedHours, formatDuration, computeElapsed } from '../utils/pricing'
@@ -395,7 +396,7 @@ export default function FormPage() {
         </Section>
 
         {/* 计时跑飞提醒 —— 忘记点「结束」时，工时和加班费会一起失控 */}
-        {result?.timerSuspect && (
+        {FEATURES.overtimeCap && result?.timerSuspect && (
           <div className="bg-red-50 border-2 border-red-300 rounded-xl px-4 py-3 mb-3">
             <p className="text-red-700 font-bold text-base mb-1">
               ⚠️ 这单计时了 {result.workHours} 小时，是不是忘记点「结束」了？

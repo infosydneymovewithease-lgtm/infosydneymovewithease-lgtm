@@ -170,7 +170,7 @@ export default function Dashboard() {
       {FEATURES.worklog && <AttendanceCard />}
       {/* 老板 10-15 指定的位置：打卡下面、统计卡上面 ——
           打卡完了，接下来就是「那我今天要干嘛」，正好接上。 */}
-      {FEATURES.worklog && <DailyProgress />}
+      {FEATURES.dashboardProgress && <DailyProgress />}
 
       {/* Stats cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
