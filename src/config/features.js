@@ -10,4 +10,5 @@ export const FEATURES = {
   worklog:   true,   // 客服工作台（/admin/worklog · /admin/team-today）
   summary:   true,   // 周月汇总（/admin/summary）
   content:   true,   // 内容排期（/admin/content · /admin/content-today）
+  roster:    true,   // 排班表（/admin/roster）
 }

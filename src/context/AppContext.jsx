@@ -668,6 +668,33 @@ export function AppProvider({ children }) {
     return { slots: data?.slots || [], items: data?.items || [], rules: data?.rules || [] }
   }
 
+  // ── 排班（2026-10-16）──────────────────────────────────
+  // 老板：「我和经理可以对这个表格休息人员进行调整」
+  async function getRoster(from, to) {
+    const { data, error } = await supabase.rpc('get_roster', { p_from: from, p_to: to })
+    if (error) { console.warn('[roster] 读取失败：', error.message); return { roster: [], holidays: [] } }
+    return { roster: data?.roster || [], holidays: data?.holidays || [] }
+  }
+
+  async function generateRoster(from, to) {
+    const { data, error } = await supabase.rpc('generate_roster', { p_from: from, p_to: to })
+    if (error) throw new Error(error.message || '生成排班失败')
+    return data
+  }
+
+  async function setRoster(date, staffId, shift, note) {
+    const { data, error } = await supabase.rpc('set_roster', {
+      p_date: date, p_staff_id: staffId, p_shift: shift, p_by: user?.id || null, p_note: note || null })
+    if (error) throw new Error(error.message || '改排班失败')
+    return data
+  }
+
+  async function listHolidays(from, to) {
+    const { data, error } = await supabase.rpc('list_holidays', { p_from: from, p_to: to })
+    if (error) { console.warn('[holiday] 读取失败：', error.message); return [] }
+    return data || []
+  }
+
   async function listContentPrompts() {
     const { data, error } = await supabase.rpc('list_content_prompts')
     if (error) { console.warn('[content] 提示词读取失败：', error.message); return [] }
@@ -1120,6 +1147,7 @@ export function AppProvider({ children }) {
       returnWorkLog, listWorkLogReturns, pendingReturns, openDays,
       getContentRange, generateWeekSlots, autolinkWeek, saveContentItem,
       updateSlot, markSlotPosted, skipSlot, listContentPrompts,
+      getRoster, generateRoster, setRoster, listHolidays,
       orders, confirmOrder, completeOrder, startWork, getMyOrders, finishWorkWithCorrection,
       createOrder, createOrderWithSlotCheck,
       updateOrder, updateOrderTimer, dispatchOrder, updateOrderStatus,

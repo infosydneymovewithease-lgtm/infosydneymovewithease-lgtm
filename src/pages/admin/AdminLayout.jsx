@@ -7,7 +7,7 @@ import { FEATURES } from '../../config/features'
 import {
   LayoutDashboard, ClipboardList, PlusCircle, Truck,
   Users, Building2, DollarSign, Package, Recycle,
-  Settings, LogOut, Menu, X, ChevronRight, Ban, Sparkles, Gauge, BookOpen, ClipboardCheck, NotebookPen, UsersRound, TrendingUp, Send, CalendarRange
+  Settings, LogOut, Menu, X, ChevronRight, Ban, Sparkles, Gauge, BookOpen, ClipboardCheck, NotebookPen, UsersRound, TrendingUp, Send, CalendarRange, CalendarDays
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -26,6 +26,8 @@ const NAV_ITEMS = [
   { label: '团队今日', icon: UsersRound,       to: '/admin/team-today', roles: ['admin', 'manager'], feature: 'worklog' },
   { label: '今天要发', icon: Send,              to: '/admin/content-today', feature: 'content' },
   { label: '内容排期', icon: CalendarRange,     to: '/admin/content',    roles: ['admin', 'manager'], feature: 'content' },
+  // 排班：所有人都能看自己的班，但只有 admin/manager 能改（页面里判断）
+  { label: '排班表',   icon: CalendarDays,       to: '/admin/roster',     feature: 'roster' },
   { label: '每日对账', icon: ClipboardCheck,   to: '/admin/reconcile',  roles: ['admin', 'manager'], feature: 'reconcile' },
   // 老板 10-15：「周汇总这个我就觉得用的话鸡肋」—— 对客服关掉。
   // 这是新加的功能，不是线上已有的，关掉不会有「被收走」的感觉。
