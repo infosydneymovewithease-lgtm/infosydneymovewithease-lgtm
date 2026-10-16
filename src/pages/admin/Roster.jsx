@@ -14,6 +14,7 @@ import { useApp } from '../../context/AppContext'
 import { sydneyToday } from '../../utils/date'
 import {
   SHIFT, SHIFT_KEYS, byDate, onDutyCount, previewChange, rosterStats, monthCells,
+  demandWindows, daySignals, monthAlert,
 } from '../../utils/roster'
 import { ChevronLeft, ChevronRight, Check, AlertTriangle } from 'lucide-react'
 
@@ -42,7 +43,10 @@ export default function Roster() {
   const ids = useMemo(() => [...new Set(data.roster.map(r => r.staff_id))], [data.roster])
   const stats = useMemo(() => rosterStats(data.roster, ids), [data.roster, ids])
   const nameOf = id => staff?.find(s => s.id === id)?.name || id
-  const holOf = d => (data.holidays || []).find(h => h.start_date <= d && d <= h.end_date)
+  // 老板 10-16：把节日学期日历融进排班表 —— 排班表原来只显示供给，不显示需求
+  const windows = useMemo(() => demandWindows(data.holidays), [data.holidays])
+  const alert   = useMemo(() => monthAlert(data.holidays, ym), [data.holidays, ym])
+  const sigOf   = d => daySignals(data.holidays, windows, d)
 
   async function run(fn, ok) {
     setBusy(true); setErr(''); setMsg('')
@@ -84,6 +88,15 @@ export default function Roster() {
         <Kpi label="人工调整过" value={`${stats.edited} 格`} />
       </div>
 
+      {/* ① 需求提示条 —— 放在月历【上面】。
+             放下面就晚了，排班的人已经排完了。淡季月份不出现。 */}
+      {alert && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-start gap-2.5">
+          <span className="shrink-0 text-base leading-none mt-0.5">🎓</span>
+          <p className="text-sm text-amber-900 leading-relaxed flex-1">{alert}</p>
+        </div>
+      )}
+
       {data.roster.length === 0 ? (
         <div className="bg-white rounded-2xl p-6 text-center shadow-sm">
           <p className="text-sm text-gray-600 mb-3">这个月还没有排班</p>
@@ -110,7 +123,7 @@ export default function Roster() {
                 if (!d) return <div key={`e${i}`} />
                 const dm = days.get(d) || {}
                 const n = onDutyCount(dm)
-                const hol = holOf(d)
+                const sig = sigOf(d)
                 return (
                   <button key={d} onClick={() => canEdit && setOpen(d)} disabled={!canEdit}
                     className={`min-h-[72px] rounded-xl border p-1.5 text-left ${CELL_BG[n] || 'bg-gray-50 border-gray-200'} ${
@@ -120,6 +133,12 @@ export default function Roster() {
                       {data.roster.some(r => r.work_date === d && r.auto === false) && (
                         <span className="text-[9px] text-gray-400">改过</span>
                       )}
+                      <span className="flex-1" />
+                      {/* 图标不用文字 —— 格子只有 72px 高，假期全名会挤爆。
+                          鼠标移上去看全名。 */}
+                      <span className="text-[10px] leading-none" title={sig.map(x => x.text).join(' · ')}>
+                        {sig.map(x => x.icon).join('')}
+                      </span>
                     </div>
                     <div className="mt-1 space-y-0.5">
                       {ids.map(id => {
@@ -134,7 +153,9 @@ export default function Roster() {
                         )
                       })}
                     </div>
-                    {hol && <span className="block text-[9px] text-amber-700 truncate mt-0.5">{hol.name}</span>}
+                    {sig.length > 0 && (
+                      <span className="block text-[9px] text-amber-700 truncate mt-0.5">{sig[0].text}</span>
+                    )}
                   </button>
                 )
               })}
@@ -146,6 +167,7 @@ export default function Roster() {
             <Lg cls="bg-amber-50 border-amber-200">单人（只到 20:00）</Lg>
             <Lg cls="bg-red-50 border-red-200">无人</Lg>
             <span><b className="text-red-700">A</b> 早班 · <b className="text-purple-700">B</b> 晚班 · <b className="text-green-600">补休</b></span>
+            <span>🎓 搬家高峰 · 🇨🇳 中国假期 · 🎄 澳洲假期</span>
           </div>
 
           {canEdit && (
@@ -183,7 +205,7 @@ export default function Roster() {
 
       {open && (
         <DayEditor date={open} dayMap={days.get(open) || {}} ids={ids} nameOf={nameOf}
-          hol={holOf(open)} busy={busy}
+          sig={sigOf(open)} busy={busy}
           onClose={() => setOpen(null)}
           onSet={async (sid, sh) => { await run(() => setRoster(open, sid, sh)) }} />
       )}
@@ -191,8 +213,9 @@ export default function Roster() {
   )
 }
 
-function DayEditor({ date, dayMap, ids, nameOf, hol, busy, onClose, onSet }) {
+function DayEditor({ date, dayMap, ids, nameOf, sig, busy, onClose, onSet }) {
   const n = onDutyCount(dayMap)
+  const peak = (sig || []).find(x => x.kind === 'out' || x.kind === 'in')
   const [y, m, d] = date.split('-').map(Number)
   const wd = WEEK[(new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7]
 
@@ -205,7 +228,9 @@ function DayEditor({ date, dayMap, ids, nameOf, hol, busy, onClose, onSet }) {
             n === 0 ? 'bg-red-100 text-red-700' : n === 1 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
             在岗 {n} 人
           </span>
-          {hol && <span className="text-xs text-amber-700">{hol.name}</span>}
+          {sig.map((x, i) => (
+            <span key={i} className="text-xs text-amber-700">{x.icon} {x.text}</span>
+          ))}
           <span className="flex-1" />
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-lg leading-none">✕</button>
         </div>
@@ -253,6 +278,13 @@ function DayEditor({ date, dayMap, ids, nameOf, hol, busy, onClose, onSet }) {
                     </p>
                   )
                 })}
+                {/* ③ 已经点下去那一刻的最后一道提醒 */}
+                {peak && (
+                  <p className="text-xs text-red-700 mt-1 flex items-start gap-1 font-semibold">
+                    <span className="shrink-0">🎓</span>
+                    <span>这天在{peak.text}期内 —— 减人要想清楚</span>
+                  </p>
+                )}
               </div>
             )
           })}

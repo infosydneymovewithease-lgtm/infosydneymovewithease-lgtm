@@ -82,3 +82,71 @@ export function monthCells(year, month) {
   }
   return out
 }
+
+// ── 需求信号 ──────────────────────────────────────────────
+// 老板 10-16：把节日学期日历融进排班表。
+//
+// 为什么要融：排班表原来只显示【供给】（谁在岗），不显示【需求】（那天忙不忙）。
+// 而排班的全部目的就是把人放在需求最大的时候 ——
+// 没有需求信号，排班就是凭感觉分配。
+//
+// ⚠️ 搬家高峰不在开学当天，在【开学前 2 周】和【考完后 2 周】。
+
+const DAY = 86400000
+const iso = t => new Date(t).toISOString().slice(0, 10)
+const ms  = d => Date.parse(d + 'T00:00:00Z')
+
+/** 把 holiday 行展开成「需求窗口」 */
+export function demandWindows(holidays) {
+  const out = []
+  for (const h of holidays || []) {
+    if (h.country !== 'UNI') continue
+    if (h.kind === 'exam') {
+      out.push({ from: h.end_date, to: iso(ms(h.end_date) + 14 * DAY),
+                 kind: 'out', label: `${h.org} 考完 → 搬出高峰`, src: h })
+    } else if (h.kind === 'term_start') {
+      out.push({ from: iso(ms(h.start_date) - 14 * DAY), to: h.start_date,
+                 kind: 'in', label: `${h.org} 开学 → 搬入高峰`, src: h })
+    }
+  }
+  return out
+}
+
+/** 某一天的标记：学期高峰 / 中国假 / 澳洲假 */
+export function daySignals(holidays, windows, d) {
+  const out = []
+  for (const w of windows || []) {
+    if (w.from <= d && d <= w.to) { out.push({ icon: '🎓', kind: w.kind, text: w.label }); break }
+  }
+  for (const h of holidays || []) {
+    if (!(h.start_date <= d && d <= h.end_date)) continue
+    if (h.country === 'CN') out.push({ icon: '🇨🇳', kind: 'cn', text: h.name })
+    else if (h.country === 'AU') out.push({ icon: '🎄', kind: 'au', text: h.name })
+  }
+  return out
+}
+
+/**
+ * 整月的一句话提示 —— 放在月历【上面】。
+ * 放月历下面就晚了，排班的人已经排完了。
+ */
+export function monthAlert(holidays, ym) {
+  const wins = demandWindows(holidays)
+  const hit = wins.filter(w => w.to.startsWith(ym) || w.from.startsWith(ym)
+                            || (w.from < ym && w.to > ym))
+  if (!hit.length) return null
+  const outs = hit.filter(w => w.kind === 'out').sort((a, b) => a.from.localeCompare(b.from))
+  const ins  = hit.filter(w => w.kind === 'in').sort((a, b) => a.from.localeCompare(b.from))
+  const parts = []
+  if (outs.length) {
+    const a = outs[0], b = outs[outs.length - 1]
+    parts.push(`${a.from.slice(5)} 起进入搬出高峰（${a.src.org} 考完${
+      outs.length > 1 ? ` → ${b.src.org} ${b.from.slice(5)}` : ''}），到 ${b.to.slice(5)}`)
+  }
+  if (ins.length) {
+    const a = ins[0], b = ins[ins.length - 1]
+    parts.push(`${a.from.slice(5)}–${b.to.slice(5)} 是开学搬入高峰（${
+      [...new Set(ins.map(w => w.src.org))].join('·')}）`)
+  }
+  return parts.length ? parts.join('；') + ' —— 这期间别排补休' : null
+}
