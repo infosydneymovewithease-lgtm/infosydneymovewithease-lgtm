@@ -10,7 +10,7 @@ import { sydneyToday, addDays, sydneyDateOf } from '../utils/date'
 import { requiredAccounts, inquiryProgress, weeklyVideo, weekRange } from '../utils/worklog'
 import { todayToPost, weekOutput, myEditsToday } from '../utils/content'
 import { todayTasks, weekTasks, progressOf, S } from '../utils/tasks'
-import { Check, ChevronRight, Clock } from 'lucide-react'
+import { Check, ChevronRight, Clock, Coffee } from 'lucide-react'
 
 export default function DailyProgress() {
   const { user, config, getWorkday, getContentRange, openDays, getPolicyText, getRoster } = useApp()
@@ -23,6 +23,7 @@ export default function DailyProgress() {
   const [open, setOpen] = useState([])
   const [policy, setPolicy] = useState({})
   const [roster, setRoster] = useState([])   // 排班表是「谁今天在岗」的唯一真相
+  const [showAnyway, setShowAnyway] = useState(false)  // 休息日但她说自己在上班
 
   const wk = useMemo(() => weekRange(date), [date])
   useEffect(() => {
@@ -72,7 +73,37 @@ export default function DailyProgress() {
   //       压根不在排班表里的人（老板、以后新加的人）不等于不上班。
   const myShift = roster.find(r => r.staff_id === user?.id)?.shift
   const offToday = myShift === 'off' || myShift === 'leave' || myShift === 'holiday'
-  if (offToday) return null
+
+  // ⚠️ 2026-10-17 第三次修正。
+  //    前一版是「排班写着休息就整块不显示」。老板发现小洁周六看不到，
+  //    第一反应是「坏了」—— 而她只是例休。
+  //    【什么都不显示 = 她不知道为什么】，这和坏掉在体感上是一样的。
+  //
+  //    而且更麻烦：排班是按规则生成的，现实常常不一样（临时顶班、自己换班）。
+  //    她真在上班却被标成休息，就连交日报的入口都没有。
+  //    所以休息日也显示，但说清楚，并留一个出口。
+  const OFF_LABEL = { off: '例休', leave: '补休', holiday: '假期' }
+  if (offToday && !showAnyway) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+            <Coffee size={15} className="text-gray-400" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-gray-800 text-sm">
+              今天{OFF_LABEL[myShift] || '休息'} —— 没有任务
+            </p>
+            <p className="text-xs text-gray-400 mt-0.5">排班表上今天是你的休息日，日报不用交</p>
+          </div>
+          <button onClick={() => setShowAnyway(true)}
+            className="text-xs text-gray-400 hover:text-red-600 underline shrink-0">
+            我今天其实在上班
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   const todo = tasks.filter(t => t.state === S.todo)
   const rest = tasks.filter(t => t.state !== S.todo)
