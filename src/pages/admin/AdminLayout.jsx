@@ -24,8 +24,13 @@ const NAV_ITEMS = [
   { divider: true },
   { label: '我的日报', icon: NotebookPen,      to: '/admin/worklog',    feature: 'worklog' },
   { label: '团队今日', icon: UsersRound,       to: '/admin/team-today', roles: ['admin', 'manager'], feature: 'worklog' },
-  { label: '今天要发', icon: Send,              to: '/admin/content-today', feature: 'content' },
-  { label: '内容排期', icon: CalendarRange,     to: '/admin/content',    roles: ['admin', 'manager'], feature: 'content' },
+  // ⚠️ 2026-10-18 老板把制作和发布对调了，理由是【小红书会显示 IP 属地】：
+  //    小洁的 VPN 出口在香港，一个悉尼搬家公司的账号发帖显示「香港」很违和；
+  //    Annie 的手机卡和网络是本地的，适合发布。
+  //    而制作不看 IP —— 小洁用 AI 写文案没压力。
+  //    所以：小洁【制作】、Annie【发布】。
+  { label: '今天要发', icon: Send,              to: '/admin/content-today', roles: ['admin', 'manager'], feature: 'content' },
+  { label: '内容排期', icon: CalendarRange,     to: '/admin/content',    feature: 'content' },
   // 排班：所有人都能看自己的班，但只有 admin/manager 能改（页面里判断）
   { label: '排班表',   icon: CalendarDays,       to: '/admin/roster',     feature: 'roster' },
   { label: '每日对账', icon: ClipboardCheck,   to: '/admin/reconcile',  roles: ['admin', 'manager'], feature: 'reconcile' },

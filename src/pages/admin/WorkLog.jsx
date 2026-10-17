@@ -480,7 +480,7 @@ export default function WorkLog() {
           同一条会被记两遍，统计直接翻倍。这正是做排期时想避免的双重录入。
           改成：主体只读，从排期自动来；补登记留着但弱化 ——
           排期外的发布真的会发生（师傅拍了张好照片随手发朋友圈），堵死了她就不发了。 */}
-      <Card title={isManager ? '今天发了什么（顶班时才有）' : '今天发了什么'}
+      <Card title={isManager ? '今天发了什么' : '今天发了什么（顶班时才有）'}
         hint={video.ok ? `本周视频 ${video.video} 条 · 图文 ${video.image} 条 · 从「今天要发」自动来的`
           : '⚠️ 本周还没出视频 —— 每周至少 1 条'}>
         <div className="space-y-1">

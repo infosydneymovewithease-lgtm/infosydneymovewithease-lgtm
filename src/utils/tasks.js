@@ -67,7 +67,11 @@ export function todayTasks(ctx) {
   // 今天要发 —— 没有待发的不是她的错，是内容还没准备好
   const ready = (slotsToday || []).filter(s => s.status === 'ready')
   const posted = (slotsToday || []).filter(s => s.posted_at)
-  if (isManager) {
+  // ⚠️ 2026-10-18 对调：制作归客服、发布归经理。
+  //    理由是小红书显示 IP 属地 —— 小洁的 VPN 在香港，发帖显示「香港」
+  //    对一个悉尼搬家公司很违和；Annie 的网络是本地的。
+  //    制作不看 IP，所以小洁写、Annie 发。
+  if (!isManager) {
     t.push({
       key: 'edit', label: '编辑内容',
       state: (editedToday || 0) > 0 ? S.done : S.todo,
@@ -80,15 +84,19 @@ export function todayTasks(ctx) {
   const who = nameOfAccount
     ? [...new Set(ready.map(s => nameOfAccount(s.account_id)))].join(' · ')
     : ''
-  t.push({
-    key: 'post',
-    label: ready.length ? `发布 ${who || '今天排的内容'}` : '发布今天排的内容',
-    state: ready.length === 0 ? (posted.length ? S.done : S.wait) : S.todo,
-    hint: ready.length ? `${ready.length} 条待发`
-      : posted.length ? `今天发了 ${posted.length} 条`
-      : '等内容准备好 —— 不是你的事',
-    minutes: ready.length * 5, to: '/admin/content-today',
-  })
+  // 发布只给经理（她的网络环境适合发）。
+  // 客服看不到这条 —— 她的活是把内容做出来，做完交给经理发。
+  if (isManager) {
+    t.push({
+      key: 'post',
+      label: ready.length ? `发布 ${who || '今天排的内容'}` : '发布今天排的内容',
+      state: ready.length === 0 ? (posted.length ? S.done : S.wait) : S.todo,
+      hint: ready.length ? `${ready.length} 条待发`
+        : posted.length ? `今天发了 ${posted.length} 条`
+        : '等小洁把内容做好 —— 不是你的事',
+      minutes: ready.length * 5, to: '/admin/content-today',
+    })
+  }
 
   // 小红书评论配额只给客服 —— 经理的主动开发是 to B，不按天算
   if (!isManager) {
