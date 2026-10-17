@@ -92,9 +92,12 @@ export default function WorkLog() {
 
   // 经理的产出是「做出来的内容」，不是「发出去的条数」—— 取本周排期来算
   useEffect(() => {
-    if (!isManager) return
+    // ⚠️ 2026-10-18 对调后：内容数据【人人都要】——
+    //    制作归客服，她的「今天编辑了什么」要靠这份数据。
+    //    原来写的是 !isManager 就 return，对调后小洁那张卡会永远是空的。
     const wk = weekRange(date)
     getContentRange(wk.from, wk.to).then(setContent)
+    if (!isManager) return
     // 老板 10-15：「经理应该是早上先核对账目吧，这个应该加到经理的日报里」
     // 按他定的 T+1 流程，她早上核的是【昨天】的账和客服日报。
     // 这两件事原来只在「团队今日」「每日对账」里，日报上一点痕迹没有。

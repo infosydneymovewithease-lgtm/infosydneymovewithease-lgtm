@@ -140,13 +140,16 @@ export function weekTasks(ctx) {
   const { role, weekVideo, weekOut } = ctx
   const isManager = role === 'admin' || role === 'manager'
   const out = []
-  if (isManager && weekOut) {
+  // ⚠️ 2026-10-18 对调：本周文案/视频是【制作】指标，归客服。
+  //    经理那边看「发了几条」，不看「做了几条」。
+  if (!isManager && weekOut) {
     out.push({ key: 'wtext', label: `本周文案 ${weekOut.text.done}/${weekOut.text.total} 条`,
       ok: weekOut.text.done >= weekOut.text.total })
     out.push({ key: 'wvideo', label: `本周视频 ${weekOut.video.done}/${weekOut.video.total} 条`,
       ok: weekOut.video.done >= weekOut.video.total })
   } else if (weekVideo) {
-    out.push({ key: 'wvideo', label: `本周视频 ${weekVideo.video}/1 条`, ok: weekVideo.ok })
+    // 经理看的是本周实际发出去几条视频
+    out.push({ key: 'wvideo', label: `本周发了视频 ${weekVideo.video}/1 条`, ok: weekVideo.ok })
   }
   return out
 }

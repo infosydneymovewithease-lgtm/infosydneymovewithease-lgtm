@@ -58,7 +58,7 @@ export function overview(orders, from, to, staffRates) {
  * 所以把管理工作也算成产出：日结确认、核对订单数、补录笔数。
  */
 export function staffStats(opts) {
-  const { orders, logs, inquiries, posts, breaks, confirms, checks, fixes, returns, from, to, staffIds } = opts
+  const { orders, logs, inquiries, posts, breaks, confirms, checks, fixes, returns, items, from, to, staffIds } = opts
   return (staffIds || []).map(id => {
     const myLogs = (logs || []).filter(l => l.staff_id === id && inRange(l.work_date, from, to))
     const worked = myLogs.filter(l => l.clock_in)
@@ -103,6 +103,9 @@ export function staffStats(opts) {
       // 日报退回。两个方向都要看：
       //   returned  = 她自己被退回几次（数据质量）
       //   returnedBy = 她退回了别人几次（她真的在核对，不是走过场）
+      // 2026-10-18 对调后，制作归客服 —— 她的产出是「做了几条内容」，
+      // 不是「发了几条」。不记的话她在表上只剩接待数，看不出内容工作量。
+      edited:      (items || []).filter(i => i.created_by === id).length,
       returned:    (returns || []).filter(r => r.staff_id === id && inRange(r.work_date, from, to)).length,
       returnedBy:  (returns || []).filter(r => r.returned_by === id && inRange(r.work_date, from, to)).length,
     }

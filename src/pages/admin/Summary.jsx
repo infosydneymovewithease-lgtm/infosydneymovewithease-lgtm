@@ -20,12 +20,13 @@ const pct = n => n == null ? '—' : `${(n * 100).toFixed(0)}%`
 
 export default function Summary() {
   const { user, staff, orders, staffRates, config, getPeriodData, getSummaryNote, saveSummaryNote,
-          listWorkLogReturns } = useApp()
+          listWorkLogReturns, getContentRange } = useApp()
   const today = sydneyToday()
   const [kind, setKind] = useState('month')
   const [anchor, setAnchor] = useState(() => today.slice(0, 7))
   const [data, setData] = useState({ logs: [], breaks: [], inquiries: [], posts: [], closes: [] })
   const [returns, setReturns] = useState([])
+  const [content, setContent] = useState({ items: [], slots: [] })
   const [note, setNote] = useState('')
   const [saved, setSaved] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -42,10 +43,12 @@ export default function Summary() {
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const [d, n, rt] = await Promise.all([
+      const [d, n, rt, ct] = await Promise.all([
         getPeriodData(range.from, range.to), getSummaryNote(period),
-        listWorkLogReturns(range.from, range.to)])
-      if (alive) { setData(d); setNote(n?.content || ''); setSaved(false); setReturns(rt) }
+        listWorkLogReturns(range.from, range.to),
+        getContentRange(range.from, range.to)])
+      if (alive) { setData(d); setNote(n?.content || ''); setSaved(false)
+                   setReturns(rt); setContent(ct) }
     })()
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -56,8 +59,8 @@ export default function Summary() {
   const ov = useMemo(() => overview(orders, range.from, range.to, staffRates), [orders, range, staffRates])
   const months = useMemo(() => recentMonths(today, 6), [today])
   const ins = useMemo(() => insights(orders, months), [orders, months])
-  const rows = useMemo(() => staffStats({ ...data, returns, orders, from: range.from, to: range.to, staffIds }),
-    [data, returns, orders, range, staffIds])
+  const rows = useMemo(() => staffStats({ ...data, returns, items: content.items, orders, from: range.from, to: range.to, staffIds }),
+    [data, returns, content, orders, range, staffIds])
   const problems = useMemo(() => gaps({ ...data, orders, accounts: config.channelAccounts,
     staffIds, from: range.from, to: range.to, staffRates }),
     [data, orders, config.channelAccounts, staffIds, range, staffRates])

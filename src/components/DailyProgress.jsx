@@ -43,8 +43,9 @@ export default function DailyProgress() {
   const accounts = requiredAccounts(config.channelAccounts)
   const prog = inquiryProgress(accounts, day.inquiries, date, user?.id)
   const slotsToday = todayToPost(content.slots, content.items, date)
-  const edits = isManager
-    ? myEditsToday(content.items, content.slots, user?.id, date, sydneyDateOf).length : 0
+  // ⚠️ 2026-10-18 对调后：制作归【客服】，所以「今天改了几条」人人都要算。
+  //    原来写的是 isManager ? ... : 0，对调后小洁的「编辑内容」会永远显示没做。
+  const edits = myEditsToday(content.items, content.slots, user?.id, date, sydneyDateOf).length
 
   const tasks = todayTasks({
     role: user?.role, log, inquiryOk: prog.ok, inquiryMissing: prog.missing,
