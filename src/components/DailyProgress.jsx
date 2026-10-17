@@ -56,7 +56,10 @@ export default function DailyProgress() {
   const week = weekTasks({
     role: user?.role,
     weekVideo: weeklyVideo(day.posts, date),
-    weekOut: isManager ? weekOutput(content.slots, content.items) : null,
+    // ⚠️ 2026-10-18：本周文案/视频是【制作】指标，对调后归客服。
+    //    原来写 isManager ? ... : null，和 weekTasks 里改成 !isManager 对不上 ——
+    //    结果小洁那条永远拿不到数据。
+    weekOut: !isManager ? weekOutput(content.slots, content.items) : null,
   })
   const p = progressOf(tasks)
 
