@@ -258,7 +258,9 @@ function SlotEditor({ slot, data, nameOf, busy, onClose, onSaveItem, onUpdateSlo
     setUp(true)
     try {
       const next = [...mats]
-      for (const f of files) next.push({ name: f.name, url: await uploadImage(f) })
+      // ⚠️ uploadImage 返回的已经是 {name,url}（失败时 {name,data}）——
+      //    再包一层 {name, url: 那个对象} 会让 url 变成对象，<img src> 拿到就是坏图。
+      for (const f of files) next.push(await uploadImage(f))
       setMats(next)
     } catch (e) { onErr(e.message || '上传失败') } finally { setUp(false) }
   }
@@ -379,7 +381,7 @@ function SlotEditor({ slot, data, nameOf, busy, onClose, onSaveItem, onUpdateSlo
                         onChange={async e => { const f = e.target.files[0]; e.target.value = ''
                           if (!f) return
                           setUp(true)
-                          try { setCover({ name: f.name, url: await uploadImage(f) }) }
+                          try { setCover(await uploadImage(f)) }
                           catch (err) { onErr(err.message || '上传失败') } finally { setUp(false) } }} />
                     </label>
                   )}

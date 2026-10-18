@@ -245,7 +245,9 @@ function ShotRow({ shots, onChange, onErr }) {
     setUp(true)
     try {
       const next = [...shots]
-      for (const f of files) next.push({ name: f.name, url: await uploadImage(f) })
+      // ⚠️ uploadImage 返回的已经是 {name,url}（失败时 {name,data}）——
+      //    再包一层 {name, url: 那个对象} 会让 url 变成对象，<img src> 拿到就是坏图。
+      for (const f of files) next.push(await uploadImage(f))
       onChange(next)
     } catch (e) { onErr(e.message || '上传失败') } finally { setUp(false) }
   }
