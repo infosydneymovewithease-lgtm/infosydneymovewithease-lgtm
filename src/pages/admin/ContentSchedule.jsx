@@ -147,6 +147,9 @@ export default function ContentSchedule() {
           <p className="text-xs text-gray-400 mb-3 leading-relaxed">
             一条内容可以发到多个号 —— 迁喜文案直接复刻到朋友圈，盼达文案改写后复用，视频转发 1 条。
             朋友圈 7 条全部来自复用，不用单独写。
+            <br />
+            朋友圈【只跟当天的来源走】：填好当天的迁喜/盼达，当天的朋友圈自动跟着变绿；
+            当天没内容就留空，不会拿别天的文案凑数。
           </p>
 
           <div className="min-w-[760px]">
