@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AppProvider, useApp } from './context/AppContext'
 import ErrorBoundary from './components/ErrorBoundary'
+import { canOpen, homeFor } from './utils/roles'
 import Login from './pages/Login'
 import Home from './pages/Home'
 import OrderDetail from './pages/OrderDetail'
@@ -104,8 +105,12 @@ function WorkerRoute({ children }) {
 
 function AdminRoute({ children }) {
   const { user } = useApp()
+  const loc = useLocation()
   if (!user) return <Navigate to="/login" replace />
   if (user.role === 'worker') return <Navigate to="/worker" replace />
+  // 白名单角色（运营）：只开放 ROLES.ops.only 里的那几页。
+  // 放在这一道，整个后台所有地址一次挡完，不用每条路由包一层。
+  if (!canOpen(loc.pathname, user.role)) return <Navigate to={homeFor(user.role)} replace />
   return children
 }
 
