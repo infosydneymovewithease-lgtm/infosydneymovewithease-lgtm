@@ -391,7 +391,7 @@ function SlotEditor({ slot, data, nameOf, busy, onClose, onSaveItem, onUpdateSlo
                   placeholder="例：素材群 10/14 老王发的那组，共 8 张"
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400" />
                 <p className="text-xs text-gray-400 mt-1">
-                  图片不用传进来 —— 小洁照这句话直接去微信素材群里存，少两趟搬运。
+                  图片不用传进来 —— 发布的人照这句话去微信素材群里存，少两趟搬运。
                 </p>
               </div>
 
