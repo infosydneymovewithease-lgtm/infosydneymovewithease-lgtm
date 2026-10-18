@@ -116,9 +116,12 @@ export default function AdminLayout() {
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
           {NAV_ITEMS.map((item, i) => {
+            // ⚠️ 权限判断要在分隔线【前面】——
+            //    写反了的话白名单角色（运营）菜单只剩两项，分隔线却全留着，
+            //    侧栏上下一堆空横线。
+            if (!canSee(item, user?.role)) return null
             if (item.divider) return <div key={i} className="my-2 border-t border-white/10" />
             if (item.feature && !FEATURES[item.feature]) return null
-    if (!canSee(item, user?.role)) return null
             if (item.soon) return (
               <div key={item.to} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/30 cursor-not-allowed text-sm">
                 <item.icon size={17} />
