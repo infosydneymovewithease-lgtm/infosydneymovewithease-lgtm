@@ -82,7 +82,7 @@ export default function SettingsOperations() {
         hint="「运营中」的账号每天必须登记咨询数；「计划中」的在登记表里灰显不必填。以后开新号在这里加，不用找人改代码">
         <div className="divide-y divide-gray-100">
           {channelAccounts.map(a => editing === a.id ? (
-            <EditAccount key={a.id} account={a} busy={busy === a.id}
+            <EditAccount key={a.id} account={a} staff={staff} busy={busy === a.id}
               onCancel={() => setEditing(null)}
               onSave={async v => { await run(a.id, () => updateChannelAccount(a.id, v)); setEditing(null) }} />
           ) : (
@@ -91,6 +91,13 @@ export default function SettingsOperations() {
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm text-gray-800">{a.name}</p>
                 {a.positioning && <p className="text-xs text-gray-400 truncate">{a.positioning}</p>}
+                {/* 老板 10-18：谁管这个号 —— 决定这个号出现在谁的「今天要发」
+                    和谁的咨询登记表里。空着＝公共的，谁都要登记。 */}
+                <p className="text-xs text-gray-400">
+                  负责人：{a.owner_staff_id
+                    ? (staff?.find?.(x => x.id === a.owner_staff_id)?.name || a.owner_staff_id)
+                    : <span className="text-gray-300">没指定（谁都要登记）</span>}
+                </p>
               </div>
               <span className={`text-xs font-semibold px-2 py-0.5 rounded shrink-0 ${STATUS[a.status]?.cls}`}>
                 {STATUS[a.status]?.label || a.status}
@@ -237,9 +244,12 @@ export default function SettingsOperations() {
   )
 }
 
-function EditAccount({ account, onSave, onCancel, busy }) {
-  const [v, setV] = useState({ platform: account.platform, name: account.name, positioning: account.positioning || '' })
+function EditAccount({ account, staff, onSave, onCancel, busy }) {
+  const [v, setV] = useState({ platform: account.platform, name: account.name,
+    positioning: account.positioning || '', owner_staff_id: account.owner_staff_id || '' })
   const set = (k, x) => setV(p => ({ ...p, [k]: x }))
+  // 只列后台的人 —— 师傅不运营账号
+  const candidates = (staff || []).filter(x => x.active !== false && x.role !== 'worker')
   return (
     <div className="py-2.5 flex items-center gap-2 flex-wrap">
       <input value={v.platform} onChange={e => set('platform', e.target.value)} placeholder="平台"
@@ -248,6 +258,12 @@ function EditAccount({ account, onSave, onCancel, busy }) {
         className="w-28 border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-red-400" />
       <input value={v.positioning} onChange={e => set('positioning', e.target.value)} placeholder="定位"
         className="flex-1 min-w-32 border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-red-400" />
+      <select value={v.owner_staff_id} onChange={e => set('owner_staff_id', e.target.value || null)}
+        title="谁管这个号 —— 决定它出现在谁的「今天要发」和咨询登记表里"
+        className="w-28 border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-red-400 shrink-0">
+        <option value="">负责人：不指定</option>
+        {candidates.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
+      </select>
       <span className="text-xs text-gray-300 font-mono shrink-0">{account.id}</span>
       <button onClick={onCancel} className="px-2 py-1.5 text-sm text-gray-500 shrink-0">取消</button>
       <button disabled={busy || !v.name.trim()} onClick={() => onSave(v)}

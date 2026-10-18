@@ -58,11 +58,32 @@ export function breakMinutes(rec, now = Date.now()) {
   return Math.max(0, Math.round((end - new Date(rec.started_at).getTime()) / 60000))
 }
 
-/** 每天必须登记的账号（status='active'）。planned 的灰显不必填。 */
-export function requiredAccounts(channelAccounts) {
+/**
+ * 这个号归谁管。
+ *
+ * 老板 10-18：新运营 Lili 接手小红书之后，小红书的私信只落在她手机上。
+ * 小洁的日报上却还列着「小红书·迁喜 待填」—— 她根本没法填，
+ * 要么空着交不了日报，要么瞎填一个数。瞎填的数比没有更糟。
+ *
+ * ⚠️ owner_staff_id 为空＝没指定＝谁都要登记（维持线上原来的行为）。
+ *    微信那两个号就是空的 —— 两个客服共用一个微信，谁在岗谁登记。
+ */
+export function ownsAccount(account, staffId, seeAll) {
+  if (seeAll || !staffId) return true          // 不传人＝全看（团队视图、老板）
+  if (!account?.owner_staff_id) return true    // 没指定负责人＝公共的
+  return account.owner_staff_id === staffId
+}
+
+/** 我这张登记表上该出现哪些号（含「计划中」的，灰显不必填）。 */
+export function myChannels(channelAccounts, staffId, seeAll) {
   return (channelAccounts || [])
-    .filter(a => a.status === 'active')
+    .filter(a => ownsAccount(a, staffId, seeAll))
     .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+}
+
+/** 每天必须登记的账号（status='active'）。planned 的灰显不必填。 */
+export function requiredAccounts(channelAccounts, staffId, seeAll) {
+  return myChannels(channelAccounts, staffId, seeAll).filter(a => a.status === 'active')
 }
 
 /**
@@ -70,8 +91,10 @@ export function requiredAccounts(channelAccounts) {
  * ⚠️ 判断依据是「这个账号今天有没有登记过」，不是「人数大于 0」——
  *    今天 0 个咨询也是有效登记，不能逼人填个假数字。
  */
-export function inquiryProgress(channelAccounts, inquiries, dateStr, staffId) {
-  const need = requiredAccounts(channelAccounts)
+export function inquiryProgress(channelAccounts, inquiries, dateStr, staffId, seeAll) {
+  // ⚠️ 这里必须跟着归属走 —— 不然小洁的日报会卡在「还差小红书没登记」，
+  //    而那个数她看不到。闸门卡的必须是她做得到的事。
+  const need = requiredAccounts(channelAccounts, staffId, seeAll)
   // staffId 给了就只看这个人填的 —— 老板 10-12：「有时候是两个人，需要知道各自」
   const mine = (inquiries || []).filter(i =>
     String(i.log_date) === dateStr && (!staffId || i.staff_id === staffId))

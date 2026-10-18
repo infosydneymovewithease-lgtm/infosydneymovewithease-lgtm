@@ -15,6 +15,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useApp } from '../../context/AppContext'
 import { sydneyToday } from '../../utils/date'
 import { todayToPost, bodyFor, SOURCE_LABEL } from '../../utils/content'
+import { ownsAccount, requiredAccounts } from '../../utils/worklog'
 import { uploadImage } from '../../utils/upload'
 import { Check, Copy, Download, Plus } from 'lucide-react'
 
@@ -23,7 +24,7 @@ const hhmm = iso => iso
   : ''
 
 export default function ContentToday() {
-  const { config, getContentRange, markSlotPosted } = useApp()
+  const { user, config, getContentRange, markSlotPosted, getWorkday, saveInquiry } = useApp()
   const [proof, setProof] = useState({})   // slotId → {url, shots}
   const date = sydneyToday()
   const [data, setData] = useState({ slots: [], items: [] })
@@ -34,9 +35,18 @@ export default function ContentToday() {
   const refresh = useCallback(async () => setData(await getContentRange(date, date)), [getContentRange, date])
   useEffect(() => { refresh() /* eslint-disable-next-line */ }, [date])
 
-  const list = todayToPost(data.slots, data.items, date)
-  const posted = list.filter(s => s.posted_at).length
   const nameOf = id => (config.channelAccounts || []).find(a => a.id === id)?.name || id
+  // 老板 10-18：发布责任挂在【账号】上，不写死在代码里。
+  // 上一版是 if (isManager)，换一次分工就要满系统找六个地方改（上次就漏了六处）。
+  // 现在归属存在 channel_account.owner_staff_id，换人在系统设置里点一下就行。
+  // ⚠️ 没指定负责人的号＝公共的，谁都看得到（微信那两个就是）。
+  const seeAll = user?.role === 'admin'
+  const mineOnly = s => ownsAccount(
+    (config.channelAccounts || []).find(a => a.id === s.account_id), user?.id, seeAll)
+  const list = todayToPost(data.slots, data.items, date).filter(mineOnly)
+  const posted = list.filter(s => s.posted_at).length
+  // 我负责的号 —— 下面那张「今天来了几个咨询」用它
+  const myAccounts = requiredAccounts(config.channelAccounts, user?.id, seeAll)
 
   async function copy(text, key) {
     try { await navigator.clipboard.writeText(text); setCopied(key); setTimeout(() => setCopied(''), 1500) }
@@ -207,6 +217,17 @@ export default function ContentToday() {
         )
       })}
 
+      {/* ── 今天来了几个咨询 ─────────────────────
+          老板 10-18：「这部分数据回填给谁好一些呢」
+          答案是按号分 —— 小红书的私信只落在运营手机上，客服看不到。
+          放在这一页而不是日报里：运营每天本来就要开这一页，
+          填完两个数就走，不用再背一整套出勤／配额／问题反馈的日报流程。
+          存的还是 platform_inquiry 同一张表，所以团队今日和周月汇总照常合计。 */}
+      {myAccounts.length > 0 && (
+        <InquiryBox date={date} accounts={myAccounts} staffId={user?.id}
+          getWorkday={getWorkday} saveInquiry={saveInquiry} onErr={setErr} />
+      )}
+
       {list.length === 0 && (
         <div className="bg-white rounded-2xl p-6 text-center shadow-sm">
           <p className="text-sm text-gray-500 leading-relaxed">
@@ -265,6 +286,70 @@ function ShotRow({ shots, onChange, onErr }) {
         <input type="file" multiple accept="image/*" className="hidden"
           onChange={e => { add([...e.target.files]); e.target.value = '' }} />
       </label>
+    </div>
+  )
+}
+
+
+// ── 今天来了几个咨询 ────────────────────────────────────
+// ⚠️ 判断「填了没有」看的是【有没有这条登记】，不是「人数大于 0」——
+//    今天 0 个咨询也是有效登记，不能逼人填个假数字出来。
+//    这一条和日报里的登记表是同一个规矩，别在这里走样。
+function InquiryBox({ date, accounts, staffId, getWorkday, saveInquiry, onErr }) {
+  const [rows, setRows] = useState([])
+  const [draft, setDraft] = useState({})
+  const [busy, setBusy] = useState('')
+
+  const load = useCallback(async () => {
+    const d = await getWorkday(date)
+    setRows((d.inquiries || []).filter(i => i.staff_id === staffId))
+  }, [getWorkday, date, staffId])
+  useEffect(() => { load() }, [load])
+
+  async function save(accountId) {
+    const raw = draft[accountId]
+    if (raw === undefined || raw === '') return
+    setBusy(accountId)
+    try { await saveInquiry(date, accountId, Number(raw) || 0); await load() }
+    catch (e) { onErr(e.message || '保存失败') } finally { setBusy('') }
+  }
+
+  const missing = accounts.filter(a => !rows.some(r => r.account_id === a.id))
+
+  return (
+    <div className="bg-white rounded-2xl p-4 shadow-sm">
+      <h2 className="font-bold text-sm">今天来了几个咨询</h2>
+      <p className="text-xs text-gray-400 mt-0.5 mb-3 leading-relaxed">
+        私信里问搬家的人数，填你自己接待的。
+        <b className="text-gray-500">今天 0 个也要填 0</b> —— 空着不算登记。
+        这个数系统抓不到，只有你看得见，但它是判断哪类文案真的带来客人的唯一依据。
+      </p>
+      <div className="space-y-1.5">
+        {accounts.map(a => {
+          const rec = rows.find(r => r.account_id === a.id)
+          const val = draft[a.id] ?? (rec ? String(rec.count) : '')
+          return (
+            <div key={a.id} className="flex items-center gap-3 py-1">
+              <span className="w-2 h-2 rounded-full shrink-0"
+                style={{ background: rec ? '#22c55e' : '#f59e0b' }} />
+              <span className="text-xs text-gray-400 w-12 shrink-0">{a.platform}</span>
+              <span className="text-sm font-semibold w-20 shrink-0">{a.name}</span>
+              <span className="text-xs text-gray-400 flex-1 truncate min-w-0">{a.positioning}</span>
+              <input type="number" min="0" inputMode="numeric" value={val}
+                onChange={e => setDraft(d => ({ ...d, [a.id]: e.target.value }))}
+                onBlur={() => save(a.id)} disabled={busy === a.id}
+                placeholder="待填"
+                className={`w-20 text-center border rounded-lg px-2 py-1.5 text-sm outline-none shrink-0
+                  ${rec ? 'border-gray-200' : 'border-amber-300 bg-amber-50'} focus:border-red-400`} />
+            </div>
+          )
+        })}
+      </div>
+      {missing.length > 0 && (
+        <p className="text-xs text-amber-700 mt-2.5">
+          还差 {missing.map(a => a.name).join('、')} 没填 —— 下班前补上
+        </p>
+      )}
     </div>
   )
 }

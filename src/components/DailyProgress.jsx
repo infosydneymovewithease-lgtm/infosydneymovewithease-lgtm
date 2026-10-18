@@ -40,7 +40,7 @@ export default function DailyProgress() {
   }, [date, isManager])
 
   const log = day.logs.find(l => l.staff_id === user?.id)
-  const accounts = requiredAccounts(config.channelAccounts)
+  const accounts = requiredAccounts(config.channelAccounts, user?.id, user?.role === 'admin')
   const prog = inquiryProgress(accounts, day.inquiries, date, user?.id)
   const slotsToday = todayToPost(content.slots, content.items, date)
   // ⚠️ 2026-10-18 对调后：制作归【客服】，所以「今天改了几条」人人都要算。

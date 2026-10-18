@@ -12,7 +12,7 @@ import { useApp } from '../../context/AppContext'
 import { sydneyToday, addDays, sydneyDateOf } from '../../utils/date'
 import { currentSeason, tzGapHours } from '../../utils/shifts'
 import {
-  requiredAccounts, inquiryProgress, myPerformance, weeklyVideo, weekRange,
+  requiredAccounts, myChannels, inquiryProgress, myPerformance, weeklyVideo, weekRange,
 } from '../../utils/worklog'
 import { myEditsToday, weekOutput } from '../../utils/content'
 import { Plus, Check } from 'lucide-react'
@@ -79,8 +79,9 @@ export default function WorkLog() {
 
   const mine = day.logs.find(l => l.staff_id === user?.id)
   const prog = useMemo(
-    () => inquiryProgress(config.channelAccounts, day.inquiries, date, user?.id),
-    [config.channelAccounts, day.inquiries, date, user?.id])
+    // ⚠️ 这里不能用下面的 isBoss —— 它声明在后面，写进依赖数组就是 TDZ 白屏。
+    () => inquiryProgress(config.channelAccounts, day.inquiries, date, user?.id, user?.role === 'admin'),
+    [config.channelAccounts, day.inquiries, date, user?.id, user?.role])
   const perf = useMemo(() => myPerformance(orders, user?.id, date), [orders, user?.id, date])
   const wk = weekRange(date)
   const video = weeklyVideo(day.posts, wk.from, wk.to)
@@ -212,7 +213,7 @@ export default function WorkLog() {
       <div id="inquiry-section" className="scroll-mt-4" />
       <Card title="平台咨询登记" hint="7 个触点每天逐个检查，填你自己接待的人数。今天 0 个也要登记 —— 填 0 就行，不填不算。左边显示你在「今天发了什么」里登记的内容，不用重复填。鼠标移到行上，右边 ✕ 可以删掉这个号">
         <div className="space-y-1.5">
-          {(config.channelAccounts || []).map(a => {
+          {myChannels(config.channelAccounts, user?.id, isBoss).map(a => {
             // 只显示自己填的 —— 两个人在岗时各填各的
             const rec = day.inquiries.find(i => i.account_id === a.id && i.staff_id === user?.id)
             const myPosts = day.posts.filter(p => p.account_id === a.id && p.posted_by === user?.id)
@@ -514,7 +515,7 @@ export default function WorkLog() {
         {extraAdd ? (
           <div className="mt-2.5 pt-2.5 border-t border-dashed border-gray-200">
             <p className="text-xs text-gray-400 mb-1.5">补登记排期外临时发的内容</p>
-            <PostAdder accounts={requiredAccounts(config.channelAccounts)} disabled={busy}
+            <PostAdder accounts={requiredAccounts(config.channelAccounts, user?.id, isBoss)} disabled={busy}
               onAdd={async v => { await run(() => addPost(date, v)); setExtraAdd(false) }} />
             <button onClick={() => setExtraAdd(false)} className="text-xs text-gray-400 mt-1.5">取消</button>
           </div>
