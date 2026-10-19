@@ -21,6 +21,18 @@ import { ownsAccount, requiredAccounts } from '../../utils/worklog'
 import { uploadImage } from '../../utils/upload'
 import { Check, Copy, Download, Plus } from 'lucide-react'
 
+// 老板 10-20：「在今天要发里看到的封面图片不能下载就变得没有意义了」
+//
+// Supabase Storage 支持 ?download= —— 服务器会回 Content-Disposition: attachment，
+// 点一下直接存到本地。
+// ⚠️ 不能只靠 <a download>：跨域时浏览器【会忽略】那个属性，
+//    结果是在新标签页打开图片，她还得右键另存，手机上更麻烦。
+//    原来视频那个「点开另存」就是这个毛病。
+const dl = (u, name) => {
+  if (!u || u.startsWith('data:')) return u     // base64 的本来就能存，download 属性有效
+  return u + (u.includes('?') ? '&' : '?') + 'download=' + encodeURIComponent(name || 'cover.jpg')
+}
+
 const hhmm = iso => iso
   ? new Date(iso).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
   : ''
@@ -136,12 +148,27 @@ export default function ContentToday() {
                     <span className="w-10 shrink-0 text-xs text-gray-400 pt-1.5">配图</span>
                     <div className="flex-1 flex items-start gap-2.5 bg-gray-50 rounded-xl px-3 py-2">
                       {s.item.cover && (
-                        <img src={s.item.cover.url || s.item.cover.data} alt=""
-                          className="w-14 h-14 rounded-lg object-cover border border-gray-200 shrink-0" />
+                        <a href={dl(s.item.cover.url || s.item.cover.data, s.item.cover.name)}
+                          download={s.item.cover.name || 'cover.jpg'} title="点一下存到本地"
+                          className="shrink-0 relative group">
+                          <img src={s.item.cover.url || s.item.cover.data} alt=""
+                            className="w-14 h-14 rounded-lg object-cover border border-gray-200 group-hover:border-red-400" />
+                          <span className="absolute inset-0 rounded-lg bg-black/0 group-hover:bg-black/40
+                                           flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition">
+                            <Download size={16} />
+                          </span>
+                        </a>
                       )}
                       <div className="min-w-0">
                         <p className="text-sm leading-relaxed">{s.item.material_note || '（没写素材在哪）'}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">左边是封面图，其余去微信素材群里存</p>
+                        {s.item.cover && (
+                          <a href={dl(s.item.cover.url || s.item.cover.data, s.item.cover.name)}
+                            download={s.item.cover.name || 'cover.jpg'}
+                            className="text-xs text-red-700 font-semibold inline-flex items-center gap-1 mt-1">
+                            <Download size={12} /> 下载封面图
+                          </a>
+                        )}
+                        <p className="text-xs text-gray-400 mt-0.5">封面图点一下就存下来了，其余配图去微信素材群里拿</p>
                       </div>
                     </div>
                   </div>
@@ -152,13 +179,13 @@ export default function ContentToday() {
                     <span className="w-10 shrink-0 text-xs text-gray-400 pt-1.5">视频</span>
                     <div className="flex gap-1.5 flex-wrap items-center">
                       {s.item.materials.map((m, i) => (
-                        <a key={i} href={m.url || m.data} target="_blank" rel="noreferrer" download={m.name}
+                        <a key={i} href={dl(m.url || m.data, m.name)} download={m.name}
                           className="w-14 h-14 rounded-lg border border-gray-200 hover:border-red-400 bg-gray-100 flex items-center justify-center">
                           <span className="text-xl">🎬</span>
                         </a>
                       ))}
                       <span className="text-xs text-red-700 font-semibold flex items-center gap-1 ml-1">
-                        <Download size={12} /> 点开另存
+                        <Download size={12} /> 点一下就下载
                       </span>
                     </div>
                   </div>
