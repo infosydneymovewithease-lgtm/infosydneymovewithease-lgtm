@@ -328,19 +328,52 @@ function SlotEditor({ slot, data, nameOf, busy, onClose, onSaveItem, onUpdateSlo
                 </p>
               </div>
 
-              {isRewrite && (
+              {isRewrite && (() => {
+                // ⚠️ 2026-10-20：原来把【整条原文】塞进 textarea 的 placeholder 里。
+                //    老板：「改写正文内的内容实际上无法选择和改写」——
+                //    灰字看着像已经填好了，其实选不中、改不了。
+                //    更糟的是她会以为填好了直接点保存，存进去是空的，
+                //    发朋友圈的人打开还是没东西可复制。
+                //    （两天前「素材在群里哪儿」那个框同一个毛病，提示写得太像真内容。）
+                //    所以：原文单独显示能选能复制，再给一个「填进来再改」的按钮。
+                const src = data.items.find(i => i.id === Number(pickId))
+                // 朋友圈用不上 #话题标签，填进来的时候先去掉，省得她一行行删
+                const seed = String(src?.body || '')
+                  .split('\n').filter(l => !/^\s*#\S/.test(l)).join('\n')
+                  .replace(/\n{3,}/g, '\n\n').trim()
+                return (
                 <div>
                   <label className="text-xs text-gray-400 block mb-1">
-                    改写版正文 <span className="text-red-600">（空着的话小洁发的时候没东西可复制）</span>
+                    改写版正文 <span className="text-red-600">（空着的话发朋友圈的人没东西可复制）</span>
                   </label>
+
+                  {seed && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-2.5 mb-2">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-semibold text-gray-500">原文（{src?.title || '无标题'}）</span>
+                        <span className="flex-1" />
+                        <button type="button" disabled={!!slot.posted_at}
+                          onClick={() => setOverride(seed)}
+                          className="text-xs font-semibold text-red-700 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50 disabled:opacity-40">
+                          填进来再改
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 leading-relaxed max-h-28 overflow-y-auto whitespace-pre-wrap select-text">
+                        {seed}
+                      </p>
+                    </div>
+                  )}
+
                   <textarea rows={6} value={override} onChange={e => setOverride(e.target.value)} disabled={!!slot.posted_at}
-                    placeholder={data.items.find(i => i.id === Number(pickId))?.body || '先在上面选一条内容，然后把原文改成适合朋友圈的版本'}
+                    placeholder={pickId ? '在这里写朋友圈版 —— 可以点上面「填进来再改」' : '先在上面选一条内容'}
                     className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400 resize-none leading-relaxed" />
                   <p className="text-xs text-gray-400 mt-1">
                     盼达是写给留学生的，朋友圈的人多半已经加过微信、甚至下过单 —— 口气要换。
+                    #话题标签已经替你去掉了，朋友圈用不上。
                   </p>
                 </div>
-              )}
+                )
+              })()}
             </>
           ) : (
             <>
