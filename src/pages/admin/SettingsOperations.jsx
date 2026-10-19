@@ -98,6 +98,16 @@ export default function SettingsOperations() {
                     ? (staff?.find?.(x => x.id === a.owner_staff_id)?.name || a.owner_staff_id)
                     : <span className="text-gray-300">没指定（谁都要登记）</span>}
                 </p>
+                {/* 老板 10-20：「运营一多就会忘记」—— 档案摘要直接显示在行上，
+                    不点开就知道这个号绑在谁名下。 */}
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {a.login_id && <span className="mr-2">登录 {a.login_id}</span>}
+                  {a.bound_to
+                    ? <span className="mr-2">绑在 {a.bound_to}</span>
+                    : <span className="text-amber-600 mr-2">⚠️ 没记绑在谁名下</span>}
+                  {a.vault_hint && <span className="text-gray-300">密码在 {a.vault_hint}</span>}
+                </p>
+                {a.note && <p className="text-xs text-gray-400 mt-0.5">{a.note}</p>}
               </div>
               <span className={`text-xs font-semibold px-2 py-0.5 rounded shrink-0 ${STATUS[a.status]?.cls}`}>
                 {STATUS[a.status]?.label || a.status}
@@ -246,7 +256,10 @@ export default function SettingsOperations() {
 
 function EditAccount({ account, staff, onSave, onCancel, busy }) {
   const [v, setV] = useState({ platform: account.platform, name: account.name,
-    positioning: account.positioning || '', owner_staff_id: account.owner_staff_id || '' })
+    positioning: account.positioning || '', owner_staff_id: account.owner_staff_id || '',
+    login_id: account.login_id || '', bound_to: account.bound_to || '',
+    two_factor: account.two_factor || '', registered_on: account.registered_on || '',
+    vault_hint: account.vault_hint || '', note: account.note || '' })
   const set = (k, x) => setV(p => ({ ...p, [k]: x }))
   // 只列后台的人 —— 师傅不运营账号
   const candidates = (staff || []).filter(x => x.active !== false && x.role !== 'worker')
@@ -269,7 +282,45 @@ function EditAccount({ account, staff, onSave, onCancel, busy }) {
       <button disabled={busy || !v.name.trim()} onClick={() => onSave(v)}
         className="px-3 py-1.5 rounded-lg text-white text-sm font-semibold disabled:opacity-40 shrink-0"
         style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>保存</button>
+
+      {/* ── 账号档案 ─────────────────────────────────────
+          老板 10-20：「有一个登记账号的地方，运营一多就会忘记」
+          ⚠️ 故意没有密码栏 —— 后台用的是公开 anon key，那把 key 写在前端 JS 里，
+             谁都能下载然后直接读表。密码放进来等于公开发布。
+             这里只记【密码存在哪】。 */}
+      <div className="w-full mt-1 pt-2.5 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <Field label="登录账号" hint="手机号或邮箱"
+          value={v.login_id} onChange={x => set('login_id', x)} />
+        <Field label="绑在谁名下" hint="公司 / 某人 —— 人走账号会跟着走"
+          value={v.bound_to} onChange={x => set('bound_to', x)} warn={!v.bound_to} />
+        <Field label="二次验证绑在哪" hint="密保手机 / 邮箱 / 验证器"
+          value={v.two_factor} onChange={x => set('two_factor', x)} />
+        <Field label="注册时间" type="date"
+          value={v.registered_on} onChange={x => set('registered_on', x || null)} />
+        <Field label="密码存在哪" hint="例：1Password / 钥匙串 —— 不要填密码本身"
+          value={v.vault_hint} onChange={x => set('vault_hint', x)} />
+        <Field label="备注" value={v.note} onChange={x => set('note', x)} />
+      </div>
+      <p className="w-full text-xs text-gray-400 leading-relaxed">
+        ⚠️ 不要在这里填密码本身。后台用的是公开 key，这张表等于公开的。
+        「绑在谁名下」最要紧 —— 小红书认手机号不认密码，
+        绑在员工个人号下的账号，人走就带走了。
+      </p>
     </div>
+  )
+}
+
+function Field({ label, hint, value, onChange, type = 'text', warn }) {
+  return (
+    <label className="block">
+      <span className={`text-xs block mb-0.5 ${warn ? 'text-amber-600 font-medium' : 'text-gray-400'}`}>
+        {label}
+      </span>
+      <input type={type} value={value || ''} onChange={e => onChange(e.target.value)}
+        placeholder={hint || ''}
+        className={`w-full border rounded-lg px-2 py-1.5 text-sm outline-none focus:border-red-400
+          ${warn ? 'border-amber-300 bg-amber-50' : 'border-gray-200'}`} />
+    </label>
   )
 }
 
