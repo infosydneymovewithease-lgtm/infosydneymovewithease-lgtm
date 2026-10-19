@@ -160,7 +160,9 @@ export default function ContentToday() {
                         </a>
                       )}
                       <div className="min-w-0">
-                        <p className="text-sm leading-relaxed">{s.item.material_note || '（没写素材在哪）'}</p>
+                        {s.item.material_note
+                          ? <p className="text-sm leading-relaxed">{s.item.material_note}</p>
+                          : <p className="text-sm text-gray-400">配图去微信素材群里找</p>}
                         {s.item.cover && (
                           <a href={dl(s.item.cover.url || s.item.cover.data, s.item.cover.name)}
                             download={s.item.cover.name || 'cover.jpg'}

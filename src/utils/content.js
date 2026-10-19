@@ -28,10 +28,15 @@ export const NEEDS_OVERRIDE = 'rewrite'
  * 老板 10-15：「我们有一个素材群，就是微信里，图片要上传吗，
  *              倒是可以上传一张封面图片」
  * 原来要求把所有图传进系统，那是重复搬运 ——
- *   师傅发到素材群 → Annie存下来传系统 → 小洁再下载 → 传小红书
+ *   师傅发到素材群 → 有人存下来传系统 → 发布的人再下载 → 传小红书
  *   中间两趟白跑，发布的人直接去群里存最快。
  *
- * 所以图文只要：正文 + 封面图 + 素材在群里哪儿。
+ * ⚠️ 2026-10-20 老板：「素材来源这里就算了，改成备注，不填写也可以保存」
+ *    原来「素材在群里哪儿」是必填，不填就卡在草稿、进不了「今天要发」。
+ *    那条规矩现在没必要了 —— 封面图已经能直接下载，
+ *    发布的人真要整组图，问一句就是了，不值得为它卡住整条内容。
+ *    图文现在只要：正文 + 封面图。
+ *
  * ⚠️ 视频仍然要求上传文件 —— 群里的视频会过期，
  *    而视频 2–4 小时才出一条，重拍代价和图片完全不是一回事。
  */
@@ -42,10 +47,9 @@ export function itemReady(item) {
     return Array.isArray(item.materials) && item.materials.length > 0
   }
   const hasCover = !!(item.cover?.url || item.cover?.data)
-  const hasWhere = !!String(item.material_note || '').trim()
   // 全都传进系统了也算做好（她想传就随她）
   const hasMat = Array.isArray(item.materials) && item.materials.length > 0
-  return (hasCover && hasWhere) || hasMat
+  return hasCover || hasMat
 }
 
 /**
@@ -151,7 +155,11 @@ export function scheduleTodos(slots, items, today, accountName) {
         text: `${s.slot_date} ${who} 的改写版还没写 —— 小洁发的时候会没东西可复制` })
     } else {
       const what = !String(item?.body || '').trim() ? '正文还没写'
-        : (item?.materials?.length ? '' : (s.kind === 'video' ? '视频素材还没传' : '图片还没传'))
+        // ⚠️ 跟着 itemReady 走：图文现在只差【封面图】，不是「图片还没传」——
+        //    整组图本来就不进系统（在微信素材群里）。说错了她会去传一堆没必要的图。
+        : (s.kind === 'video'
+            ? (item?.materials?.length ? '' : '视频素材还没传')
+            : ((item?.cover?.url || item?.cover?.data || item?.materials?.length) ? '' : '封面图还没传'))
       out.push({ sev: over || due ? 'high' : 'mid', slotId: s.id, date: s.slot_date,
         text: `${s.slot_date} ${who} ${what || '还没做完'}${over ? '（已过准备截止日）' : due ? '（今天是准备截止日）' : ''}` })
     }

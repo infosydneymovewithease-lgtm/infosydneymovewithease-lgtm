@@ -431,13 +431,13 @@ function SlotEditor({ slot, data, nameOf, busy, onClose, onSaveItem, onUpdateSlo
 
               <div>
                 <label className="text-xs text-gray-400 block mb-1">
-                  素材在群里哪儿 <span className="text-red-600">必填</span>
+                  备注 <span className="text-gray-300">· 可不填</span>
                 </label>
                 <input value={matNote} onChange={e => setMatNote(e.target.value)} disabled={!!slot.posted_at}
                   placeholder="例：素材群 10/14 老王发的那组，共 8 张"
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400" />
                 <p className="text-xs text-gray-400 mt-1">
-                  图片不用传进来 —— 发布的人照这句话去微信素材群里存，少两趟搬运。
+                  想告诉发布的人去群里哪儿找整组图就写一句；不写也能保存、也能发。
                 </p>
               </div>
 
