@@ -44,10 +44,23 @@ export default function AttendanceCard({ compact = false }) {
     return () => clearInterval(id)
   }, [])
 
+  // 老板 10-20：经理点打卡报「TypeError: Load failed」，而他在悉尼登她的账号一点就通。
+  // 那句是【浏览器】报的，不是系统报的 —— 意思是请求根本没送到服务器。
+  // 客服在国内走 VPN 连 supabase.co，线路抖一下就是这个。
+  // 原样显示等于让她看一句英文报错然后去猜，所以在这里翻译掉。
+  // ⚠️ 只翻译网络错误。权限、数据那类后端错误要原样留着 —— 那是排查线索。
+  function humanError(e) {
+    const m = String(e?.message || '')
+    if (/Load failed|Failed to fetch|NetworkError|ERR_NETWORK|timeout|aborted/i.test(m)) {
+      return '连不上服务器 —— 检查一下 VPN 是不是断了，或者换个网络再点一次。这次没记上，重点不会记两条。'
+    }
+    return m || '操作失败'
+  }
+
   async function run(fn) {
     setBusy(true); setErr('')
     try { await fn(); await refresh() }
-    catch (e) { setErr(e.message || '操作失败') }
+    catch (e) { setErr(humanError(e)) }
     finally { setBusy(false) }
   }
 
