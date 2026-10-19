@@ -56,8 +56,17 @@ export default function Reconcile() {
   // 这种时候绝不能让人点「确认当日收入」。
   const [dirty, setDirty] = useState({})
   const [showLogs, setShowLogs] = useState(false)
+  // 当日备注 —— 老板 10-20：「我希望这个最好也能有一个备注」
+  // 单条有备注（师傅微信确认…），整天没有。可整天才是真正要解释的那一层：
+  // 「老王那单缺开始结束，电话问到的」「金姐这单客人少给 20，下次补」——
+  // 这些话不写下来，三周后翻到这一天只剩一个数字，谁也想不起来为什么。
+  // 数据库早就有 daily_close.note，close_day 也收 p_note，缺的只是这个框。
+  const [dayNote, setDayNote] = useState('')
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+
+  // 撤销确认后重新填时，把上次写的带回来，不用重打一遍
+  useEffect(() => { setDayNote(close?.note || '') }, [close?.note])
 
   const medians = useMemo(() => vehicleMedians(orders), [orders])
   const dayOrders = useMemo(
@@ -213,6 +222,11 @@ export default function Reconcile() {
                   {staff.find(s => s.id === close.confirmed_by)?.name || close.confirmed_by} ·
                   {' '}{stamp(close.confirmed_at)}
                 </p>
+                {close.note && (
+                  <p className="text-gray-600 text-xs mt-1.5 bg-gray-50 rounded-lg px-2.5 py-1.5 leading-relaxed">
+                    {close.note}
+                  </p>
+                )}
               </div>
               <button disabled={busy} onClick={() => run(() => reopenDay(date))}
                 className="flex items-center gap-1.5 text-sm text-gray-600 border border-gray-200 rounded-xl px-3 py-2 hover:bg-gray-50 disabled:opacity-40">
@@ -221,7 +235,11 @@ export default function Reconcile() {
             </div>
           ) : (
             <>
-              <button disabled={busy || clean < done.length || unsaved > 0} onClick={() => run(() => closeDay(date))}
+              <input value={dayNote} onChange={e => setDayNote(e.target.value)}
+                placeholder="这一天的备注（可不填）—— 例：老王那单缺开始结束，电话问到的；金姐少给 20 下次补"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm mb-2.5
+                           outline-none focus:border-red-400" />
+              <button disabled={busy || clean < done.length || unsaved > 0} onClick={() => run(() => closeDay(date, dayNote))}
                 className="w-full text-white font-bold py-3 rounded-xl disabled:opacity-40"
                 style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
                 {unsaved > 0
