@@ -24,12 +24,13 @@ const NAV_ITEMS = [
   { divider: true },
   { label: '我的日报', icon: NotebookPen,      to: '/admin/worklog',    feature: 'worklog' },
   { label: '团队今日', icon: UsersRound,       to: '/admin/team-today', roles: ['admin', 'manager'], feature: 'worklog' },
-  // ⚠️ 2026-10-18 老板把制作和发布对调了，理由是【小红书会显示 IP 属地】：
-  //    小洁的 VPN 出口在香港，一个悉尼搬家公司的账号发帖显示「香港」很违和；
-  //    Annie 的手机卡和网络是本地的，适合发布。
-  //    而制作不看 IP —— 小洁用 AI 写文案没压力。
-  //    所以：小洁【制作】、Annie【发布】。
-  { label: '今天要发', icon: Send,              to: '/admin/content-today', roles: ['admin', 'manager'], feature: 'content' },
+  // ⚠️ 2026-10-18 晚：发布归属改成挂在【账号】上（channel_account.owner_staff_id），
+  //    所以这里【故意不写 roles】—— 谁能发哪个号，由页面里按账号过滤决定：
+  //      小红书迁喜/盼达 → Lili   朋友圈/视频号 → 公共，谁在岗谁发
+  //    早上那版写死 roles:['admin','manager'] 是「只有 Annie 发」时期的产物，
+  //    留着的话小洁进不去这一页，朋友圈每天那条就没人发得了。
+  //    （上午的 IP 属地约束已经不适用：小红书现在归 Lili，不经小洁的 VPN。）
+  { label: '今天要发', icon: Send,              to: '/admin/content-today', feature: 'content' },
   { label: '内容排期', icon: CalendarRange,     to: '/admin/content',    feature: 'content' },
   // 排班：所有人都能看自己的班，但只有 admin/manager 能改（页面里判断）
   { label: '排班表',   icon: CalendarDays,       to: '/admin/roster',     feature: 'roster' },
