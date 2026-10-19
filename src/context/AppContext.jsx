@@ -726,6 +726,17 @@ export function AppProvider({ children }) {
     return data.id
   }
 
+  // 删掉一条内容。老板 10-20：「我对这个文案不满意可以删除这个文案吗」
+  // ⚠️ 安全的前提是两件事已经成立，别在别处改坏：
+  //   ① content_slot.item_id 是 ON DELETE SET NULL —— 挂着它的格子会自动变回空，
+  //      不会留下指向空内容的坏引用
+  //   ② content_post 存的是【标题快照】，没有外键指向 content_item ——
+  //      所以删内容不会伤到已发布的历史记录
+  async function deleteContentItem(id) {
+    const { error } = await supabase.from('content_item').delete().eq('id', id)
+    if (error) throw new Error(error.message || '删除失败，请重试')
+  }
+
   async function updateSlot(id, patch) {
     const { error } = await supabase.from('content_slot').update(patch).eq('id', id)
     if (error) throw new Error(error.message || '保存失败')
@@ -1145,7 +1156,7 @@ export function AppProvider({ children }) {
       getPeriodData, getSummaryNote, saveSummaryNote,
       getPolicyText, confirmTeamDay, getTeamConfirm, addChannelAccount, deleteChannelAccount, channelUsage,
       returnWorkLog, listWorkLogReturns, pendingReturns, openDays,
-      getContentRange, generateWeekSlots, autolinkWeek, saveContentItem,
+      getContentRange, generateWeekSlots, autolinkWeek, saveContentItem, deleteContentItem,
       updateSlot, markSlotPosted, skipSlot, listContentPrompts,
       getRoster, generateRoster, setRoster, listHolidays,
       orders, confirmOrder, completeOrder, startWork, getMyOrders, finishWorkWithCorrection,

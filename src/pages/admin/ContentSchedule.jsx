@@ -36,7 +36,7 @@ const CELL = {
 
 export default function ContentSchedule() {
   const { user, config, getContentRange, generateWeekSlots, autolinkWeek,
-          saveContentItem, updateSlot, skipSlot } = useApp()
+          saveContentItem, updateSlot, skipSlot, deleteContentItem } = useApp()
   const today = sydneyToday()
   const [monday, setMonday] = useState(() => mondayOf(today))
   const [data, setData] = useState({ slots: [], items: [], rules: [] })
@@ -190,6 +190,7 @@ export default function ContentSchedule() {
         <SlotEditor slot={open} data={data} nameOf={nameOf} busy={busy}
           onClose={() => setOpen(null)}
           onSaveItem={saveContentItem} onUpdateSlot={updateSlot} onSkip={skipSlot}
+          onDeleteItem={deleteContentItem}
           onDone={async () => { await refresh(); setOpen(null) }}
           onErr={setErr} />
       )}
@@ -235,7 +236,7 @@ function Kpi({ label, value, warn }) {
 }
 
 // ── 格子编辑 ────────────────────────────────────────────────
-function SlotEditor({ slot, data, nameOf, busy, onClose, onSaveItem, onUpdateSlot, onSkip, onDone, onErr }) {
+function SlotEditor({ slot, data, nameOf, busy, onClose, onSaveItem, onUpdateSlot, onSkip, onDone, onErr, onDeleteItem }) {
   const item = data.items.find(i => i.id === slot.item_id) || null
   const isRewrite = slot.source_type === 'rewrite'
   const isDerived = slot.source_type !== 'original'
@@ -501,6 +502,30 @@ function SlotEditor({ slot, data, nameOf, busy, onClose, onSaveItem, onUpdateSlo
                   className="text-sm font-semibold text-gray-500 border border-gray-200 rounded-xl px-4 hover:bg-gray-50">
                   跳过本周
                 </button>
+                {/* 老板 10-20：「我对这个文案不满意可以删除这个文案吗」
+                    ⚠️ 删之前把【挂在哪几个格子上】说清楚 —— 一条文案常常同时
+                       挂着小红书和朋友圈两格，只看这一格会以为只影响这里。
+                    ⚠️ 已经发出去的不让删 —— 排期表要对得上实际发了什么。
+                       （发布历史存在 content_post 里，有标题快照，删内容伤不到它。） */}
+                {!isDerived && slot.item_id && (
+                  <button disabled={saving} title="从内容库里删掉这条"
+                    onClick={async () => {
+                      const linked = (data.slots || []).filter(s => s.item_id === slot.item_id)
+                      const postedOn = linked.filter(s => s.posted_at)
+                      if (postedOn.length) {
+                        onErr(`这条已经在 ${postedOn.map(s => `${s.slot_date} ${nameOf(s.account_id)}`).join('、')} 发出去了，不能删 —— 排期表要对得上实际发了什么。不想再发就用「跳过本周」。`)
+                        return
+                      }
+                      const where = linked.map(s => `${s.slot_date} ${nameOf(s.account_id)}`).join('\n  ')
+                      if (!confirm(`删掉「${title || '无标题'}」？\n\n它挂在这 ${linked.length} 个格子上，删了都会变回空：\n  ${where}\n\n删了找不回来。`)) return
+                      setSaving(true)
+                      try { await onDeleteItem(slot.item_id); await onDone() }
+                      catch (e) { onErr(e.message) } finally { setSaving(false) }
+                    }}
+                    className="text-sm font-semibold text-gray-400 hover:text-red-600 px-3 disabled:opacity-40">
+                    删除
+                  </button>
+                )}
               </div>
             )}
           </div>
