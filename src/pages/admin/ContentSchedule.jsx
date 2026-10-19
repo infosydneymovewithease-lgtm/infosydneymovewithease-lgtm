@@ -345,6 +345,7 @@ function SlotEditor({ slot, data, nameOf, busy, onClose, onSaveItem, onUpdateSlo
                 <div>
                   <label className="text-xs text-gray-400 block mb-1">
                     改写版正文 <span className="text-red-600">（空着的话发朋友圈的人没东西可复制）</span>
+                    {override.trim() && <span className="text-gray-300 ml-1">· {override.trim().length} 字</span>}
                   </label>
 
                   {seed && (
@@ -358,13 +359,16 @@ function SlotEditor({ slot, data, nameOf, busy, onClose, onSaveItem, onUpdateSlo
                           填进来再改
                         </button>
                       </div>
-                      <p className="text-xs text-gray-500 leading-relaxed max-h-28 overflow-y-auto whitespace-pre-wrap select-text">
+                      {/* ⚠️ 别再压矮这个框。老板 10-20：「内容不完整」——
+                          原来 max-h-28（112px），289 字的文案只露得出中间三行，
+                          看着像被截断了。内容是全的，是框的问题。 */}
+                      <p className="text-xs text-gray-500 leading-relaxed max-h-64 overflow-y-auto whitespace-pre-wrap select-text">
                         {seed}
                       </p>
                     </div>
                   )}
 
-                  <textarea rows={6} value={override} onChange={e => setOverride(e.target.value)} disabled={!!slot.posted_at}
+                  <textarea rows={10} value={override} onChange={e => setOverride(e.target.value)} disabled={!!slot.posted_at}
                     placeholder={pickId ? '在这里写朋友圈版 —— 可以点上面「填进来再改」' : '先在上面选一条内容'}
                     className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400 resize-none leading-relaxed" />
                   <p className="text-xs text-gray-400 mt-1">
@@ -384,8 +388,11 @@ function SlotEditor({ slot, data, nameOf, busy, onClose, onSaveItem, onUpdateSlo
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400" />
               </div>
               <div>
-                <label className="text-xs text-gray-400 block mb-1">正文</label>
-                <textarea rows={8} value={body} onChange={e => setBody(e.target.value)} disabled={!!slot.posted_at}
+                <label className="text-xs text-gray-400 block mb-1">
+                  正文
+                  {body.trim() && <span className="text-gray-300 ml-1">· {body.trim().length} 字</span>}
+                </label>
+                <textarea rows={12} value={body} onChange={e => setBody(e.target.value)} disabled={!!slot.posted_at}
                   placeholder={'正文…\n\n#悉尼搬家 #留学生搬家'}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400 resize-none leading-relaxed" />
               </div>
