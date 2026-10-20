@@ -616,7 +616,10 @@ export function AppProvider({ children }) {
 
   async function getWorkday(workDate) {
     const { data, error } = await supabase.rpc('get_workday', { p_work_date: workDate })
-    if (error) { console.warn('[workday] 读取失败：', error.message); return { logs: [], breaks: [], inquiries: [], posts: [] } }
+    if (error) {
+      console.warn('[workday] 读取失败：', error.message)
+      return { logs: [], breaks: [], inquiries: [], posts: [], error: error.message }
+    }
     return { logs: data?.logs || [], breaks: data?.breaks || [], inquiries: data?.inquiries || [], posts: data?.posts || [] }
   }
 
@@ -673,7 +676,14 @@ export function AppProvider({ children }) {
 
   async function getContentRange(from, to) {
     const { data, error } = await supabase.rpc('get_content_range', { p_from: from, p_to: to })
-    if (error) { console.warn('[content] 读取失败：', error.message); return { slots: [], items: [], rules: [] } }
+    // ⚠️ 读失败【不能静默】。2026-10-20 经理值班时这里失败了，页面显示
+    //    「这一周还没有格子」，而服务器上 15 个格子一个没少 ——
+    //    等于拿一句假话引导她去点「生成本周格子」。
+    //    返回空没错，错在没人知道这个空是「真没有」还是「没读到」。
+    if (error) {
+      console.warn('[content] 读取失败：', error.message)
+      return { slots: [], items: [], rules: [], error: error.message }
+    }
     return { slots: data?.slots || [], items: data?.items || [], rules: data?.rules || [] }
   }
 

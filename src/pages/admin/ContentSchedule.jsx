@@ -21,6 +21,7 @@ import {
   SOURCE_LABEL, STATUS_LABEL, mondayOf, addDaysLocal,
 } from '../../utils/content'
 import { uploadImage } from '../../utils/upload'
+import { humanError, readFailMsg } from '../../utils/netError'
 import PromptLibrary from '../../components/PromptLibrary'
 import { ChevronLeft, ChevronRight, Plus, Check } from 'lucide-react'
 
@@ -77,7 +78,7 @@ export default function ContentSchedule() {
   async function run(fn, okMsg) {
     setBusy(true); setErr(''); setMsg('')
     try { const r = await fn(); await refresh(); if (okMsg) setMsg(okMsg(r)) }
-    catch (e) { setErr(e.message || '操作失败') } finally { setBusy(false) }
+    catch (e) { setErr(humanError(e)) } finally { setBusy(false) }
   }
 
   const videoDone = stats.videos.filter(s => s.posted_at).length
@@ -115,8 +116,25 @@ export default function ContentSchedule() {
         <Kpi label="复用省下" value={`${stats.reused} 条`} />
       </div>
 
+      {/* ⚠️ 读失败和「真的没有格子」必须分开说。
+          2026-10-20 经理值班时读失败，页面显示「这一周还没有格子」，
+          而服务器上 15 个格子一个没少。 */}
+      {data.error && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+          <span className="text-lg shrink-0">⚠️</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-amber-900 font-semibold leading-relaxed">{readFailMsg({ message: data.error })}</p>
+            <button onClick={refresh}
+              className="mt-2 text-sm font-semibold text-white px-4 py-2 rounded-xl"
+              style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
+              重新加载
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── 没格子就先生成 ─────────────────── */}
-      {data.slots.length === 0 && (
+      {!data.error && data.slots.length === 0 && (
         <div className="bg-white rounded-2xl p-5 text-center shadow-sm">
           <p className="text-sm text-gray-600 mb-3">这一周还没有格子</p>
           <button disabled={busy} onClick={() => run(() => generateWeekSlots(monday), r => `生成了 ${r.created} 个格子`)}
