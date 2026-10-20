@@ -19,6 +19,7 @@ import { sydneyToday } from '../../utils/date'
 import { todayToPost, bodyFor, SOURCE_LABEL } from '../../utils/content'
 import { ownsAccount, requiredAccounts } from '../../utils/worklog'
 import { uploadImage } from '../../utils/upload'
+import { humanError } from '../../utils/netError'
 import { Check, Copy, Download, Plus } from 'lucide-react'
 
 // 老板 10-20：「在今天要发里看到的封面图片不能下载就变得没有意义了」
@@ -359,25 +360,48 @@ function ShotRow({ shots, onChange, onErr }) {
 //    今天 0 个咨询也是有效登记，不能逼人填个假数字出来。
 //    这一条和日报里的登记表是同一个规矩，别在这里走样。
 function InquiryBox({ date, accounts, staffId, getWorkday, saveInquiry, onErr }) {
-  const [rows, setRows] = useState([])
-  const [draft, setDraft] = useState({})
+  const [saved, setSaved] = useState({})     // accountId → 已存进库的数字
+  const [draft, setDraft] = useState({})     // accountId → 正在输入的
   const [busy, setBusy] = useState('')
+  const [okFlash, setOkFlash] = useState('')
 
   const load = useCallback(async () => {
     const d = await getWorkday(date)
-    setRows((d.inquiries || []).filter(i => i.staff_id === staffId))
+    const mine = (d.inquiries || []).filter(i => i.staff_id === staffId)
+    setSaved(Object.fromEntries(mine.map(i => [i.account_id, String(i.count)])))
   }, [getWorkday, date, staffId])
   useEffect(() => { load() }, [load])
 
-  async function save(accountId) {
-    const raw = draft[accountId]
+  // 「没存」的定义：输入框里有东西，而且和库里存的不一样。
+  // ⚠️ 这个状态必须【看得见】—— 老板 10-20 转述经理的原话：
+  //    「写完之后在哪里提交？我退出页面，我填的就没了。」
+  //    原来是点到别处自动存，界面上没有任何反馈。对写代码的人理所当然，
+  //    对用的人等于没有保存这回事。她填的 1 和 1 一条都没进库。
+  const dirty = accounts.filter(a => {
+    const d = draft[a.id]
+    return d !== undefined && d !== '' && d !== saved[a.id]
+  })
+
+  async function saveOne(id) {
+    const raw = draft[id]
     if (raw === undefined || raw === '') return
-    setBusy(accountId)
-    try { await saveInquiry(date, accountId, Number(raw) || 0); await load() }
-    catch (e) { onErr(e.message || '保存失败') } finally { setBusy('') }
+    setBusy(id); onErr('')
+    try {
+      await saveInquiry(date, id, Number(raw) || 0)
+      setSaved(p => ({ ...p, [id]: String(Number(raw) || 0) }))
+      setDraft(p => { const n = { ...p }; delete n[id]; return n })
+      setOkFlash(id); setTimeout(() => setOkFlash(''), 1500)
+    } catch (e) {
+      // ⚠️ 失败时【不清空输入框】—— 她的数字还在里面，点重试就行，不用重打
+      onErr(humanError(e, '这个数字'))
+    } finally { setBusy('') }
   }
 
-  const missing = accounts.filter(a => !rows.some(r => r.account_id === a.id))
+  async function saveAll() {
+    for (const a of dirty) await saveOne(a.id)
+  }
+
+  const missing = accounts.filter(a => saved[a.id] === undefined)
 
   return (
     <div className="bg-white rounded-2xl p-4 shadow-sm">
@@ -389,29 +413,59 @@ function InquiryBox({ date, accounts, staffId, getWorkday, saveInquiry, onErr })
       </p>
       <div className="space-y-1.5">
         {accounts.map(a => {
-          const rec = rows.find(r => r.account_id === a.id)
-          const val = draft[a.id] ?? (rec ? String(rec.count) : '')
+          const has = saved[a.id] !== undefined
+          const val = draft[a.id] ?? (has ? saved[a.id] : '')
+          const isDirty = dirty.some(x => x.id === a.id)
           return (
-            <div key={a.id} className="flex items-center gap-3 py-1">
+            <div key={a.id} className="flex items-center gap-2.5 py-1">
               <span className="w-2 h-2 rounded-full shrink-0"
-                style={{ background: rec ? '#22c55e' : '#f59e0b' }} />
+                style={{ background: isDirty ? '#ef4444' : has ? '#22c55e' : '#f59e0b' }} />
               <span className="text-xs text-gray-400 w-12 shrink-0">{a.platform}</span>
               <span className="text-sm font-semibold w-20 shrink-0">{a.name}</span>
-              <span className="text-xs text-gray-400 flex-1 truncate min-w-0">{a.positioning}</span>
+              <span className="text-xs text-gray-400 flex-1 truncate min-w-0 hidden sm:block">{a.positioning}</span>
               <input type="number" min="0" inputMode="numeric" value={val}
                 onChange={e => setDraft(d => ({ ...d, [a.id]: e.target.value }))}
-                onBlur={() => save(a.id)} disabled={busy === a.id}
+                onBlur={() => isDirty && saveOne(a.id)}
+                disabled={busy === a.id}
                 placeholder="待填"
-                className={`w-20 text-center border rounded-lg px-2 py-1.5 text-sm outline-none shrink-0
-                  ${rec ? 'border-gray-200' : 'border-amber-300 bg-amber-50'} focus:border-red-400`} />
+                className={`w-16 text-center border rounded-lg px-2 py-1.5 text-sm outline-none shrink-0
+                  ${isDirty ? 'border-red-300 bg-red-50' : has ? 'border-gray-200' : 'border-amber-300 bg-amber-50'}
+                  focus:border-red-400`} />
+              <span className="w-14 shrink-0 text-xs text-right">
+                {busy === a.id ? <span className="text-gray-400">存…</span>
+                  : isDirty ? (
+                    <button onClick={() => saveOne(a.id)}
+                      className="font-semibold text-white px-2 py-1 rounded-lg"
+                      style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>保存</button>
+                  ) : okFlash === a.id ? <span className="text-green-600 font-semibold">✓ 已存</span>
+                  : has ? <span className="text-green-600">✓ 已存</span>
+                  : <span className="text-amber-600">待填</span>}
+              </span>
             </div>
           )
         })}
       </div>
-      {missing.length > 0 && (
+
+      {/* 一个明确的提交入口 —— 经理问的就是这个。
+          哪怕自动保存已经跑过了，也要有个看得见的按钮，否则她不知道东西进没进去。 */}
+      {dirty.length > 0 && (
+        <button onClick={saveAll} disabled={!!busy}
+          className="mt-3 w-full text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-40"
+          style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
+          保存这 {dirty.length} 个数字
+        </button>
+      )}
+
+      {dirty.length > 0 ? (
+        <p className="text-xs text-red-600 mt-2 font-medium">
+          红色的还没存进系统 —— 现在离开页面就没了
+        </p>
+      ) : missing.length > 0 ? (
         <p className="text-xs text-amber-700 mt-2.5">
           还差 {missing.map(a => a.name).join('、')} 没填 —— 下班前补上
         </p>
+      ) : (
+        <p className="text-xs text-green-600 mt-2.5">今天的咨询数都登记好了 ✓</p>
       )}
     </div>
   )
