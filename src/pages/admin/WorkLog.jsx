@@ -220,7 +220,13 @@ export default function WorkLog() {
               ⚠️ 闸门（inquiryProgress）仍然只算归自己的 ——
                  否则小洁又会卡在她填不了的小红书上，交不了日报。 */}
           {myChannels(config.channelAccounts, null, true).map(a => {
-            const mine = ownsAccount(a, user?.id, isBoss)
+            // ⚠️ 2026-10-20 老板：「小红书这两个的填写交给我和经理」。
+            //    做成【经理和老板能填任何号】，而不是改归属 ——
+            //    改归属会让运营那边的页面立刻变空，而这件事还没跟本人谈。
+            //    系统不该替人把话说出去。
+            //    注意：能填 ≠ 必须填。闸门（inquiryProgress）仍只算归自己的，
+            //    所以经理不会因为小红书没填而交不了日报。
+            const mine = ownsAccount(a, user?.id, isBoss) || isManager
             // 只显示自己填的 —— 两个人在岗时各填各的
             const rec = day.inquiries.find(i => i.account_id === a.id && i.staff_id === user?.id)
             // 归别人管的号：显示负责人填了多少，只读
