@@ -339,9 +339,14 @@ function SlotEditor({ slot, data, nameOf, busy, onClose, onSaveItem, onUpdateSlo
                 //    所以：原文单独显示能选能复制，再给一个「填进来再改」的按钮。
                 const src = data.items.find(i => i.id === Number(pickId))
                 // 朋友圈用不上 #话题标签，填进来的时候先去掉，省得她一行行删
-                const seed = String(src?.body || '')
+                const plain = String(src?.body || '')
                   .split('\n').filter(l => !/^\s*#\S/.test(l)).join('\n')
                   .replace(/\n{3,}/g, '\n\n').trim()
+                // 老板 10-20：「标题不能改写吗」
+                // 朋友圈【没有标题栏】—— 发布页上标题只对小红书和视频号显示，
+                // 朋友圈那几条复制的只有正文。所以标题在这里变成【第一行】，
+                // 想改就改、不要就删，而不是单开一个用不上的标题字段。
+                const seed = (src?.title ? src.title + '\n\n' : '') + plain
                 return (
                 <div>
                   <label className="text-xs text-gray-400 block mb-1">
@@ -352,7 +357,7 @@ function SlotEditor({ slot, data, nameOf, busy, onClose, onSaveItem, onUpdateSlo
                   {seed && (
                     <div className="bg-gray-50 border border-gray-200 rounded-xl p-2.5 mb-2">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-semibold text-gray-500">原文（{src?.title || '无标题'}）</span>
+                        <span className="text-xs font-semibold text-gray-500">原文 · 朋友圈版</span>
                         <span className="flex-1" />
                         <button type="button" disabled={!!slot.posted_at}
                           onClick={() => setOverride(seed)}
@@ -374,6 +379,7 @@ function SlotEditor({ slot, data, nameOf, busy, onClose, onSaveItem, onUpdateSlo
                     className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400 resize-none leading-relaxed" />
                   <p className="text-xs text-gray-400 mt-1">
                     盼达是写给留学生的，朋友圈的人多半已经加过微信、甚至下过单 —— 口气要换。
+                    朋友圈没有标题栏，所以标题变成了第一行,想改就改、不要就删。
                     #话题标签已经替你去掉了，朋友圈用不上。
                   </p>
                 </div>
