@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AppProvider, useApp } from './context/AppContext'
 import ErrorBoundary from './components/ErrorBoundary'
+import VersionWatch from './components/VersionWatch'
 import { canOpen, homeFor } from './utils/roles'
 import Login from './pages/Login'
 import Home from './pages/Home'
@@ -210,6 +211,7 @@ export default function App() {
 
   return (
     <AppProvider>
+        <VersionWatch />
       <BrowserRouter>
         {!splashDone && <SplashScreen onDone={handleSplashDone} />}
         <ErrorBoundary>
