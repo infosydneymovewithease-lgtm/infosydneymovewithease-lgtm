@@ -65,13 +65,16 @@ export function todayTasks(ctx) {
   })
 
   // 今天要发 —— 没有待发的不是她的错，是内容还没准备好
+  // ⚠️ slotsToday 由调用方按【账号归属】过滤过，所以这里不用再判断谁能发哪个号。
   const ready = (slotsToday || []).filter(s => s.status === 'ready')
   const posted = (slotsToday || []).filter(s => s.posted_at)
-  // ⚠️ 2026-10-18 对调：制作归客服、发布归经理。
-  //    理由是小红书显示 IP 属地 —— 小洁的 VPN 在香港，发帖显示「香港」
-  //    对一个悉尼搬家公司很违和；Annie 的网络是本地的。
-  //    制作不看 IP，所以小洁写、Annie 发。
-  if (!isManager) {
+
+  // ⚠️ 2026-10-21 分工重定：老板写，经理发。
+  //    老板：「运营以后还是我和经理吧，我写她发，因为内容需要把控一些」
+  //    （10-18 那版「小洁写、Annie 发」已作废；中间短暂由运营 Lili 全包，
+  //      那个岗位 10-21 取消了。）
+  //    写作只给老板 —— 挂在客服头上她会被催写她不再负责的东西。
+  if (role === 'admin') {
     t.push({
       key: 'edit', label: '编辑内容',
       state: (editedToday || 0) > 0 ? S.done : S.todo,
@@ -84,16 +87,20 @@ export function todayTasks(ctx) {
   const who = nameOfAccount
     ? [...new Set(ready.map(s => nameOfAccount(s.account_id)))].join(' · ')
     : ''
-  // 发布只给经理（她的网络环境适合发）。
-  // 客服看不到这条 —— 她的活是把内容做出来，做完交给经理发。
-  if (isManager) {
+  // ⚠️ 2026-10-21 老板：「小洁不需要发布的原因是小洁的 IP 地址是国内，
+  //    我和经理是澳洲这面，另外朋友圈不受这个限制，小洁可以发布」
+  //    所以小洁不是「不参与发布」，是【只发朋友圈】——
+  //    小红书和视频号会公开显示 IP 属地，一个悉尼搬家公司显示国内城市很违和。
+  //    谁能发哪个号由 channel_account.owner_staff_id 决定，调用方已经过滤好了；
+  //    这里只要「手上有没有活」—— 没有归自己的号就不出这条任务。
+  if (ready.length || posted.length || isManager) {
     t.push({
       key: 'post',
       label: ready.length ? `发布 ${who || '今天排的内容'}` : '发布今天排的内容',
       state: ready.length === 0 ? (posted.length ? S.done : S.wait) : S.todo,
       hint: ready.length ? `${ready.length} 条待发`
         : posted.length ? `今天发了 ${posted.length} 条`
-        : '等小洁把内容做好 —— 不是你的事',
+        : '等内容做好 —— 不是你的事',
       minutes: ready.length * 5, to: '/admin/content-today',
     })
   }
@@ -140,9 +147,9 @@ export function weekTasks(ctx) {
   const { role, weekVideo, weekOut } = ctx
   const isManager = role === 'admin' || role === 'manager'
   const out = []
-  // ⚠️ 2026-10-18 对调：本周文案/视频是【制作】指标，归客服。
-  //    经理那边看「发了几条」，不看「做了几条」。
-  if (!isManager && weekOut) {
+  // ⚠️ 2026-10-21：本周文案/视频是【制作】指标，归老板（他写）。
+  //    经理和客服那边看「发了几条」，不看「做了几条」。
+  if (role === 'admin' && weekOut) {
     out.push({ key: 'wtext', label: `本周文案 ${weekOut.text.done}/${weekOut.text.total} 条`,
       ok: weekOut.text.done >= weekOut.text.total })
     out.push({ key: 'wvideo', label: `本周视频 ${weekOut.video.done}/${weekOut.video.total} 条`,

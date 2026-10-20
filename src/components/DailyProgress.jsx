@@ -7,7 +7,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { sydneyToday, addDays, sydneyDateOf } from '../utils/date'
-import { requiredAccounts, inquiryProgress, weeklyVideo, weekRange } from '../utils/worklog'
+import { requiredAccounts, ownsAccount, inquiryProgress, weeklyVideo, weekRange } from '../utils/worklog'
 import { todayToPost, weekOutput, myEditsToday } from '../utils/content'
 import { todayTasks, weekTasks, progressOf, S } from '../utils/tasks'
 import { Check, ChevronRight, Clock, Coffee } from 'lucide-react'
@@ -42,7 +42,12 @@ export default function DailyProgress() {
   const log = day.logs.find(l => l.staff_id === user?.id)
   const accounts = requiredAccounts(config.channelAccounts, user?.id, user?.role === 'admin')
   const prog = inquiryProgress(accounts, day.inquiries, date, user?.id)
-  const slotsToday = todayToPost(content.slots, content.items, date)
+  // ⚠️ 发布任务要按【账号归属】算 —— 小洁只发朋友圈（它不显示 IP 属地），
+  //    小红书和视频号归澳洲这边。不过滤的话她会被催发她发不了的号。
+  const canPost = s => ownsAccount(
+    (config.channelAccounts || []).find(a => a.id === s.account_id),
+    user?.id, user?.role === 'admin' || user?.role === 'manager')
+  const slotsToday = todayToPost(content.slots, content.items, date).filter(canPost)
   // ⚠️ 2026-10-18 对调后：制作归【客服】，所以「今天改了几条」人人都要算。
   //    原来写的是 isManager ? ... : 0，对调后小洁的「编辑内容」会永远显示没做。
   const edits = myEditsToday(content.items, content.slots, user?.id, date, sydneyDateOf).length
@@ -59,7 +64,8 @@ export default function DailyProgress() {
     // ⚠️ 2026-10-18：本周文案/视频是【制作】指标，对调后归客服。
     //    原来写 isManager ? ... : null，和 weekTasks 里改成 !isManager 对不上 ——
     //    结果小洁那条永远拿不到数据。
-    weekOut: !isManager ? weekOutput(content.slots, content.items) : null,
+    // 本周文案/视频是制作指标 —— 归老板（他写）
+    weekOut: user?.role === 'admin' ? weekOutput(content.slots, content.items) : null,
   })
   const p = progressOf(tasks)
 
