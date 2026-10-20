@@ -181,7 +181,13 @@ export default function ContentToday() {
                             <Download size={12} /> 下载封面图
                           </a>
                         )}
-                        <p className="text-xs text-gray-400 mt-0.5">封面图点一下就存下来了，其余配图去微信素材群里拿</p>
+                        {/* 老板 10-20：「可以下载了但是不知道下载到哪里去了」
+                            网页无权选择保存位置，这是浏览器的安全限制。
+                            能做的是把最快的存法写在旁边 —— 手机上长按进相册，一步到位。 */}
+                        <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                          手机上<b className="text-gray-500">长按图片 →「存储到照片」</b>直接进相册，比点下载快。
+                          <br />点下载的话：电脑在「下载」文件夹，手机在「文件」App 的下载项里。
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -215,6 +221,11 @@ export default function ContentToday() {
                       <span className="text-xs text-red-700 font-semibold flex items-center gap-1 ml-1">
                         <Download size={12} /> 点一下就下载
                       </span>
+                      {/* 视频没法长按存相册，只能走「文件」App 转一道 */}
+                      <p className="w-full text-xs text-gray-400 mt-1 leading-relaxed">
+                        存进相册：下载后打开<b className="text-gray-500">「文件」App → 下载项</b>，
+                        点开视频 → 分享 → 存储视频。电脑上在「下载」文件夹。
+                      </p>
                     </div>
                   </div>
                 )}
