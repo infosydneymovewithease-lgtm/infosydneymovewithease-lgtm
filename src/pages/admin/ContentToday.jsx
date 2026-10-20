@@ -17,7 +17,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useApp } from '../../context/AppContext'
 import { sydneyToday } from '../../utils/date'
 import { todayToPost, bodyFor, SOURCE_LABEL } from '../../utils/content'
-import { ownsAccount, requiredAccounts } from '../../utils/worklog'
+import { requiredAccounts } from '../../utils/worklog'
 import { uploadImage } from '../../utils/upload'
 import { humanError } from '../../utils/netError'
 import { Check, Copy, Download, Plus } from 'lucide-react'
@@ -39,7 +39,7 @@ const hhmm = iso => iso
   : ''
 
 export default function ContentToday() {
-  const { user, config, getContentRange, markSlotPosted, getWorkday, saveInquiry,
+  const { user, staff, config, getContentRange, markSlotPosted, getWorkday, saveInquiry,
           unmarkSlotPosted } = useApp()
   const [proof, setProof] = useState({})   // slotId → {url, shots}
   const date = sydneyToday()
@@ -56,18 +56,24 @@ export default function ContentToday() {
   // 上一版是 if (isManager)，换一次分工就要满系统找六个地方改（上次就漏了六处）。
   // 现在归属存在 channel_account.owner_staff_id，换人在系统设置里点一下就行。
   // ⚠️ 没指定负责人的号＝公共的，谁都看得到（微信那两个就是）。
-  // ⚠️ 2026-10-21：经理在线上看不到迁喜那条（它还挂在运营名下）。
-  //    Lili 不来了，于是今天迁喜就绪却【没人发得了】——
-  //    小洁看不到、经理看不到、运营不会来，只剩老板一个人能发。
-  //    和昨天咨询登记同一个办法：不改归属（那会让运营页面立刻变空，
-  //    而这件事老板还没跟本人谈），改成【经理和老板看得到全部号】。
-  const seeAll = user?.role === 'admin' || user?.role === 'manager'
-  const mineOnly = s => ownsAccount(
-    (config.channelAccounts || []).find(a => a.id === s.account_id), user?.id, seeAll)
-  const list = todayToPost(data.slots, data.items, date).filter(mineOnly)
+  // ⚠️ 2026-10-21 老板：「小洁那里应该以看到全部内容为准，
+  //    哪天让她顶一下还是有可能的」
+  //    所以这一页【不按归属过滤】—— 三个人都看到全部，谁都能发。
+  //    归属只决定【催谁】：日报里的发布任务仍按归属算，
+  //    小洁不会被催发她平时不发的小红书。看得到 ≠ 必须做。
+  const list = todayToPost(data.slots, data.items, date)
+  // 不归自己的，标一句「平时归谁发」—— 顶班时她才知道哪几条是平时不碰的
+  const ownerOf = id => {
+    const a = (config.channelAccounts || []).find(x => x.id === id)
+    if (!a?.owner_staff_id || a.owner_staff_id === user?.id) return null
+    return staff?.find?.(x => x.id === a.owner_staff_id)?.name || a.owner_staff_id
+  }
   const posted = list.filter(s => s.posted_at).length
-  // 我负责的号 —— 下面那张「今天来了几个咨询」用它
-  const myAccounts = requiredAccounts(config.channelAccounts, user?.id, seeAll)
+  // 我负责的号 —— 下面那张「今天来了几个咨询」用它。
+  // ⚠️ 这一个要【按归属】：上面的发布列表给全部（顶班要看得到），
+  //    但咨询登记是「填你自己接待的」，列上别人的号等于催她填不该填的。
+  const myAccounts = requiredAccounts(config.channelAccounts, user?.id,
+    user?.role === 'admin' || user?.role === 'manager')
 
   async function copy(text, key) {
     try { await navigator.clipboard.writeText(text); setCopied(key); setTimeout(() => setCopied(''), 1500) }
@@ -138,6 +144,11 @@ export default function ContentToday() {
                 {SOURCE_LABEL[s.source_type]}
                 {s.source_type === 'clone' && ' · 和原文一模一样'}
               </span>
+              {ownerOf(s.account_id) && !done && (
+                <span className="text-xs text-gray-400 bg-gray-100 rounded px-1.5 py-0.5">
+                  平时归 {ownerOf(s.account_id)} 发
+                </span>
+              )}
               <span className="flex-1" />
               <span className="text-xs text-gray-400">
                 {done ? `${hhmm(s.posted_at)} 已发`
