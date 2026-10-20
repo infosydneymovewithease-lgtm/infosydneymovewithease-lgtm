@@ -111,6 +111,13 @@ function LoginForm({ username, password, error, logging, setUsername, setPasswor
           className="w-full px-4 py-3.5 border border-gray-200 rounded-xl text-gray-800 text-base focus:outline-none focus:ring-2 focus:border-transparent bg-gray-50"
           style={{ '--tw-ring-color': '#8B1A1A' }}
           autoComplete="username"
+          /* 老板 10-20：手机上 phill/1234 登不上。
+             iPhone 默认把输入框第一个字母自动大写 → 打出来是 Phill，
+             而账号匹配区分大小写，所以永远登不上。电脑上碰不到这个坑。 */
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          inputMode="text"
         />
       </div>
 

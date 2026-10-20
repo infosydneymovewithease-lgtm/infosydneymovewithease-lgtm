@@ -283,10 +283,19 @@ export function AppProvider({ children }) {
   // S1-D: 登录走 RPC，不再让前端能直接 SELECT staff 表
   // RPC 用 SECURITY DEFINER 在数据库内部验证密码 + 返回不含密码字段的用户对象
   async function login(username, password) {
-    const { data, error } = await supabase.rpc('login_staff', {
-      p_username: username,
-      p_password: password,
-    })
+    // 老板 10-20：手机上登不上 —— iPhone 自动把首字母大写，打出来是 Phill。
+    // 账号匹配区分大小写，所以怎么试都不对，而电脑上永远复现不了。
+    // 两道兜底：去掉首尾空格（粘贴和自动填充常带）；
+    //          原样登不上就再用小写试一次（全公司账号本来都是小写）。
+    // ⚠️ 只放宽【账号】，密码一个字符都不动。
+    const tries = [...new Set([String(username || '').trim(),
+                               String(username || '').trim().toLowerCase()])]
+    let data = null, error = null
+    for (const u of tries) {
+      const r = await supabase.rpc('login_staff', { p_username: u, p_password: password })
+      if (r.error) { error = r.error; break }
+      if (r.data) { data = r.data; break }
+    }
     if (error) {
       console.error('[Supabase] login_staff failed:', error)
       return false
