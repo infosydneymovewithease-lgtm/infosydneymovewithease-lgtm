@@ -211,7 +211,7 @@ export default function WorkLog() {
 
       {/* ── 平台咨询登记 ──────────────────────── */}
       <div id="inquiry-section" className="scroll-mt-4" />
-      <Card title="平台咨询登记" hint="每个触点每天逐个检查，填你自己接待的人数。今天 0 个也要登记 —— 填 0 就行，不填不算。归别人管的号只显示对方填了多少，你不用填。左边显示你在「今天发了什么」里登记的内容，不用重复填。鼠标移到行上，右边 ✕ 可以删掉这个号">
+      <Card title="平台咨询登记" hint="每个触点每天逐个检查，填你自己接待的人数。今天 0 个也要登记 —— 填 0 就行，不填不算。前面几个是发内容的号；老客户回访和企业客户预订是客人来的别的路子，一样要记。归别人管的号只显示对方填了多少，你不用填。左边显示你在「今天发了什么」里登记的内容，不用重复填。鼠标移到行上，右边 ✕ 可以删掉这个号">
         <div className="space-y-1.5">
           {/* ⚠️ 2026-10-20 老板：「经理看不到小红书迁喜和盼达的登记，
               我想大家同步都可以看到」。
@@ -253,8 +253,15 @@ export default function WorkLog() {
                     : !mine ? (theirs.length ? '#86efac' : '#e5e7eb')
                     : done ? '#22c55e' : '#f59e0b' }} />
                 <span className="text-xs text-gray-400 w-12 shrink-0">{a.platform}</span>
-                <span className={`text-sm w-20 shrink-0 ${planned ? 'text-gray-400' : 'font-semibold'}`}>{a.name}</span>
-                <span className="text-xs text-gray-400 flex-1 truncate min-w-0">{a.positioning}</span>
+                {/* 老板 10-21：定位写在名字【下面】的小灰字里。
+                    原来它单占一列，「全车型 · 老客复购 / 回访」这种长一点的
+                    直接被截断，等于写了没人看得到。 */}
+                <span className="flex-1 min-w-0">
+                  <span className={`block text-sm ${planned ? 'text-gray-400' : 'font-semibold'}`}>{a.name}</span>
+                  {a.positioning && (
+                    <span className="block text-xs text-gray-400 leading-tight">{a.positioning}</span>
+                  )}
+                </span>
                 {/* 老板 10-13：「删除或更改某一条信息」——
                     在看到它的地方改和删，不用跑去设置页。
                     只对 admin/manager 开放（改一个号影响全员每天的登记表）。 */}

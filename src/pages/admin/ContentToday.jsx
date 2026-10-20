@@ -442,9 +442,9 @@ function InquiryBox({ date, accounts, staffId, getWorkday, saveInquiry, onErr })
     <div className="bg-white rounded-2xl p-4 shadow-sm">
       <h2 className="font-bold text-sm">今天来了几个咨询</h2>
       <p className="text-xs text-gray-400 mt-0.5 mb-3 leading-relaxed">
-        私信里问搬家的人数，填你自己接待的。
+        问搬家的人数，填你自己接待的。
         <b className="text-gray-500">今天 0 个也要填 0</b> —— 空着不算登记。
-        这个数系统抓不到，只有你看得见，但它是判断哪类文案真的带来客人的唯一依据。
+        这个数系统抓不到，只有你看得见，但它是判断客人从哪来的唯一依据。
       </p>
       <div className="space-y-1.5">
         {accounts.map(a => {
@@ -456,8 +456,12 @@ function InquiryBox({ date, accounts, staffId, getWorkday, saveInquiry, onErr })
               <span className="w-2 h-2 rounded-full shrink-0"
                 style={{ background: isDirty ? '#ef4444' : has ? '#22c55e' : '#f59e0b' }} />
               <span className="text-xs text-gray-400 w-12 shrink-0">{a.platform}</span>
-              <span className="text-sm font-semibold w-20 shrink-0">{a.name}</span>
-              <span className="text-xs text-gray-400 flex-1 truncate min-w-0 hidden sm:block">{a.positioning}</span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm font-semibold">{a.name}</span>
+                {a.positioning && (
+                  <span className="block text-xs text-gray-400 leading-tight">{a.positioning}</span>
+                )}
+              </span>
               <input type="number" min="0" inputMode="numeric" value={val}
                 onChange={e => setDraft(d => ({ ...d, [a.id]: e.target.value }))}
                 onBlur={() => isDirty && saveOne(a.id)}
