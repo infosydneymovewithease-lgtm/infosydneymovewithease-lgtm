@@ -408,9 +408,17 @@ function SlotEditor({ slot, data, nameOf, busy, onClose, onSaveItem, onUpdateSlo
                     师傅发群里 → Annie存下来传系统 → 小洁再下载 → 传小红书。
                     中间两趟白跑。改成只传封面 + 写清在群里哪儿。 */}
               <div>
+                {/* ⚠️ 2026-10-20 老板：「你说这两项要不要」
+                    视频条目的 itemReady 只看【正文 + 视频文件】，封面图传不传都算就绪。
+                    之前这里对视频也写「必填」，是假规矩 —— 她照着填，系统不认也不用，
+                    下次就不信那些红字了。假规矩比没规矩更糟。
+                    视频的封面留着是因为视频号发布时要选封面，有现成的比截帧好，
+                    但它是【可选】的，而且必须在「今天要发」上显示出来，不然等于白传。 */}
                 <label className="text-xs text-gray-400 block mb-1">
-                  封面图 <span className="text-red-600">必填 · 1 张</span>
-                  <span className="text-gray-300"> · 排期表和「今天要发」靠它认出是哪条</span>
+                  封面图 {slot.kind === 'video'
+                    ? <span className="text-gray-300">· 可不填 · 视频号发布时能直接用</span>
+                    : <><span className="text-red-600">必填 · 1 张</span>
+                        <span className="text-gray-300"> · 排期表和「今天要发」靠它认出是哪条</span></>}
                 </label>
                 <div className="flex gap-2 items-center">
                   {cover ? (

@@ -180,6 +180,21 @@ export default function ContentToday() {
                   <div className="flex items-start gap-2.5">
                     <span className="w-10 shrink-0 text-xs text-gray-400 pt-1.5">视频</span>
                     <div className="flex gap-1.5 flex-wrap items-center">
+                      {/* 视频的封面图也要能拿到 —— 视频号发布时要选封面，
+                          有做好的比从视频里截一帧强。不显示出来等于白传。 */}
+                      {s.item.cover && (
+                        <a href={dl(s.item.cover.url || s.item.cover.data, s.item.cover.name)}
+                          download={s.item.cover.name || 'cover.jpg'} title="封面图 · 点一下存到本地"
+                          className="relative group shrink-0">
+                          <img src={s.item.cover.url || s.item.cover.data} alt=""
+                            className="w-14 h-14 rounded-lg object-cover border border-gray-200 group-hover:border-red-400" />
+                          <span className="absolute inset-0 rounded-lg bg-black/0 group-hover:bg-black/40
+                                           flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition">
+                            <Download size={16} />
+                          </span>
+                          <span className="absolute -bottom-0.5 left-0 right-0 text-[9px] text-center text-white bg-black/50 rounded-b-lg">封面</span>
+                        </a>
+                      )}
                       {s.item.materials.map((m, i) => (
                         <a key={i} href={dl(m.url || m.data, m.name)} download={m.name}
                           className="w-14 h-14 rounded-lg border border-gray-200 hover:border-red-400 bg-gray-100 flex items-center justify-center">
