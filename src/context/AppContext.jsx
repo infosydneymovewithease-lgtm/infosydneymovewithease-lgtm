@@ -816,6 +816,16 @@ export function AppProvider({ children }) {
     if (error) throw new Error(error.message || '保存失败')
   }
 
+  // 发错了撤销。老板 10-20：「小红书发好了但是朋友圈是按错了」
+  // ⚠️ 必须同时撤两处 —— 只清格子不删发布记录的话，
+  //    日报和周月汇总里会一直多一条，而且永远对不上。
+  //    这个在数据库函数里保证（unmark_slot_posted）。
+  async function unmarkSlotPosted(slotId) {
+    const { error } = await supabase.rpc('unmark_slot_posted', {
+      p_slot_id: slotId, p_by: user?.id || null })
+    if (error) throw new Error(error.message || '撤销失败，请重试')
+  }
+
   // 一个动作写两处（content_slot + content_post），在数据库函数里保证 ——
   // 发完再去日报手填一遍，忙的时候一定漏一边，然后数字对不上，然后没人信这张表
   async function markSlotPosted(slotId, proofUrl, proofShots) {
@@ -1231,6 +1241,7 @@ export function AppProvider({ children }) {
       getPolicyText, confirmTeamDay, getTeamConfirm, addChannelAccount, deleteChannelAccount, channelUsage,
       returnWorkLog, listWorkLogReturns, pendingReturns, openDays,
       getContentRange, generateWeekSlots, autolinkWeek, saveContentItem, deleteContentItem,
+      unmarkSlotPosted,
       cleanupPostedVideos,
       updateSlot, markSlotPosted, skipSlot, listContentPrompts,
       getRoster, generateRoster, setRoster, listHolidays,

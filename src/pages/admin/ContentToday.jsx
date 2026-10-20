@@ -38,7 +38,8 @@ const hhmm = iso => iso
   : ''
 
 export default function ContentToday() {
-  const { user, config, getContentRange, markSlotPosted, getWorkday, saveInquiry } = useApp()
+  const { user, config, getContentRange, markSlotPosted, getWorkday, saveInquiry,
+          unmarkSlotPosted } = useApp()
   const [proof, setProof] = useState({})   // slotId → {url, shots}
   const date = sydneyToday()
   const [data, setData] = useState({ slots: [], items: [] })
@@ -65,6 +66,15 @@ export default function ContentToday() {
   async function copy(text, key) {
     try { await navigator.clipboard.writeText(text); setCopied(key); setTimeout(() => setCopied(''), 1500) }
     catch { setErr('复制失败，手动选中复制吧') }
+  }
+
+  async function undoPosted(s) {
+    if (!confirm(`撤销「${nameOf(s.account_id)}」这条的已发标记？\n\n` +
+      `它会变回待发，日报里那一条发布记录也会一起删掉。\n` +
+      `（确实发出去的内容不受影响 —— 删的只是系统里的记录）`)) return
+    setBusy(true); setErr('')
+    try { await unmarkSlotPosted(s.id); await refresh() }
+    catch (e) { setErr(e.message) } finally { setBusy(false) }
   }
 
   async function markPosted(id) {
@@ -245,6 +255,13 @@ export default function ContentToday() {
                     <a href={s.proof_url} target="_blank" rel="noreferrer"
                       className="text-xs font-normal text-gray-500 underline">看笔记</a>
                   )}
+                  {/* 老板 10-20：「小红书发好了但是朋友圈是按错了」
+                      手机上那个按钮很大，手指一滑就点到隔壁那条。
+                      原来点错了只能找人改库。 */}
+                  <button disabled={busy} onClick={() => undoPosted(s)}
+                    className="text-xs font-normal text-gray-400 underline hover:text-red-600 disabled:opacity-40">
+                    点错了，撤销
+                  </button>
                 </p>
               ) : (
                 <>
