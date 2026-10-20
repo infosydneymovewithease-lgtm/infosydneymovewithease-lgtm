@@ -212,15 +212,23 @@ export default function ContentToday() {
                           <span className="absolute -bottom-0.5 left-0 right-0 text-[9px] text-center text-white bg-black/50 rounded-b-lg">封面</span>
                         </a>
                       )}
+                      {/* ⚠️ 2026-10-20 老板和经理都点不动 —— 因为「点一下就下载」那行字
+                          原来写在 <a> 外面，是整块里唯一【不能点】的东西，
+                          偏偏它看起来最像按钮。能点的只有那个 14px 的 🎬 小方块。
+                          现在整行（图标 + 文件名 + 下载字样）都在同一个 <a> 里。 */}
                       {s.item.materials.map((m, i) => (
                         <a key={i} href={dl(m.url || m.data, m.name)} download={m.name}
-                          className="w-14 h-14 rounded-lg border border-gray-200 hover:border-red-400 bg-gray-100 flex items-center justify-center">
-                          <span className="text-xl">🎬</span>
+                          className="w-full flex items-center gap-2.5 border border-gray-200 hover:border-red-400
+                                     bg-gray-50 hover:bg-red-50 rounded-xl px-2.5 py-2 transition">
+                          <span className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center text-xl shrink-0">🎬</span>
+                          <span className="flex-1 min-w-0">
+                            <span className="block text-sm font-semibold text-gray-800 truncate">{m.name || '视频文件'}</span>
+                            <span className="block text-xs text-red-700 font-semibold flex items-center gap-1">
+                              <Download size={12} /> 点这里下载
+                            </span>
+                          </span>
                         </a>
                       ))}
-                      <span className="text-xs text-red-700 font-semibold flex items-center gap-1 ml-1">
-                        <Download size={12} /> 点一下就下载
-                      </span>
                       {/* 视频没法长按存相册，只能走「文件」App 转一道 */}
                       <p className="w-full text-xs text-gray-400 mt-1 leading-relaxed">
                         存进相册：下载后打开<b className="text-gray-500">「文件」App → 下载项</b>，
