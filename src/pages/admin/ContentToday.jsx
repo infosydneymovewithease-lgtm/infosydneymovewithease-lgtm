@@ -56,7 +56,12 @@ export default function ContentToday() {
   // 上一版是 if (isManager)，换一次分工就要满系统找六个地方改（上次就漏了六处）。
   // 现在归属存在 channel_account.owner_staff_id，换人在系统设置里点一下就行。
   // ⚠️ 没指定负责人的号＝公共的，谁都看得到（微信那两个就是）。
-  const seeAll = user?.role === 'admin'
+  // ⚠️ 2026-10-21：经理在线上看不到迁喜那条（它还挂在运营名下）。
+  //    Lili 不来了，于是今天迁喜就绪却【没人发得了】——
+  //    小洁看不到、经理看不到、运营不会来，只剩老板一个人能发。
+  //    和昨天咨询登记同一个办法：不改归属（那会让运营页面立刻变空，
+  //    而这件事老板还没跟本人谈），改成【经理和老板看得到全部号】。
+  const seeAll = user?.role === 'admin' || user?.role === 'manager'
   const mineOnly = s => ownsAccount(
     (config.channelAccounts || []).find(a => a.id === s.account_id), user?.id, seeAll)
   const list = todayToPost(data.slots, data.items, date).filter(mineOnly)
