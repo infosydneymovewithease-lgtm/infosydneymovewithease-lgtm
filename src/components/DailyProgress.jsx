@@ -47,7 +47,14 @@ export default function DailyProgress() {
   const canPost = s => ownsAccount(
     (config.channelAccounts || []).find(a => a.id === s.account_id),
     user?.id, user?.role === 'admin' || user?.role === 'manager')
+  // ⚠️ 朋友圈同一条早晚各发一次 —— 早上发完还不算完。
+  //    不这样改的话，早上点完第一下，这块面板就显示「今天发完了」，
+  //    晚上那次没人记得。
+  const timesOf = id => (config.channelAccounts || []).find(a => a.id === id)?.times_per_day || 1
   const slotsToday = todayToPost(content.slots, content.items, date).filter(canPost)
+    .map(s => (timesOf(s.account_id) >= 2 && s.posted_at && !s.posted_at_2)
+      ? { ...s, status: 'ready', posted_at: null }   // 还差晚上那次
+      : s)
   // ⚠️ 2026-10-18 对调后：制作归【客服】，所以「今天改了几条」人人都要算。
   //    原来写的是 isManager ? ... : 0，对调后小洁的「编辑内容」会永远显示没做。
   const edits = myEditsToday(content.items, content.slots, user?.id, date, sydneyDateOf).length

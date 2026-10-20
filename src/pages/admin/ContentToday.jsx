@@ -40,7 +40,7 @@ const hhmm = iso => iso
 
 export default function ContentToday() {
   const { user, staff, config, getContentRange, markSlotPosted, getWorkday, saveInquiry,
-          unmarkSlotPosted } = useApp()
+          unmarkSlotPosted, markSlotPosted2 } = useApp()
   const [proof, setProof] = useState({})   // slotId → {url, shots}
   const date = sydneyToday()
   const [data, setData] = useState({ slots: [], items: [] })
@@ -68,7 +68,12 @@ export default function ContentToday() {
     if (!a?.owner_staff_id || a.owner_staff_id === user?.id) return null
     return staff?.find?.(x => x.id === a.owner_staff_id)?.name || a.owner_staff_id
   }
-  const posted = list.filter(s => s.posted_at).length
+  // 朋友圈一天发两次（早 10:00 / 晚 20:00 悉尼时间），同一条内容。
+  // ⚠️ 「发完了」要两次都发了才算 —— 只按 posted_at 判断的话，
+  //    早上发完这一页就变绿，晚上那次没人记得。
+  const timesOf = id => (config.channelAccounts || []).find(a => a.id === id)?.times_per_day || 1
+  const fullyPosted = s => !!s.posted_at && (timesOf(s.account_id) < 2 || !!s.posted_at_2)
+  const posted = list.filter(fullyPosted).length
   // 我负责的号 —— 下面那张「今天来了几个咨询」用它。
   // ⚠️ 这一个要【按归属】：上面的发布列表给全部（顶班要看得到），
   //    但咨询登记是「填你自己接待的」，列上别人的号等于催她填不该填的。
@@ -87,6 +92,12 @@ export default function ContentToday() {
     setBusy(true); setErr('')
     try { await unmarkSlotPosted(s.id); await refresh() }
     catch (e) { setErr(e.message) } finally { setBusy(false) }
+  }
+
+  async function markPosted2(id) {
+    setBusy(true); setErr('')
+    try { await markSlotPosted2(id); await refresh() }
+    catch (e) { setErr(humanError(e, '这次标记')) } finally { setBusy(false) }
   }
 
   async function markPosted(id) {
@@ -131,7 +142,8 @@ export default function ContentToday() {
       )}
 
       {list.map(s => {
-        const done = !!s.posted_at
+        const done = fullyPosted(s)
+        const twice = timesOf(s.account_id) >= 2
         const body = bodyFor(s, s.item)
         return (
           <div key={s.id} className={`bg-white rounded-2xl shadow-sm overflow-hidden ${done ? 'opacity-60' : ''}`}>
@@ -286,7 +298,9 @@ export default function ContentToday() {
             <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 border-t border-gray-100">
               {done ? (
                 <p className="flex-1 text-center text-sm font-semibold text-green-700 flex items-center justify-center gap-1.5 flex-wrap">
-                  <Check size={15} /> {hhmm(s.posted_at)} 已发
+                  <Check size={15} /> {twice
+                    ? `早 ${hhmm(s.posted_at)} · 晚 ${hhmm(s.posted_at_2)} 都发了`
+                    : `${hhmm(s.posted_at)} 已发`}
                   {s.proof_url && (
                     <a href={s.proof_url} target="_blank" rel="noreferrer"
                       className="text-xs font-normal text-gray-500 underline">看笔记</a>
@@ -301,14 +315,32 @@ export default function ContentToday() {
                 </p>
               ) : (
                 <>
-                  <button disabled={busy} onClick={() => markPosted(s.id)}
-                    className="flex-1 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-40"
-                    style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
-                    发完了，标记已发
-                  </button>
-                  <span className="text-xs text-gray-400 leading-snug">
-                    点一下自动记进你的日报，<br />不用再填一遍
-                  </span>
+                  {/* 朋友圈早晚各一次，同一条内容 —— 两个打卡位，不是两个格子。
+                      拆成两个格子会让人以为要准备两份东西。 */}
+                  {twice && s.posted_at ? (
+                    <>
+                      <span className="text-sm text-green-700 font-semibold flex items-center gap-1 shrink-0">
+                        <Check size={14} /> 早 {hhmm(s.posted_at)} 已发
+                      </span>
+                      <button disabled={busy} onClick={() => markPosted2(s.id)}
+                        className="flex-1 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-40"
+                        style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
+                        晚上这次发完了（约 20:00）
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button disabled={busy} onClick={() => markPosted(s.id)}
+                        className="flex-1 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-40"
+                        style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
+                        {twice ? '早上这次发完了（10:00 后）' : '发完了，标记已发'}
+                      </button>
+                      <span className="text-xs text-gray-400 leading-snug">
+                        {twice ? <>同一条内容早晚各发一次<br />晚上那次回来再点第二下</>
+                               : <>点一下自动记进你的日报，<br />不用再填一遍</>}
+                      </span>
+                    </>
+                  )}
                 </>
               )}
             </div>

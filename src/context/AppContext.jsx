@@ -826,6 +826,15 @@ export function AppProvider({ children }) {
     if (error) throw new Error(error.message || '保存失败')
   }
 
+  // 朋友圈同一条早晚各发一次。老板 10-21：「同一条内容就行」
+  // ⚠️ 第二次【不】再写 content_post —— 那张表是内容维度不是点击维度，
+  //    同一条记两遍，周月汇总的发布量会凭空翻倍。
+  async function markSlotPosted2(slotId) {
+    const { error } = await supabase.rpc('mark_slot_posted_2', {
+      p_slot_id: slotId, p_by: user?.id || null })
+    if (error) throw new Error(error.message || '标记失败，请重试')
+  }
+
   // 发错了撤销。老板 10-20：「小红书发好了但是朋友圈是按错了」
   // ⚠️ 必须同时撤两处 —— 只清格子不删发布记录的话，
   //    日报和周月汇总里会一直多一条，而且永远对不上。
@@ -1251,7 +1260,7 @@ export function AppProvider({ children }) {
       getPolicyText, confirmTeamDay, getTeamConfirm, addChannelAccount, deleteChannelAccount, channelUsage,
       returnWorkLog, listWorkLogReturns, pendingReturns, openDays,
       getContentRange, generateWeekSlots, autolinkWeek, saveContentItem, deleteContentItem,
-      unmarkSlotPosted,
+      unmarkSlotPosted, markSlotPosted2,
       cleanupPostedVideos,
       updateSlot, markSlotPosted, skipSlot, listContentPrompts,
       getRoster, generateRoster, setRoster, listHolidays,
