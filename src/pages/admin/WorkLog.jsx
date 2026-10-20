@@ -12,7 +12,7 @@ import { useApp } from '../../context/AppContext'
 import { sydneyToday, addDays, sydneyDateOf } from '../../utils/date'
 import { currentSeason, tzGapHours } from '../../utils/shifts'
 import {
-  requiredAccounts, myChannels, inquiryProgress, myPerformance, weeklyVideo, weekRange,
+  requiredAccounts, myChannels, ownsAccount, inquiryProgress, myPerformance, weeklyVideo, weekRange,
 } from '../../utils/worklog'
 import { myEditsToday, weekOutput } from '../../utils/content'
 import { Plus, Check } from 'lucide-react'
@@ -211,11 +211,25 @@ export default function WorkLog() {
 
       {/* ── 平台咨询登记 ──────────────────────── */}
       <div id="inquiry-section" className="scroll-mt-4" />
-      <Card title="平台咨询登记" hint="7 个触点每天逐个检查，填你自己接待的人数。今天 0 个也要登记 —— 填 0 就行，不填不算。左边显示你在「今天发了什么」里登记的内容，不用重复填。鼠标移到行上，右边 ✕ 可以删掉这个号">
+      <Card title="平台咨询登记" hint="每个触点每天逐个检查，填你自己接待的人数。今天 0 个也要登记 —— 填 0 就行，不填不算。归别人管的号只显示对方填了多少，你不用填。左边显示你在「今天发了什么」里登记的内容，不用重复填。鼠标移到行上，右边 ✕ 可以删掉这个号">
         <div className="space-y-1.5">
-          {myChannels(config.channelAccounts, user?.id, isBoss).map(a => {
+          {/* ⚠️ 2026-10-20 老板：「经理看不到小红书迁喜和盼达的登记，
+              我想大家同步都可以看到」。
+              【看得到】和【必须填】是两件事，之前我一刀切把两个都收了。
+              现在：全部账号都列出来；归自己的能填；归别人的显示对方填了多少（只读）。
+              ⚠️ 闸门（inquiryProgress）仍然只算归自己的 ——
+                 否则小洁又会卡在她填不了的小红书上，交不了日报。 */}
+          {myChannels(config.channelAccounts, null, true).map(a => {
+            const mine = ownsAccount(a, user?.id, isBoss)
             // 只显示自己填的 —— 两个人在岗时各填各的
             const rec = day.inquiries.find(i => i.account_id === a.id && i.staff_id === user?.id)
+            // 归别人管的号：显示负责人填了多少，只读
+            const theirs = !mine
+              ? day.inquiries.filter(i => i.account_id === a.id && i.staff_id === a.owner_staff_id)
+              : []
+            const ownerName = !mine
+              ? (staff?.find?.(x => x.id === a.owner_staff_id)?.name || a.owner_staff_id)
+              : null
             const myPosts = day.posts.filter(p => p.account_id === a.id && p.posted_by === user?.id)
             const planned = a.status !== 'active'
             const done = !!rec
@@ -229,7 +243,9 @@ export default function WorkLog() {
             return (
               <div key={a.id} className="flex items-center gap-3 py-1">
                 <span className="w-2 h-2 rounded-full shrink-0" style={{
-                  background: planned ? '#d1d5db' : done ? '#22c55e' : '#f59e0b' }} />
+                  background: planned ? '#d1d5db'
+                    : !mine ? (theirs.length ? '#86efac' : '#e5e7eb')
+                    : done ? '#22c55e' : '#f59e0b' }} />
                 <span className="text-xs text-gray-400 w-12 shrink-0">{a.platform}</span>
                 <span className={`text-sm w-20 shrink-0 ${planned ? 'text-gray-400' : 'font-semibold'}`}>{a.name}</span>
                 <span className="text-xs text-gray-400 flex-1 truncate min-w-0">{a.positioning}</span>
@@ -256,6 +272,13 @@ export default function WorkLog() {
                 )}
                 {planned ? (
                   <span className="text-xs text-gray-300 w-24 text-right shrink-0">未开通</span>
+                ) : !mine ? (
+                  /* 归别人管的号 —— 看得到，不用填，也填不了 */
+                  <span className="text-xs text-gray-400 w-44 text-right shrink-0">
+                    {theirs.length
+                      ? <>{ownerName} 填了 <b className="text-gray-600">{theirs.reduce((n, i) => n + (Number(i.count) || 0), 0)}</b> 人</>
+                      : <>归 {ownerName} 填 · 还没填</>}
+                  </span>
                 ) : (
                   <>
                     {/* 凭证直接读「今天发了什么」里登记的内容 —— 不让人填两遍。
