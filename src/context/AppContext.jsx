@@ -737,6 +737,71 @@ export function AppProvider({ children }) {
     if (error) throw new Error(error.message || '删除失败，请重试')
   }
 
+  // 每周清掉已经发过的视频文件。老板 10-20：
+  //   「下一周开始，另一个周一的时候，把前面的视频自动删除」
+  //
+  // 背景：图片压缩后一张 300KB，一年才 720MB；视频一条 10–30MB，
+  //       一年 2GB —— 免费额度 1GB，爆的是视频不是图片。
+  //
+  // ⚠️ 只删【文件】，不删内容记录 —— 标题、正文、封面图、发布时间全留着。
+  //    当初要求视频必须上传，理由是「微信群里的视频会过期」，
+  //    那是【发布之前】的留底。发完之后这个理由就不成立了。
+  //
+  // ⚠️ 三道闸：① 这条内容挂的所有格子都在本周一之前
+  //            ② 其中至少有一个真的发出去了
+  //            ③ 没发过、没排过的一概不碰（那种删了就真没了）
+  async function cleanupPostedVideos(beforeMonday) {
+    const { data: slots } = await supabase.from('content_slot')
+      .select('slot_date,item_id,posted_at,skipped_at').not('item_id', 'is', null)
+    if (!slots?.length) return { files: 0, items: 0 }
+
+    const byItem = new Map()
+    for (const s of slots) {
+      if (!byItem.has(s.item_id)) byItem.set(s.item_id, [])
+      byItem.get(s.item_id).push(s)
+    }
+    const ids = [...byItem.entries()]
+      .filter(([, ss]) => ss.every(x => x.slot_date < beforeMonday) && ss.some(x => x.posted_at))
+      .map(([id]) => id)
+    if (!ids.length) return { files: 0, items: 0 }
+
+    const { data: items } = await supabase.from('content_item')
+      .select('id,kind,materials,note').eq('kind', 'video').in('id', ids)
+    const MARK = '/storage/v1/object/public/'
+    const paths = []
+    const touched = []
+    for (const it of items || []) {
+      const mats = Array.isArray(it.materials) ? it.materials : []
+      if (!mats.length) continue
+      for (const m of mats) {
+        const u = String(m?.url || '')
+        const i = u.indexOf(MARK)
+        if (i < 0) continue                                  // base64 退路存的，没有文件可删
+        const rest = u.slice(i + MARK.length).split('?')[0]   // bucket/path
+        const slash = rest.indexOf('/')
+        if (slash > 0) paths.push({ bucket: rest.slice(0, slash), path: rest.slice(slash + 1) })
+      }
+      touched.push(it)
+    }
+    if (!touched.length) return { files: 0, items: 0 }
+
+    const byBucket = {}
+    for (const p of paths) (byBucket[p.bucket] ||= []).push(p.path)
+    let removed = 0
+    for (const [bucket, list] of Object.entries(byBucket)) {
+      const { error } = await supabase.storage.from(bucket).remove(list)
+      if (error) { console.warn('[清理视频] 删文件失败：', error.message); return { files: 0, items: 0, error: error.message } }
+      removed += list.length
+    }
+    for (const it of touched) {
+      await supabase.from('content_item').update({
+        materials: [],
+        note: [it.note, `视频文件已按周清理（${beforeMonday} 之前已发布）`].filter(Boolean).join(' · '),
+      }).eq('id', it.id)
+    }
+    return { files: removed, items: touched.length }
+  }
+
   async function updateSlot(id, patch) {
     const { error } = await supabase.from('content_slot').update(patch).eq('id', id)
     if (error) throw new Error(error.message || '保存失败')
@@ -1157,6 +1222,7 @@ export function AppProvider({ children }) {
       getPolicyText, confirmTeamDay, getTeamConfirm, addChannelAccount, deleteChannelAccount, channelUsage,
       returnWorkLog, listWorkLogReturns, pendingReturns, openDays,
       getContentRange, generateWeekSlots, autolinkWeek, saveContentItem, deleteContentItem,
+      cleanupPostedVideos,
       updateSlot, markSlotPosted, skipSlot, listContentPrompts,
       getRoster, generateRoster, setRoster, listHolidays,
       orders, confirmOrder, completeOrder, startWork, getMyOrders, finishWorkWithCorrection,

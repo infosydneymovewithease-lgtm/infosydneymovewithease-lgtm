@@ -36,7 +36,8 @@ const CELL = {
 
 export default function ContentSchedule() {
   const { user, config, getContentRange, generateWeekSlots, autolinkWeek,
-          saveContentItem, updateSlot, skipSlot, deleteContentItem } = useApp()
+          saveContentItem, updateSlot, skipSlot, deleteContentItem,
+          cleanupPostedVideos } = useApp()
   const today = sydneyToday()
   const [monday, setMonday] = useState(() => mondayOf(today))
   const [data, setData] = useState({ slots: [], items: [], rules: [] })
@@ -49,6 +50,21 @@ export default function ContentSchedule() {
   const refresh = useCallback(async () => setData(await getContentRange(monday, sunday)),
     [getContentRange, monday, sunday])
   useEffect(() => { refresh() /* eslint-disable-next-line */ }, [monday])
+
+  // 每周清一次已发布的视频文件。老板 10-20 定的：周一清掉上周及更早的。
+  // ⚠️ 没有定时任务可用（纯前端 + Supabase），所以挂在「有人打开这一页」上。
+  //    每个浏览器每周只跑一次，靠 localStorage 记。漏跑一周也没关系 ——
+  //    下次打开会把更早的一起清掉，它判断的是日期不是「上一次跑到哪」。
+  useEffect(() => {
+    const thisMonday = mondayOf(sydneyToday())
+    const key = `video_cleanup_${thisMonday}`
+    if (localStorage.getItem(key)) return
+    localStorage.setItem(key, '1')
+    cleanupPostedVideos(thisMonday).then(r => {
+      if (r?.files) setMsg(`清掉了 ${r.items} 条已发视频的文件（共 ${r.files} 个），内容记录和封面图都还在`)
+    }).catch(e => console.warn('[清理视频]', e.message))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const nameOf = id => (config.channelAccounts || []).find(a => a.id === id)?.name || id
   const grid  = useMemo(() => weekGrid(data.slots, data.items, monday, config.channelAccounts),
