@@ -485,13 +485,17 @@ export default function FormPage() {
           )}
         </Section>
 
-        {/* 折扣 */}
-        <Section title="折扣">
+        {/* ⚠️ 2026-10-21 老板：折扣改成【固定金额】。
+            九折在 $500 的单上减 $50，在 $150 上减 $15 —— 同一个动作代价差三倍，
+            师傅在现场判断不了自己送出去多少钱。历史上按比例给出去最大一笔 $120。
+            超过 $20 师傅自己给不了，要先打电话给客服说明缘由，
+            由客服或经理在每日对账里填。 */}
+        <Section title="优惠">
           <div className="grid grid-cols-3 gap-2">
             {[
-              { val: 0,   label: '无折扣' },
-              { val: 9.5, label: '九五折' },
-              { val: 9,   label: '九折' },
+              { val: 0,  label: '无优惠' },
+              { val: 10, label: '优惠 $10' },
+              { val: 20, label: '优惠 $20' },
             ].map(opt => (
               <button key={opt.val} onClick={() => setDiscount(opt.val)}
                 className={`py-3 rounded-xl font-semibold text-sm border-2 transition-colors ${
@@ -504,6 +508,10 @@ export default function FormPage() {
               </button>
             ))}
           </div>
+          <p className="text-xs text-gray-400 mt-2 leading-relaxed">
+            要再多减，<b className="text-gray-600">先打电话给客服说明情况</b> ——
+            客服或经理确认后在系统里填，这里给不了。
+          </p>
         </Section>
 
         {/* 定金 */}

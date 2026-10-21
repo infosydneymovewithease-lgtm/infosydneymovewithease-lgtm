@@ -107,7 +107,7 @@ export function calcTotal({
   fragile,
   supplies,
   fuel,
-  discount,        // 0=无折扣, 9=九折, 9.5=九五折
+  discount,        // 优惠【金额】：0 / 10 / 20（2026-10-21 从九折九五折改过来）
   paymentMethod,   // 'cash' | 'transfer'
   deposit,
 }) {
@@ -146,15 +146,20 @@ export function calcTotal({
     + miscFee
     - vanDiscount
 
-  const discountRate = discount === 9 ? 0.9 : discount === 9.5 ? 0.95 : 1
-  const afterDiscount = subtotal * discountRate
-  const discountAmount = subtotal - afterDiscount
+  // ⚠️ 2026-10-21：优惠从【比例】改成【固定金额】。
+  //    九折在 $500 的单上是减 $50，在 $150 上是减 $15 —— 同一个动作代价差三倍，
+  //    师傅在现场判断不了自己送出去多少钱。历史上最大一笔按比例给出去 $120。
+  //    现在师傅端只有 $10 / $20 两档，超过要打电话给客服，由客服或经理在对账里填。
+  //
+  // ⚠️ 老板定的口径：「总金额 + GST − 定金 − 优惠」—— 优惠【不参与 GST】。
+  const discountAmount = Math.max(0, Number(discount) || 0)
 
   const gst = paymentMethod === 'transfer'
-    ? Math.round(afterDiscount * 0.1 * 100) / 100
+    ? Math.round(subtotal * 0.1 * 100) / 100
     : 0
 
-  const total = afterDiscount + gst - (Number(deposit) || 0)
+  const total = subtotal + gst - (Number(deposit) || 0) - discountAmount
+  const afterDiscount = subtotal - discountAmount   // 仅供显示，不参与算税
 
   return {
     billed,

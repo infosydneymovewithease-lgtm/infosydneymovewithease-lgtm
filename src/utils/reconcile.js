@@ -145,6 +145,10 @@ export const RECONCILE_FIELDS = [
   { key: 'parkingFee',    label: '停车费',   type: 'money' },
   { key: 'highwayFee',    label: '高速费',   type: 'money' },
   { key: 'deposit',       label: '定金',     type: 'money' },
+  // 老板 10-21：师傅端的「九折/九五折」改成固定金额优惠（$10/$20），
+  // 超过 $20 要先打电话给客服说明缘由，由客服或经理在这里填。
+  // 历史上师傅按比例给出去最大一笔是 $120 —— 比例在大单上没有上限。
+  { key: 'discountAmount', label: '优惠',    type: 'money' },
   { key: 'finalAmount',   label: '实收金额', type: 'money' },
 ]
 
@@ -267,7 +271,7 @@ export function deriveDraft(order, draft, field, auto = {}, b2bCustomers) {
   //      定金  203 单扣了 / 32 单没扣 / 28 单为 0  → 标准做法是扣，
   //            那 32 单没扣的是错的，正好是对账该揪出来的
   //    所以这里用完整公式，不再按差额凑：
-  //      实收 = 费用合计 + GST − 定金
+  //      实收 = 费用合计 + GST − 定金 − 优惠（2026-10-21 加的优惠）
   const merged = { ...draft, ...out }
   const b = breakdown(order, merged)
   if (!touched('gst'))         out.gst = b.gst.toFixed(2)
@@ -288,9 +292,13 @@ export function breakdown(order, draft = {}) {
   const method = pick(order, draft, 'paymentMethod')
   const gst = method === 'transfer' ? Math.round(sub * 0.1 * 100) / 100 : 0
   const deposit = get('deposit')
+  // ⚠️ 老板 10-21 定的口径：「总金额 + GST − 定金 − 优惠」
+  //    优惠【不参与 GST】—— 税基是优惠前的金额。
+  //    （先减优惠再算税会少交一点 GST，但老板要的是客人更好理解的算法。）
+  const discount = get('discountAmount')
   return {
-    fees, van, sub, gst, deposit, method,
-    total: Math.round((sub + gst - deposit) * 100) / 100,
+    fees, van, sub, gst, deposit, discount, method,
+    total: Math.round((sub + gst - deposit - discount) * 100) / 100,
     people: v?.people || 1,
   }
 }

@@ -562,6 +562,7 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, o
                 <Line label={b.method === 'transfer' ? 'GST 10%' : 'GST（现金不收）'} value={money(b.gst)}
                   dim={b.gst === 0} />
                 <Line label="定金" value={b.deposit ? `−${money(b.deposit)}` : money(0)} dim={!b.deposit} />
+                <Line label="优惠" value={b.discount ? `−${money(b.discount)}` : money(0)} dim={!b.discount} />
                 <div className="border-t border-gray-200 mt-1.5 pt-1.5">
                   <Line label="实收金额" value={money(b.total)} bold />
                 </div>

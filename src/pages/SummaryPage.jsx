@@ -77,7 +77,7 @@ export default function SummaryPage() {
           <div className="px-5 py-4 border-t border-dashed border-gray-200 space-y-2">
             <ReceiptRow label="小计" value={result.subtotal} />
             {result.discountAmount > 0 && (
-              <ReceiptRow label="折扣优惠" value={-result.discountAmount} color="text-green-600" />
+              <ReceiptRow label="优惠" value={-result.discountAmount} color="text-green-600" />
             )}
             {result.gst > 0 && (
               <ReceiptRow label="GST (10%)" value={result.gst} />

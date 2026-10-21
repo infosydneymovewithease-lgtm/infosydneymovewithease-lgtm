@@ -1272,7 +1272,7 @@ const EDIT_FIELDS = [
   { key: 'parkingFee',  label: '停车违规费' },
   { key: 'suppliesFee', label: '物资费' },
   { key: 'fuelFee',     label: '油费' },
-  { key: 'discountAmount', label: '折扣（减）' },
+  { key: 'discountAmount', label: '优惠（减）' },
 ]
 
 function EditBillModal({ order, onClose, onSave }) {
@@ -1294,12 +1294,15 @@ function EditBillModal({ order, onClose, onSave }) {
     + num('heavyFee') + num('highwayFee') + num('parkingFee')
     + num('suppliesFee') + num('fuelFee')
     - vanDiscount
-  const afterDiscount = subtotalBeforeDiscount - num('discountAmount')
+  // ⚠️ 2026-10-21 老板定的口径：「总金额 + GST − 定金 − 优惠」
+  //    优惠【不参与 GST】—— 税基是优惠前的金额。三处要一致：
+  //    utils/pricing.js（师傅端）· utils/reconcile.js（对账）· 这里（订单详情）。
+  const discountSub = num('discountAmount')
   const gst = order.paymentMethod === 'transfer'
-    ? Math.round(afterDiscount * 0.1 * 100) / 100
+    ? Math.round(subtotalBeforeDiscount * 0.1 * 100) / 100
     : 0
   const depositSub = order.depositPaid ? (Number(order.deposit) || 0) : 0
-  const finalAmount = Math.round((afterDiscount + gst - depositSub) * 100) / 100
+  const finalAmount = Math.round((subtotalBeforeDiscount + gst - depositSub - discountSub) * 100) / 100
 
   const finalReason = reasonPreset === '其他' ? reason.trim() : reasonPreset
   const canSave = !!finalReason
