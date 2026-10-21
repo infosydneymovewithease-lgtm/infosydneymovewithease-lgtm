@@ -39,6 +39,45 @@ const toISO = v => {
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
+// ── 时间只填时分 ────────────────────────────────────────────
+// 老板 10-21：「有没有更好的，这个有点费劲」
+// 原来用 datetime-local，要一格一格敲年/月/日/时/分 —— 五段。
+// 可日期根本不用她填：对账对的就是这一单那一天。所以只留时分两段，
+// 日期由系统补上，她敲 4 个数字就完事。
+const hhmmOf = v => {
+  if (!v) return ''
+  if (/^\d{2}:\d{2}$/.test(v)) return v
+  const d = new Date(v)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+// ⚠️ 叫 nextDay 不叫 addDays —— 这个文件已经从 utils/date 引了一个 addDays。
+//    重名在构建期就会炸（这次就是），但同类的错有些要跑到运行时才暴露。
+const nextDay = ymd => {
+  const [y, m, d] = ymd.split('-').map(Number)
+  const t = new Date(Date.UTC(y, m - 1, d))
+  t.setUTCDate(t.getUTCDate() + 1)
+  return t.toISOString().slice(0, 10)
+}
+
+/**
+ * 时分 → 完整的本地时间串（datetime-local 格式），日期取这一单的日期。
+ * ⚠️ 收工时间早于开工时间 = 跨了零点（长途单会这样），日期自动进一天。
+ *    不处理的话会算出负工时，然后时间费变成负数。
+ */
+function composeDT(order, key, hhmm, draft) {
+  if (!hhmm) return ''
+  const base = String(order?.date || '').slice(0, 10)
+  if (!base) return hhmm
+  let day = base
+  if (key === 'workEndedAt') {
+    const start = hhmmOf(draft?.workStartedAt || order?.workStartedAt)
+    if (start && hhmm < start) day = nextDay(base)
+  }
+  return `${day}T${hhmm}`
+}
+
 export default function Reconcile() {
   const { orders, staffRates, staff, reconcileOrder, undoReconcile, closeDay, reopenDay,
           getReconcile, markReconciled, unmarkReconciled, markAllReconciled, b2bCustomers } = useApp()
@@ -488,14 +527,18 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, o
                   </span>
                   <div className="flex items-center gap-1.5">
                   <input
-                    type={f.type === 'time' ? 'datetime-local' : 'number'}
-                    // ⚠️ datetime-local 的 step 单位是【秒】，不是和 number 一样的「最小增量」。
-                    //    之前这里统一写 0.01，浏览器就按 10 毫秒精度渲染，
-                    //    日期选择器多出「秒」和「分毫秒」两列 —— 记收工时间精确到毫秒是荒唐的。
+                    type={f.type === 'time' ? 'time' : 'number'}
+                    // ⚠️ time 的 step 单位是【秒】，不是和 number 一样的「最小增量」。
+                    //    写 0.01 的话浏览器会按 10 毫秒精度渲染，多出「秒」和「毫秒」两列 ——
+                    //    记收工时间精确到毫秒是荒唐的。
                     step={f.type === 'time' ? 60 : f.type === 'qty' ? f.step : f.type === 'hours' ? '0.5' : '0.01'}
-                    value={f.type === 'qty' ? (qty[f.key] ?? '') : (draft[f.key] ?? '')}
+                    value={f.type === 'qty' ? (qty[f.key] ?? '')
+                      : f.type === 'time' ? hhmmOf(draft[f.key] ?? '')
+                      : (draft[f.key] ?? '')}
                     placeholder={f.type === 'qty' ? `几${f.unit}` : '不改就留空'}
-                    onChange={e => edit(f.key, e.target.value)}
+                    onChange={e => edit(f.key, f.type === 'time'
+                      ? composeDT(order, f.key, e.target.value, draft)
+                      : e.target.value)}
                     className={`border rounded-lg px-2 py-1 text-sm font-mono w-full outline-none focus:border-red-400 ${
                       auto[f.key] ? 'border-amber-300 bg-amber-50' : 'border-gray-200'}`}
                   />
