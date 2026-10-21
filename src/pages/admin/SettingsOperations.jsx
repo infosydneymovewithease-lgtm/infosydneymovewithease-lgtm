@@ -31,7 +31,9 @@ export default function SettingsOperations() {
   const { channelAccounts, shiftConfigs, breakWindows, staffSchedules } = config
   const season = currentSeason()
   const gap = tzGapHours()
-  const shift = shiftConfigs.find(s => s.season === season)
+  // 2026-10-21 起一个季有 A/B 两行
+  const shifts = shiftConfigs.filter(s => s.season === season)
+    .sort((a, b) => String(a.shift).localeCompare(String(b.shift)))
 
   if (channelAccounts.length === 0 && shiftConfigs.length === 0) {
     return (
@@ -158,13 +160,26 @@ export default function SettingsOperations() {
       {/* ── 班次 ─────────────────────────────────── */}
       <Block icon={Clock} title="客服班次"
         hint={`当前按${season === 'summer' ? '夏令时' : '冬令时'}执行 · 悉尼比北京快 ${gap} 小时（实时查时区库，不写死）`}>
-        {shift ? (
-          <div className="grid grid-cols-2 gap-3">
-            <Cell label="悉尼时间" value={`${shift.start_time?.slice(0,5)} – ${shift.end_time?.slice(0,5)}`} />
-            <Cell label="客服本地（北京）"
-              value={`${sydneyToBeijing(shift.start_time)} – ${sydneyToBeijing(shift.end_time)}`} accent />
-            <Cell label="休息" value={`${shift.break_count} 段 × ${shift.break_minutes} 分钟`} />
-            <Cell label="超时提醒" value={`超 ${shift.overtime_alert_minutes} 分钟提醒本人和 Annie`} />
+        {shifts.length ? (
+          <div className="space-y-3">
+            {shifts.map(sc => (
+              <div key={sc.shift}>
+                <p className="text-xs font-bold text-gray-500 mb-1.5">{sc.shift} 班</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Cell label="悉尼时间" value={`${sc.start_time?.slice(0,5)} – ${sc.end_time?.slice(0,5)}`} />
+                  <Cell label="客服本地（北京）"
+                    value={`${sydneyToBeijing(sc.start_time)} – ${sydneyToBeijing(sc.end_time)}`} accent />
+                  <Cell label="休息" value={`${sc.break_count} 段 × ${sc.break_minutes} 分钟`} />
+                  <Cell label="超时提醒" value={`超 ${sc.overtime_alert_minutes} 分钟提醒本人和 Annie`} />
+                </div>
+                <p className="text-xs text-gray-400 mt-1.5">
+                  {(breakWindows || []).filter(w => w.season === season && w.shift === sc.shift)
+                    .sort((a, b) => a.slot_index - b.slot_index)
+                    .map(w => `${w.slot_name} ${w.window_start?.slice(0,5)}–${w.window_end?.slice(0,5)}`)
+                    .join(' · ') || '没配休息窗口'}（北京时间）
+                </p>
+              </div>
+            ))}
           </div>
         ) : <p className="text-sm text-gray-400">没有 {season} 的班次配置</p>}
         <p className="text-xs text-gray-400 mt-3 pt-3 border-t border-dashed border-gray-200">

@@ -308,7 +308,10 @@ export default function TeamToday() {
                 </div>
               ))}
               <div className="flex gap-2 mt-1.5 flex-wrap">
-                {slots.map(w => {
+                {/* ⚠️ 休息段要【按这个人当天的班次】取，不能用页面级的 slots ——
+                    A 班和 B 班的 slot_index 都是 1、2，混在一起既会重复渲染，
+                    也会把别人班次的段算到她头上。 */}
+                {slotsForDay(config.breakWindows, config.staffSchedules, date, new Date(), roster, id).map(w => {
                   const r = day.breaks.find(b => b.staff_id === id && b.slot_index === w.slot_index)
                   const on = r?.started_at && !r?.ended_at
                   const mins = breakMinutes(r)

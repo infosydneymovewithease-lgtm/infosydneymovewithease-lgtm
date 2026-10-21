@@ -15,17 +15,41 @@
 import { currentSeason, toMinutes, toHHMM, isWorkingOn } from './shifts'
 import { sydneyDateOf } from './date'
 
-/** 某天该开放哪几段休息。单人日自动砍掉 single_day=false 的那段。 */
-export function slotsForDay(breakWindows, staffSchedules, dateStr, now = new Date(), roster) {
+/**
+ * 某天该开放哪几段休息。
+ *
+ * ⚠️ 2026-10-21 起按【班次】分：
+ *    A 班 06:30–17:00 只有 早饭 + 午饭（17:00 就下班了，没有下午休）
+ *    B 班 08:30–19:30 只有 午饭 + 下午休
+ *    不传 staffId 就返回当季全部（团队视图用）。
+ *    在这之前所有人看到的是不分班次的 3 段 —— A 班的人会看到一段
+ *    她根本没有的「下午休息」。
+ *
+ * @param staffId 看谁的班次；从排班表取当天的 A/B
+ */
+export function slotsForDay(breakWindows, staffSchedules, dateStr, now = new Date(), roster, staffId) {
   const season = currentSeason(now)
   const ids = [...new Set((staffSchedules || []).map(s => s.staff_id))]
   const onDuty = ids.filter(id => isWorkingOn(staffSchedules, id, dateStr, roster))
   const alone = onDuty.length <= 1
+  // 当天这个人上的是哪个班 —— 排班表是唯一真相
+  const myShift = staffId
+    ? (roster || []).find(r => r.work_date === dateStr && r.staff_id === staffId)?.shift
+    : null
   return (breakWindows || [])
     .filter(w => w.season === season)
+    // ⚠️ 保险：SQL 还没跑的时候 break_window 没有 shift 这一列，
+    //    硬按班次过滤会把休息段全滤光 —— 出勤卡上一段都不剩。
+    //    代码可能先于 SQL 上线（Vercel 自动部署，SQL 要人手动跑），
+    //    这种「新代码 + 旧数据」的窗口期必须能活。
+    .filter(w => {
+      if (!staffId) return true
+      if (!w.shift) return true                       // 旧数据：不分班次，全给
+      return w.shift === (myShift === 'B' ? 'B' : 'A') // 没排班就按 A 班（覆盖最早的那个）
+    })
     .filter(w => !alone || w.single_day)
     .sort((a, b) => a.slot_index - b.slot_index)
-    .map(w => ({ ...w, alone }))
+    .map(w => ({ ...w, alone, shift: w.shift }))
 }
 
 /** 窗口内可选的起点（半小时一跳）。用来显示「哪些时段还空着」。 */

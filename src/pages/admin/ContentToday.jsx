@@ -325,7 +325,7 @@ export default function ContentToday() {
                       <button disabled={busy} onClick={() => markPosted2(s.id)}
                         className="flex-1 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-40"
                         style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
-                        晚上这次发完了（约 20:00）
+                        晚上这次发完了（19:30 左右）
                       </button>
                     </>
                   ) : (

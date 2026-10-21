@@ -60,7 +60,8 @@ export default function AttendanceCard({ compact = false }) {
   }
 
   const mine = day.logs.find(l => l.staff_id === user?.id)
-  const slots = slotsForDay(config.breakWindows, config.staffSchedules, date, new Date(), roster)
+  // ⚠️ 传 user.id —— 不传的话会把 A/B 两个班的休息段混在一起显示
+  const slots = slotsForDay(config.breakWindows, config.staffSchedules, date, new Date(), roster, user?.id)
   const others = othersOnBreak(day.breaks, user?.id)
   const onBreakNow = slots.find(w => {
     const r = myBreak(day.breaks, user?.id, w.slot_index)
