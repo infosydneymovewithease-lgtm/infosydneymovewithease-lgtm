@@ -41,13 +41,34 @@ export function todayTasks(ctx) {
   })
 
   // 经理第一件事是核昨天的账（老板定的 T+1 流程）
+  //
+  // ⚠️ 2026-10-22 拆成两条。老板：「经理这个进度应该有每日对账」
+  //    原来一条「核对昨天的账和客服日报」把两件事捆在一起，
+  //    而且只链到团队今日 —— 每日对账那一页在进度里【根本没有入口】。
+  //    两件事发生在两个页面、做法也不一样：
+  //      审核日报 → 团队今日（看她们填的对不对，不对就退回）
+  //      日结对账 → 每日对账（逐单核金额，全部核完确认当日收入）
   if (isManager) {
-    const n = (openDays || []).length
+    const open = openDays || []
+    const needReview = open.filter(d => !d.team_confirmed)
     t.push({
-      key: 'reconcile', label: '核对昨天的账和客服日报',
-      state: n === 0 ? S.done : S.todo,
-      hint: n === 0 ? '前 7 天都闭环了' : `还有 ${n} 天没闭环`,
-      minutes: n * 15, to: '/admin/team-today',
+      key: 'review', label: '审核客服日报',
+      state: needReview.length === 0 ? S.done : S.todo,
+      hint: needReview.length === 0 ? '前 7 天都审完了' : `还有 ${needReview.length} 天没审`,
+      minutes: needReview.length * 8, to: '/admin/team-today',
+    })
+
+    const needClose = open.filter(d => !d.day_closed)
+    t.push({
+      key: 'reconcile', label: '每日对账 · 日结',
+      state: needClose.length === 0 ? S.done : S.todo,
+      hint: needClose.length === 0 ? '前 7 天的账都结了' : `还有 ${needClose.length} 天没日结`,
+      minutes: needClose.length * 15,
+      // 带上日期：直接落到最早那个没结的日子
+      to: needClose.length
+        ? `/admin/reconcile?date=${[...needClose].sort((a, b) =>
+            String(a.work_date).localeCompare(String(b.work_date)))[0].work_date}`
+        : '/admin/reconcile',
     })
   }
 
