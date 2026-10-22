@@ -166,7 +166,6 @@ export function todayTasks(ctx) {
 /** 周任务单独一行 —— 混进日清单会天天显示红的，然后被无视 */
 export function weekTasks(ctx) {
   const { role, weekVideo, weekOut } = ctx
-  const isManager = role === 'admin' || role === 'manager'
   const out = []
   // ⚠️ 2026-10-21：本周文案/视频是【制作】指标，归老板（他写）。
   //    经理和客服那边看「发了几条」，不看「做了几条」。
