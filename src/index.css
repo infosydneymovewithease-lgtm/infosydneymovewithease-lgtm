@@ -16,3 +16,27 @@ body {
   background: #f5f5f5;
   position: relative;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   触屏设备上输入框一律 ≥16px
+   老板 2026-10-23：「师傅端手机打开，那个网页大小总是会变大」
+
+   iOS Safari 的硬规则：聚焦一个字号小于 16px 的输入框，
+   它会自动放大【整个页面】—— 而且放大之后不会自己缩回去。
+   师傅端的输入框用的是 text-sm（14px），所以点一次就一直是大的。
+
+   这不是 bug，是 iOS 故意的（怕字太小看不清）。唯一的解法是把字号抬到 16。
+
+   ⚠️ 用 pointer: coarse 限定在触屏设备 —— 电脑上保持原来的紧凑样式。
+   ⚠️ 必须 !important：Tailwind 的 text-sm 是类选择器，
+      优先级高于元素选择器，不加就盖不住。
+   ⚠️ 别改成 user-scalable=no 来解决 —— 那会连带禁掉双指缩放，
+      师傅想放大看照片都不行，而且 iOS 10 之后本来就忽略它。
+   ───────────────────────────────────────────────────────────── */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
