@@ -229,12 +229,20 @@ export default function WorkLog() {
             const mine = ownsAccount(a, user?.id, isBoss) || isManager
             // 只显示自己填的 —— 两个人在岗时各填各的
             const rec = day.inquiries.find(i => i.account_id === a.id && i.staff_id === user?.id)
-            // 归别人管的号：显示负责人填了多少，只读
+            // 归别人管的号：显示【所有其他人】填了多少，只读。
+            // ⚠️ 2026-10-22：原来只看负责人（owner_staff_id）填了没有 ——
+            //    老板自己填了迁喜 6、盼达 2，小洁那边却显示「归 Annie 填 · 还没填」。
+            //    那是一句假话：填过了，只是不是负责人填的。
+            //    咨询登记按人存（10-12 老板定的「两个人要知道各自」），
+            //    所以这里要把别人填的【都】算上，并且说清是谁填的。
             const theirs = !mine
-              ? day.inquiries.filter(i => i.account_id === a.id && i.staff_id === a.owner_staff_id)
+              ? day.inquiries.filter(i => i.account_id === a.id && i.staff_id !== user?.id)
               : []
+            const theirSum = theirs.reduce((n, i) => n + (Number(i.count) || 0), 0)
+            const theirWho = [...new Set(theirs.map(i =>
+              staff?.find?.(x => x.id === i.staff_id)?.name || i.staff_id))].join('、')
             const ownerName = !mine
-              ? (staff?.find?.(x => x.id === a.owner_staff_id)?.name || a.owner_staff_id)
+              ? (staff?.find?.(x => x.id === a.owner_staff_id)?.name || a.owner_staff_id || '公共')
               : null
             const myPosts = day.posts.filter(p => p.account_id === a.id && p.posted_by === user?.id)
             const planned = a.status !== 'active'
@@ -289,7 +297,7 @@ export default function WorkLog() {
                   /* 归别人管的号 —— 看得到，不用填，也填不了 */
                   <span className="text-xs text-gray-400 w-44 text-right shrink-0">
                     {theirs.length
-                      ? <>{ownerName} 填了 <b className="text-gray-600">{theirs.reduce((n, i) => n + (Number(i.count) || 0), 0)}</b> 人</>
+                      ? <><b className="text-gray-600">{theirSum}</b> 人 · {theirWho} 填的</>
                       : <>归 {ownerName} 填 · 还没填</>}
                   </span>
                 ) : (
