@@ -1,7 +1,7 @@
 import { useApp } from '../../context/AppContext'
 import AttendanceCard from '../../components/AttendanceCard'
 import DailyProgress from '../../components/DailyProgress'
-import { FEATURES } from '../../config/features'
+import { FEATURES, BACKLOG_FROM } from '../../config/features'
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
@@ -47,24 +47,27 @@ export default function Dashboard() {
   // 合并订单（搬家 + 寄存）用于待确认/当日未派单等检测
   const allActive = [...orders, ...(storageOrders || [])]
   const isActive = o => !['已完成','已取消'].includes(o.status)
+  // 老板 10-23：「之前的不管，从今天开始」—— 起算日之前的积压不再计入待办。
+  // ⚠️ 只影响【计数】，订单一条没动，点进列表（date=all）照样全看得到。
+  const inScope = o => !o.date || o.date >= BACKLOG_FROM
 
   // 各类待办
   // 「待确认」跟 OrderList chip 对齐：包含已报价（报价但未收定金的也算新单待处理）
   // B2B 企业月结单不参与「待确认」统计 — 这种单不需要收定金，开单即确认
   const pendingConfirm = allActive.filter(o =>
-    !o.isB2BOrder && (o.status === '待确认' || o.status === '已报价')
+    !o.isB2BOrder && (o.status === '待确认' || o.status === '已报价') && inScope(o)
   )
   const todayUnassigned = allActive.filter(o =>
     (o.date === today) && !o.assignedTo && isActive(o)
   )
-  const unassigned = orders.filter(o => !o.assignedTo && isActive(o))
+  const unassigned = orders.filter(o => !o.assignedTo && isActive(o) && inScope(o))
   // 「未提交账单」状态实际无代码会写入 —— 改用真实条件：工作日期已过、已派师傅、却还没完成的单
   // = 师傅干完(或该干)了但一直没交账单，正是漏单/残留单的源头
-  const pendingBill = orders.filter(o => o.date && o.date < today && o.assignedTo && isActive(o))
+  const pendingBill = orders.filter(o => o.date && o.date < today && o.assignedTo && isActive(o) && inScope(o))
   const unpaid = orders.filter(o => o.status === '客户未付款')
   // 用 utils/orderHelpers 的 isDepositPaid（项目唯一权威定金判断），跟 OrderList 同源
   // B2B 企业月结单天然没有定金，不参与"定金未收"统计
-  const noDeposit = orders.filter(o => !o.isB2BOrder && o.deposit > 0 && !isDepositPaid(o) && isActive(o))
+  const noDeposit = orders.filter(o => !o.isB2BOrder && o.deposit > 0 && !isDepositPaid(o) && isActive(o) && inScope(o))
 
   // 寄存到期 / 逾期
   const storageExpiring = (storageOrders || []).filter(o => {
@@ -201,6 +204,11 @@ export default function Dashboard() {
               {muted ? <BellOff size={14} /> : <Bell size={14} className="text-amber-500" />}
             </button>
           </div>
+          {/* 把起算日写在脸上 —— 不然有人会以为系统把老单弄丢了 */}
+          <p className="px-4 pb-2 -mt-1 text-xs text-gray-400">
+            {BACKLOG_FROM.slice(5).replace('-', '/')} 起算 ·
+            之前的老单没删，在「全部订单」里照样查得到
+          </p>
           <div className="divide-y divide-gray-50">
             {alerts.map((a, i) => (
               <button
