@@ -26,7 +26,7 @@ export const S = { done: 'done', todo: 'todo', wait: 'wait', skip: 'skip' }
 export function todayTasks(ctx) {
   const {
     role, log, inquiryOk, inquiryMissing, slotsToday, quota,
-    openDays, editedToday, nameOfAccount,
+    openDays, editedToday, nameOfAccount, todayDone,
   } = ctx
   const isManager = role === 'admin' || role === 'manager'
   const t = []
@@ -65,12 +65,18 @@ export function todayTasks(ctx) {
     })
 
     const needClose = open.filter(d => !d.day_closed)
+    // ⚠️ 老板 10-22：「这个不是应该提醒今天经理要做这件事情吗」
+    //    日结是 T+1（今天结昨天的），但【今天已完成的单现在就能核】——
+    //    攒到明天只会变成一堆。所以昨天的结清了，也要把今天能干的说出来。
+    const n = Number(todayDone) || 0
     t.push({
       key: 'reconcile', label: '每日对账 · 日结',
       state: needClose.length === 0 ? S.done : S.todo,
-      hint: needClose.length === 0
-        ? '昨天及以前的账都结了 · 今天的账明天核'
-        : `${needClose.map(md).join('、')} 的账没结`,
+      hint: needClose.length
+        ? `${needClose.map(md).join('、')} 的账没结`
+        : n
+          ? `昨天及以前都结了 · 今天 ${n} 单已完成，现在就能核`
+          : '昨天及以前的账都结了 · 今天还没有完成的单',
       minutes: needClose.length * 15,
       // 带上日期：直接落到最早那个没结的日子
       to: needClose.length

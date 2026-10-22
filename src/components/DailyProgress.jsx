@@ -13,7 +13,7 @@ import { todayTasks, weekTasks, progressOf, S } from '../utils/tasks'
 import { Check, ChevronRight, Clock, Coffee } from 'lucide-react'
 
 export default function DailyProgress() {
-  const { user, config, getWorkday, getContentRange, openDays, getPolicyText, getRoster } = useApp()
+  const { user, config, orders, getWorkday, getContentRange, openDays, getPolicyText, getRoster } = useApp()
   const navigate = useNavigate()
   const date = sydneyToday()
   const isManager = user?.role === 'admin' || user?.role === 'manager'
@@ -63,6 +63,8 @@ export default function DailyProgress() {
     role: user?.role, log, inquiryOk: prog.ok, inquiryMissing: prog.missing,
     slotsToday, quota: Number(policy.comment_quota) || 3,
     openDays: open, editedToday: edits,
+    // 今天已完成的单 —— 这些现在就能核，不用等明天日结
+    todayDone: (orders || []).filter(o => o.date === date && o.status === '已完成').length,
     nameOfAccount: id => (config.channelAccounts || []).find(a => a.id === id)?.name || id,
   })
   const week = weekTasks({
@@ -199,7 +201,9 @@ export default function DailyProgress() {
 }
 
 function Row({ t, onGo }) {
-  const clickable = !!onGo && t.state === S.todo
+  // ⚠️ 完成的也能点进去 —— 「每日对账」做完了，她可能还想进去看今天的单。
+  //    原来只有 todo 能点，等于做完就把门关上了。
+  const clickable = !!onGo && t.state !== S.wait
   return (
     <button onClick={onGo} disabled={!clickable}
       className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-xl text-left transition-colors ${
