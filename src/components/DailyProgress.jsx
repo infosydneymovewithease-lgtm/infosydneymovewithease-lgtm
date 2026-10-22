@@ -198,7 +198,7 @@ export default function DailyProgress() {
   )
 }
 
-function Row({ t, onGo, dim }) {
+function Row({ t, onGo }) {
   const clickable = !!onGo && t.state === S.todo
   return (
     <button onClick={onGo} disabled={!clickable}
@@ -210,7 +210,11 @@ function Row({ t, onGo, dim }) {
           t.state === S.done ? 'text-gray-400'
           : t.state === S.wait || t.state === S.skip ? 'text-gray-400'
           : 'text-gray-800 font-medium'}`}>{t.label}</span>
-        {t.hint && t.state !== S.done && (
+        {/* ⚠️ 2026-10-22：完成的也要显示说明。
+            老板看到「每日对账 · 日结」打了绿勾，以为今天的账核完了 ——
+            其实它查的是【前 7 天到昨天】（T+1 流程，今天的账明天核）。
+            绿勾底下什么都不写，等于让人自己猜它在说哪一天。 */}
+        {t.hint && (
           <span className="block text-xs text-gray-400 mt-0.5 leading-snug truncate">{t.hint}</span>
         )}
       </span>

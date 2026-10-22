@@ -50,11 +50,17 @@ export function todayTasks(ctx) {
   //      日结对账 → 每日对账（逐单核金额，全部核完确认当日收入）
   if (isManager) {
     const open = openDays || []
+    // ⚠️ 这两条查的是【昨天及以前】，不含今天 —— T+1 流程：
+    //    「师傅当天没发，第二天上午打电话要到数据，再填对账」。
+    //    所以文案里必须写明是哪一天，否则绿勾会被当成「今天的也核完了」。
+    const md = d => String(d.work_date).slice(5).replace('-', '/')
     const needReview = open.filter(d => !d.team_confirmed)
     t.push({
       key: 'review', label: '审核客服日报',
       state: needReview.length === 0 ? S.done : S.todo,
-      hint: needReview.length === 0 ? '前 7 天都审完了' : `还有 ${needReview.length} 天没审`,
+      hint: needReview.length === 0
+        ? '昨天及以前都审完了'
+        : `${needReview.map(md).join('、')} 没审`,
       minutes: needReview.length * 8, to: '/admin/team-today',
     })
 
@@ -62,7 +68,9 @@ export function todayTasks(ctx) {
     t.push({
       key: 'reconcile', label: '每日对账 · 日结',
       state: needClose.length === 0 ? S.done : S.todo,
-      hint: needClose.length === 0 ? '前 7 天的账都结了' : `还有 ${needClose.length} 天没日结`,
+      hint: needClose.length === 0
+        ? '昨天及以前的账都结了 · 今天的账明天核'
+        : `${needClose.map(md).join('、')} 的账没结`,
       minutes: needClose.length * 15,
       // 带上日期：直接落到最早那个没结的日子
       to: needClose.length
