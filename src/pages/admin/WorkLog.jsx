@@ -83,9 +83,12 @@ export default function WorkLog() {
 
   const mine = day.logs.find(l => l.staff_id === user?.id)
   const prog = useMemo(
-    // ⚠️ 这里不能用下面的 isBoss —— 它声明在后面，写进依赖数组就是 TDZ 白屏。
-    () => inquiryProgress(config.channelAccounts, day.inquiries, date, user?.id, user?.role === 'admin'),
-    [config.channelAccounts, day.inquiries, date, user?.id, user?.role])
+    // ⚠️ 这里不能用下面的 isBoss / backfillMode —— 它们声明在后面，
+    //    写进依赖数组就是 TDZ 白屏（之前栽过一次）。所以内联算。
+    // 最后那个参数＝补录模式：别人填过的号就算填了，不要求老板再填一遍。
+    () => inquiryProgress(config.channelAccounts, day.inquiries, date, user?.id,
+      user?.role === 'admin', user?.role === 'admin' && date !== today),
+    [config.channelAccounts, day.inquiries, date, user?.id, user?.role, today])
   const perf = useMemo(() => myPerformance(orders, user?.id, date), [orders, user?.id, date])
   const wk = weekRange(date)
   const video = weeklyVideo(day.posts, wk.from, wk.to)
@@ -423,7 +426,8 @@ export default function WorkLog() {
         </div>
         {!prog.ok && (
           <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 mt-2">
-            ⚠️ 还差 {prog.missing.map(a => a.name).join('、')} 没登记 —— 填完才能提交日报、才能下班
+            ⚠️ 还差 {prog.missing.map(a => a.name).join('、')} 没登记 ——
+            {backfillMode ? '这几个号那天一个人都没登记，补上才能提交' : '填完才能提交日报、才能下班'}
           </p>
         )}
       </Card>

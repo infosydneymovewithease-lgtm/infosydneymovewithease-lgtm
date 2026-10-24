@@ -115,13 +115,20 @@ export function requiredAccounts(channelAccounts, staffId, seeAll) {
  * ⚠️ 判断依据是「这个账号今天有没有登记过」，不是「人数大于 0」——
  *    今天 0 个咨询也是有效登记，不能逼人填个假数字。
  */
-export function inquiryProgress(channelAccounts, inquiries, dateStr, staffId, seeAll) {
+/**
+ * @param anyStaff 「有人填过就算填了」。只在【老板补录历史日】时为 true ——
+ *   补录时他是来补缺口的，不是报自己的接待量。
+ *   要求他把别人填过的号再填一遍，等于逼他造重复数据
+ *   （咨询登记按人存：小洁填 1、他再填 1，公司合计变成 2）。
+ *   ⚠️ 平时一律 false —— 两个人各报各的那条规矩没动。
+ */
+export function inquiryProgress(channelAccounts, inquiries, dateStr, staffId, seeAll, anyStaff) {
   // ⚠️ 这里必须跟着归属走 —— 不然小洁的日报会卡在「还差小红书没登记」，
   //    而那个数她看不到。闸门卡的必须是她做得到的事。
   const need = requiredAccounts(channelAccounts, staffId, seeAll)
   // staffId 给了就只看这个人填的 —— 老板 10-12：「有时候是两个人，需要知道各自」
   const mine = (inquiries || []).filter(i =>
-    String(i.log_date) === dateStr && (!staffId || i.staff_id === staffId))
+    String(i.log_date) === dateStr && (anyStaff || !staffId || i.staff_id === staffId))
   const done = new Set(mine.map(i => i.account_id))
   const missing = need.filter(a => !done.has(a.id))
   const total = mine.reduce((s, i) => s + (Number(i.count) || 0), 0)
