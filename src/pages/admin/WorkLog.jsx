@@ -124,7 +124,14 @@ export default function WorkLog() {
   const nameOfAccount = id => (config.channelAccounts || []).find(a => a.id === id)?.name || id
 
   const [truth, setTruth] = useState(false)
-  const canSubmit = !!mine?.clock_in && prog.ok && commentOk && issuesOk && (!policy.truth_declaration || truth)
+  // ⚠️ 补录模式不要求打卡。老板 10-24：
+  //    「昨天已经过去了，我只能补录昨天我知道的数据，补录完成我应该是可以提交的」
+  //    他 10/23 本来就没上班，现在也补不出一个打卡记录来 —— 要求打卡等于
+  //    逼他造一条假出勤。补录是管理动作，不是报自己的工。
+  //    ⚠️ 只对 admin 的补录放开（backfillMode），客服和经理一点没松。
+  const backfillMode = isBoss && editingPast
+  const clockOk = backfillMode || !!mine?.clock_in
+  const canSubmit = clockOk && prog.ok && commentOk && issuesOk && (!policy.truth_declaration || truth)
   const submitted = !!mine?.submitted_at
 
   return (
@@ -221,7 +228,7 @@ export default function WorkLog() {
       {editingPast && (
         <div className="bg-amber-100 border-2 border-amber-400 rounded-2xl px-4 py-3 flex items-center gap-3 flex-wrap">
           <span className="text-sm font-bold text-amber-900">
-            正在修改 {date} 的日报（不是今天）
+            {backfillReason ? `正在补录 ${date} 的数据` : `正在修改 ${date} 的日报（不是今天）`}
           </span>
           {backfillReason && (
             <span className="text-xs text-amber-800 bg-white/70 rounded-lg px-2 py-1">
@@ -289,15 +296,17 @@ export default function WorkLog() {
             //    那是一句假话：填过了，只是不是负责人填的。
             //    咨询登记按人存（10-12 老板定的「两个人要知道各自」），
             //    所以这里要把别人填的【都】算上，并且说清是谁填的。
-            const theirs = !mine
-              ? day.inquiries.filter(i => i.account_id === a.id && i.staff_id !== user?.id)
-              : []
+            // ⚠️ 2026-10-24 老板补录时指出：「朋友圈显示着昨天小洁写的 1 什么的」
+            //    原来只在【归别人管】时才算 theirs，所以老板（他看得到所有号）
+            //    永远看到一个空框 —— 以为没人填，再填一遍，合计就翻倍。
+            //    咨询登记是按人存的，两个人各填 1，公司总数就是 2。
+            //    所以不管归谁，别人填过的都要摆在他眼前。
+            const theirs = day.inquiries.filter(i => i.account_id === a.id && i.staff_id !== user?.id)
             const theirSum = theirs.reduce((n, i) => n + (Number(i.count) || 0), 0)
             const theirWho = [...new Set(theirs.map(i =>
               staff?.find?.(x => x.id === i.staff_id)?.name || i.staff_id))].join('、')
-            const ownerName = !mine
-              ? (staff?.find?.(x => x.id === a.owner_staff_id)?.name || a.owner_staff_id || '公共')
-              : null
+            const ownerName = staff?.find?.(x => x.id === a.owner_staff_id)?.name
+              || a.owner_staff_id || '公共'
             const myPosts = day.posts.filter(p => p.account_id === a.id && p.posted_by === user?.id)
             const planned = a.status !== 'active'
             const done = !!rec
@@ -365,6 +374,13 @@ export default function WorkLog() {
                             {myPosts.length > 1 && ` 等 ${myPosts.length} 条`}
                           </span>
                         : <span className="text-gray-300">今天没登记发布</span>}
+                    </span>
+                    {/* 别人已经填过的 —— 摆在输入框左边，填之前一眼看得到，
+                        免得又填一遍把合计顶成两倍 */}
+                    <span className="text-xs w-24 text-right shrink-0 truncate">
+                      {theirs.length
+                        ? <span className="text-green-700 font-semibold">{theirWho}已填 {theirSum}</span>
+                        : <span className="text-gray-300">归 {ownerName}</span>}
                     </span>
                     <input type="number" min="0" step="1" placeholder="待填"
                       defaultValue={rec?.count ?? ''}
@@ -706,7 +722,7 @@ export default function WorkLog() {
                 submitted_at: new Date().toISOString(), truth_confirmed: true }))}
               className="w-full text-white font-bold py-3 rounded-xl disabled:opacity-40"
               style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
-              {!mine?.clock_in ? '先打上班卡'
+              {!clockOk ? '先打上班卡'
                 : !prog.ok ? `提交今日记录 · 还差 ${prog.missing.length} 个平台`
                 : !commentOk ? `小红书评论还差 ${quota - commentCount} 条`
                 : !issuesOk ? '还没写今天的问题 · 想改进的地方'
