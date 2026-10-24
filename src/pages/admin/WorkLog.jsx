@@ -30,7 +30,7 @@ export default function WorkLog() {
     user, orders, config, staff,
     getWorkday, upsertWorkLog, saveInquiry, addPost, getPolicyText,
     addChannelAccount, updateChannelAccount, deleteChannelAccount, channelUsage,
-    listWorkLogReturns, pendingReturns, getContentRange, openDays,
+    listWorkLogReturns, pendingReturns, getContentRange, openDays, logBackfill,
   } = useApp()
   const navigate = useNavigate()
   // ⚠️ 默认今天。只有【被退回的日子】可以切过去改 ——
@@ -39,6 +39,10 @@ export default function WorkLog() {
   const today = sydneyToday()
   const [date, setDate] = useState(today)
   const [pending, setPending] = useState([])   // 被退回还没改完的日子
+  // 管理员补录。老板 10-24 选的方案③ —— 只给 admin 开自由选日期的口子，
+  // 每次写原因并进 audit_log。客服那边的「当下填写」一点没松。
+  const [backfill, setBackfill] = useState(null)   // { date, reason } 或 null
+  const [backfillReason, setBackfillReason] = useState('')  // 进入补录时填的原因，顶上一直显示
   const editingPast = date !== today
   const [day, setDay] = useState({ logs: [], breaks: [], inquiries: [], posts: [] })
   const [busy, setBusy] = useState(false)
@@ -168,14 +172,64 @@ export default function WorkLog() {
         </div>
       )}
 
+      {/* 管理员补录入口 —— 只有 admin 看得到。
+          ⚠️ 不要给客服和经理开这个：代码里那条注释写得很清楚 ——
+             「那等于开了补填口子，她可以周五把周一到周四空着的日报全补上，
+               当下填写就全废了」。 */}
+      {isBoss && !editingPast && (
+        backfill ? (
+          <div className="bg-white rounded-2xl p-4 shadow-sm border-2 border-amber-300">
+            <p className="text-sm font-bold text-gray-900 mb-1">补录其他日期</p>
+            <p className="text-xs text-gray-400 mb-3 leading-relaxed">
+              正常补填走「退回重填」（经理在团队今日退回，本人自己改）。
+              这个入口只给你，每次都会记一条操作日志 —— 谁、哪天、什么原因。
+            </p>
+            <div className="flex gap-2 flex-wrap items-start">
+              <input type="date" max={today} value={backfill.date}
+                onChange={e => setBackfill(b => ({ ...b, date: e.target.value }))}
+                className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400" />
+              <input value={backfill.reason}
+                onChange={e => setBackfill(b => ({ ...b, reason: e.target.value }))}
+                placeholder="为什么要补（必填）—— 例：经理当天没打卡，数据电话问到的"
+                className="flex-1 min-w-56 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-red-400" />
+              <button disabled={busy || !backfill.date || backfill.reason.trim().length < 2
+                               || backfill.date >= today}
+                onClick={async () => {
+                  try {
+                    await logBackfill(backfill.date, backfill.reason)
+                    setBackfillReason(backfill.reason.trim())
+                    setDate(backfill.date)
+                    setBackfill(null)
+                  } catch (e) { setErr(e.message) }
+                }}
+                className="text-white font-bold px-4 py-2 rounded-xl text-sm disabled:opacity-40"
+                style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
+                开始补录
+              </button>
+              <button onClick={() => setBackfill(null)} className="text-sm text-gray-500 px-2 py-2">取消</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setBackfill({ date: '', reason: '' })}
+            className="self-start text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50">
+            补录其他日期
+          </button>
+        )
+      )}
+
       {/* 正在改历史日 —— 必须一眼看出不是在填今天，否则会填错日子 */}
       {editingPast && (
         <div className="bg-amber-100 border-2 border-amber-400 rounded-2xl px-4 py-3 flex items-center gap-3 flex-wrap">
           <span className="text-sm font-bold text-amber-900">
             正在修改 {date} 的日报（不是今天）
           </span>
+          {backfillReason && (
+            <span className="text-xs text-amber-800 bg-white/70 rounded-lg px-2 py-1">
+              补录原因：{backfillReason}
+            </span>
+          )}
           <span className="flex-1" />
-          <button onClick={() => setDate(today)}
+          <button onClick={() => { setDate(today); setBackfillReason('') }}
             className="text-xs font-semibold text-amber-900 border border-amber-500 rounded-lg px-3 py-1.5 hover:bg-amber-200">
             回到今天
           </button>

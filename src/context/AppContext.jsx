@@ -664,6 +664,24 @@ export function AppProvider({ children }) {
 
   // 老板 10-13：经理核对发现虚假错报要有出口。
   // 原因必填的校验在数据库函数里，不在这儿 —— 前端有 bug 也绕不过去。
+  // 管理员补录留痕。老板 10-24 选的方案③：
+  //   「我的日报」默认只能填今天，补填的正路是【退回重填】。
+  //   但 10/23 卡死了：小洁没提交（退不了）、经理没打卡也没提交（也退不了），
+  //   而经理又不能退自己的 —— 三条路全堵。
+  //   所以只给 admin 开一个自由选日期的口子，每次必须写原因并写进 audit_log。
+  //   ⚠️ 口子只开给老板一个人 —— 客服那边的「当下填写」一点没松。
+  async function logBackfill(workDate, reason) {
+    const { error } = await supabase.from('audit_log').insert({
+      staff_id: user?.id || null,
+      action: 'admin_backfill',
+      target_type: 'daily_work_log',
+      target_id: String(workDate),
+      detail: { reason: String(reason || '').trim(), by_role: user?.role || null },
+    })
+    // 留痕失败不该挡住补录本身，但要让人看见
+    if (error) throw new Error('留痕失败，没有进行补录：' + (error.message || '未知错误'))
+  }
+
   async function returnWorkLog(workDate, staffId, reason) {
     const { error } = await supabase.rpc('return_work_log', {
       p_work_date: workDate, p_staff_id: staffId, p_by: user?.id || null, p_reason: reason })
@@ -1258,7 +1276,7 @@ export function AppProvider({ children }) {
       getWorkday, upsertWorkLog, startBreak, endBreak, saveInquiry, addPost, deletePost, getInquiryWeek,
       getPeriodData, getSummaryNote, saveSummaryNote,
       getPolicyText, confirmTeamDay, getTeamConfirm, addChannelAccount, deleteChannelAccount, channelUsage,
-      returnWorkLog, listWorkLogReturns, pendingReturns, openDays,
+      returnWorkLog, listWorkLogReturns, pendingReturns, openDays, logBackfill,
       getContentRange, generateWeekSlots, autolinkWeek, saveContentItem, deleteContentItem,
       unmarkSlotPosted, markSlotPosted2,
       cleanupPostedVideos,
