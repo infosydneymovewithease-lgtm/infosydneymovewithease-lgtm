@@ -1044,9 +1044,19 @@ export function AppProvider({ children }) {
   function updateOrderStatus(orderId, status) {
     // 合法转换校验 — 防止"已完成"被误改回"待确认"等非法转换
     const current = orders.find(o => o.id === orderId)
-    if (current && !isLegalOrderTransition(current.status, status)) {
+    const isAdmin = user?.role === 'admin'
+    if (current && !isLegalOrderTransition(current.status, status, { isAdmin })) {
       console.warn(`[orderStatus] illegal transition: ${current.status} -> ${status}`)
       throw new Error(`状态转换不合法：${current.status} → ${status}`)
+    }
+    // ⚠️ 恢复已取消必须留痕。取消本身系统一个字都没记（orders 表没有取消相关字段），
+    //    恢复再不记，这单的经历就彻底查不到了。
+    if (current?.status === '已取消' && status !== '已取消') {
+      supabase.from('audit_log').insert({
+        staff_id: user?.id || null, action: 'restore_cancelled',
+        target_type: 'order', target_id: String(orderId),
+        detail: { orderNo: current.orderNo || null, from: '已取消', to: status },
+      }).then(({ error: e }) => { if (e) console.warn('[audit] 恢复留痕失败：', e.message) })
     }
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o))
     bg(supabase.from('orders').update(pickOrder({ status })).eq('id', orderId), '更新订单状态')

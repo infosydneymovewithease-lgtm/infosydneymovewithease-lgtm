@@ -53,11 +53,32 @@ export const STORAGE_TRANSITIONS = {
 }
 
 // ── 校验函数 ─────────────────────────────────────────────────
-export function isLegalOrderTransition(from, to) {
+/**
+ * 老板可以把【已取消】恢复回来，其他人不行。
+ *
+ * 老板 2026-10-26：「我觉得我应该有恢复权限，其他人可以是终点」
+ * 起因：QX2610033（Frank）被取消了，但谁取消的、为什么，系统里一个字都没记
+ *       —— orders 表 89 个字段里【没有任何取消相关的列】。
+ *       取消一旦落下就改不回来，而现实里「取消错了」「客人又搬了」都会发生。
+ *
+ * ⚠️ 为什么不干脆放开给所有人：
+ *    终态的意义就是「到这儿就定了」。谁都能改回去，状态机就不是状态机了。
+ *    给一个人开口子、并且留痕，比把门拆了强。
+ *
+ * ⚠️ 不能恢复到【进行中 / 未提交账单 / 师傅已提交账单】——
+ *    那几个状态意味着活已经在干或干完了，凭空恢复过去会让工时和工资凭空出现。
+ */
+export const CANCEL_RESTORE_STATES = [
+  '待确认', '已报价', '已收定金', '已派单', '师傅已确认', '已完成',
+]
+
+export function isLegalOrderTransition(from, to, opts = {}) {
   // 同状态视为合法（幂等更新）
   if (from === to) return true
   // 没有 from（新订单）也合法
   if (!from) return true
+  // 老板恢复已取消 —— 唯一的例外
+  if (from === '已取消' && opts.isAdmin && CANCEL_RESTORE_STATES.includes(to)) return true
   return (ORDER_TRANSITIONS[from] || []).includes(to)
 }
 

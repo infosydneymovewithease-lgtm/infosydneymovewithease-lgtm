@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { VEHICLES, VAN_PROMO_DISCOUNT } from '../../data/vehicles'
 import { HEAVY_ITEM_OPTIONS, calcHeavyTotal } from '../../data/heavyItems'
-import { ORDER_STATUSES } from '../../data/orderStatus'
+import { ORDER_STATUSES, isLegalOrderTransition } from '../../data/orderStatus'
 import { SLOT_CONFIG, fetchSlotsAvailability } from '../../utils/slotAvailability'
 import { isTimeOutsideSlot } from '../../utils/orderTime'
 import {
@@ -1070,21 +1070,34 @@ export default function AdminOrderDetail() {
       {/* Status modal */}
       {showStatusChange && (
         <Modal title="修改订单状态" onClose={() => setShowStatusChange(false)}>
+          {order.status === '已取消' && (
+            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3 leading-relaxed">
+              {user?.role === 'admin'
+                ? '已取消对其他人是终点，只有你能恢复。恢复会记一条操作日志（谁、什么时候、恢复成什么）。'
+                : '已取消是终点，改不回来 —— 要恢复找老板。'}
+            </p>
+          )}
           <div className="space-y-2">
-            {STATUS_FLOW.map(s => (
-              <button
-                key={s}
-                onClick={() => handleStatusChange(s)}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-colors ${
-                  order.status === s
-                    ? 'border-red-300 bg-red-50'
-                    : 'border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                <span className="text-gray-800 text-sm">{s}</span>
-                {order.status === s && <CheckCircle size={16} className="text-red-500" />}
-              </button>
-            ))}
+            {/* ⚠️ 只亮能转过去的 —— 原来全部可点，点了才弹「状态转换不合法」。
+                让人点一个注定失败的按钮，是界面在骗人。 */}
+            {STATUS_FLOW.map(s => {
+              const isNow = order.status === s
+              const ok = isNow || isLegalOrderTransition(order.status, s, { isAdmin: user?.role === 'admin' })
+              return (
+                <button
+                  key={s}
+                  disabled={!ok}
+                  onClick={() => ok && handleStatusChange(s)}
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-colors ${
+                    isNow ? 'border-red-300 bg-red-50'
+                    : ok ? 'border-gray-200 hover:bg-gray-50'
+                    : 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'}`}
+                >
+                  <span className={`text-sm ${ok ? 'text-gray-800' : 'text-gray-400'}`}>{s}</span>
+                  {isNow && <CheckCircle size={16} className="text-red-500" />}
+                </button>
+              )
+            })}
           </div>
         </Modal>
       )}
