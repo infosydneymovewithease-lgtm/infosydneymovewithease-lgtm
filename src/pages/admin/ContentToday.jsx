@@ -52,6 +52,9 @@ export default function ContentToday() {
   useEffect(() => { refresh() /* eslint-disable-next-line */ }, [date])
 
   const nameOf = id => (config.channelAccounts || []).find(a => a.id === id)?.name || id
+  // ⚠️ 封面优先用【这个格子自己的】，没有才用原文那张。
+  //    老板 10-26：朋友圈原来只能跟着盼达的封面走，没处换。
+  const coverOf = s => s.cover_override || s.item?.cover || null
   // 老板 10-18：发布责任挂在【账号】上，不写死在代码里。
   // 上一版是 if (isManager)，换一次分工就要满系统找六个地方改（上次就漏了六处）。
   // 现在归属存在 channel_account.owner_staff_id，换人在系统设置里点一下就行。
@@ -186,11 +189,11 @@ export default function ContentToday() {
                   <div className="flex items-start gap-2.5">
                     <span className="w-10 shrink-0 text-xs text-gray-400 pt-1.5">配图</span>
                     <div className="flex-1 flex items-start gap-2.5 bg-gray-50 rounded-xl px-3 py-2">
-                      {s.item.cover && (
-                        <a href={dl(s.item.cover.url || s.item.cover.data, s.item.cover.name)}
-                          download={s.item.cover.name || 'cover.jpg'} title="点一下存到本地"
+                      {coverOf(s) && (
+                        <a href={dl(coverOf(s).url || coverOf(s).data, coverOf(s).name)}
+                          download={coverOf(s).name || 'cover.jpg'} title="点一下存到本地"
                           className="shrink-0 relative group">
-                          <img src={s.item.cover.url || s.item.cover.data} alt=""
+                          <img src={coverOf(s).url || coverOf(s).data} alt=""
                             className="w-14 h-14 rounded-lg object-cover border border-gray-200 group-hover:border-red-400" />
                           <span className="absolute inset-0 rounded-lg bg-black/0 group-hover:bg-black/40
                                            flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition">
@@ -202,9 +205,9 @@ export default function ContentToday() {
                         {s.item.material_note
                           ? <p className="text-sm leading-relaxed">{s.item.material_note}</p>
                           : <p className="text-sm text-gray-400">配图去微信素材群里找</p>}
-                        {s.item.cover && (
-                          <a href={dl(s.item.cover.url || s.item.cover.data, s.item.cover.name)}
-                            download={s.item.cover.name || 'cover.jpg'}
+                        {coverOf(s) && (
+                          <a href={dl(coverOf(s).url || coverOf(s).data, coverOf(s).name)}
+                            download={coverOf(s).name || 'cover.jpg'}
                             className="text-xs text-red-700 font-semibold inline-flex items-center gap-1 mt-1">
                             <Download size={12} /> 下载封面图
                           </a>
@@ -227,11 +230,11 @@ export default function ContentToday() {
                     <div className="flex gap-1.5 flex-wrap items-center">
                       {/* 视频的封面图也要能拿到 —— 视频号发布时要选封面，
                           有做好的比从视频里截一帧强。不显示出来等于白传。 */}
-                      {s.item.cover && (
-                        <a href={dl(s.item.cover.url || s.item.cover.data, s.item.cover.name)}
-                          download={s.item.cover.name || 'cover.jpg'} title="封面图 · 点一下存到本地"
+                      {coverOf(s) && (
+                        <a href={dl(coverOf(s).url || coverOf(s).data, coverOf(s).name)}
+                          download={coverOf(s).name || 'cover.jpg'} title="封面图 · 点一下存到本地"
                           className="relative group shrink-0">
-                          <img src={s.item.cover.url || s.item.cover.data} alt=""
+                          <img src={coverOf(s).url || coverOf(s).data} alt=""
                             className="w-14 h-14 rounded-lg object-cover border border-gray-200 group-hover:border-red-400" />
                           <span className="absolute inset-0 rounded-lg bg-black/0 group-hover:bg-black/40
                                            flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition">

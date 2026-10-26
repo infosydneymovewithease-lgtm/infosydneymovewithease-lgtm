@@ -281,6 +281,9 @@ function SlotEditor({ slot, data, nameOf, busy, onClose, onSaveItem, onUpdateSlo
   const [cover, setCover] = useState(item?.cover || null)
   const [matNote, setMatNote] = useState(item?.material_note || '')
   const [override, setOverride] = useState(slot.body_override || '')
+  // 复用格子自己的封面。老板 10-26：朋友圈那张现在只能跟着盼达走，没处换。
+  // 空＝用原文那张，不是替换是覆盖。
+  const [coverOv, setCoverOv] = useState(slot.cover_override || null)
   const [pickId, setPickId] = useState(slot.item_id || '')
   const [skipping, setSkipping] = useState(false)
   const [reason, setReason] = useState('')
@@ -306,6 +309,7 @@ function SlotEditor({ slot, data, nameOf, busy, onClose, onSaveItem, onUpdateSlo
       if (isDerived) {
         await onUpdateSlot(slot.id, {
           item_id: pickId ? Number(pickId) : null,
+          cover_override: coverOv,
           ...(isRewrite ? { body_override: override } : {}),
         })
       } else {
@@ -361,6 +365,45 @@ function SlotEditor({ slot, data, nameOf, busy, onClose, onSaveItem, onUpdateSlo
                   {slot.source_type === 'repost' && '转发＝直接把视频号那条转到朋友圈。'}
                   {isRewrite && '改写＝你提前改好一版存在这里，小洁发的时候一键复制，不用停下来改。'}
                 </p>
+              </div>
+
+              {/* 这个格子自己的封面 —— 老板 10-26：
+                  「朋友圈会自动有封面图片，那个封面就是盼达的封面，没有改的路径」
+                  空着就还用原文那张，所以不填一点不影响现在的用法。 */}
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  这条自己的封面 <span className="text-gray-300">· 可不填</span>
+                </label>
+                <div className="flex gap-2 items-center">
+                  {coverOv ? (
+                    <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200">
+                      <img src={coverOv.url || coverOv.data} alt="" className="w-full h-full object-cover" />
+                      {!slot.posted_at && (
+                        <button onClick={() => setCoverOv(null)}
+                          className="absolute top-0 right-0 bg-black/60 text-white text-xs w-4 h-4 leading-4 text-center">✕</button>
+                      )}
+                    </div>
+                  ) : !slot.posted_at && (
+                    <label className="w-16 h-16 rounded-lg border border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-red-400 text-gray-400">
+                      {up ? '…' : <Plus size={18} />}
+                      <input type="file" accept="image/*" className="hidden"
+                        onChange={async e => { const f = e.target.files[0]; e.target.value = ''
+                          if (!f) return
+                          setUp(true)
+                          try { setCoverOv(await uploadImage(f)) }
+                          catch (err) { onErr(err.message || '上传失败') } finally { setUp(false) } }} />
+                    </label>
+                  )}
+                  {/* 原文那张摆旁边做对照 —— 不传就用它 */}
+                  {!coverOv && data.items.find(i => i.id === Number(pickId))?.cover && (
+                    <div className="flex items-center gap-2">
+                      <img src={(() => { const c = data.items.find(i => i.id === Number(pickId)).cover
+                                         return c.url || c.data })()}
+                        alt="" className="w-16 h-16 rounded-lg object-cover border border-gray-200 opacity-60" />
+                      <span className="text-xs text-gray-400">不传就用原文这张</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {isRewrite && (() => {
