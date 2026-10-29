@@ -17,7 +17,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useApp } from '../../context/AppContext'
 import { sydneyToday } from '../../utils/date'
 import { todayToPost, bodyFor, SOURCE_LABEL } from '../../utils/content'
-import { requiredAccounts } from '../../utils/worklog'
+import { requiredAccounts, opsDateFor, opsCanEdit } from '../../utils/worklog'
 import { uploadImage } from '../../utils/upload'
 import { humanError } from '../../utils/netError'
 import { Check, Copy, Download, Plus } from 'lucide-react'
@@ -77,7 +77,7 @@ export default function ContentToday() {
   const timesOf = id => (config.channelAccounts || []).find(a => a.id === id)?.times_per_day || 1
   const fullyPosted = s => !!s.posted_at && (timesOf(s.account_id) < 2 || !!s.posted_at_2)
   const posted = list.filter(fullyPosted).length
-  // 我负责的号 —— 下面那张「今天来了几个咨询」用它。
+  // 我负责的号 —— 下面那张「昨天来了几个咨询」用它。
   // ⚠️ 这一个要【按归属】：上面的发布列表给全部（顶班要看得到），
   //    但咨询登记是「填你自己接待的」，列上别人的号等于催她填不该填的。
   const myAccounts = requiredAccounts(config.channelAccounts, user?.id,
@@ -351,14 +351,19 @@ export default function ContentToday() {
         )
       })}
 
-      {/* ── 今天来了几个咨询 ─────────────────────
+      {/* ── 昨天来了几个咨询 ─────────────────────
+          ⚠️ 2026-10-30 起填的是【昨天】。老板 10-29：
+             「只有第二天才能确认第一天具体咨询人数」
+             「我发完当天的小红书，顺手就可以看昨天的人数，非常简单」
+             —— 发布动作在今天，数数动作看昨天，一次打开页面两件事都办了。
           老板 10-18：「这部分数据回填给谁好一些呢」
           答案是按号分 —— 小红书的私信只落在运营手机上，客服看不到。
           放在这一页而不是日报里：运营每天本来就要开这一页，
           填完两个数就走，不用再背一整套出勤／配额／问题反馈的日报流程。
           存的还是 platform_inquiry 同一张表，所以团队今日和周月汇总照常合计。 */}
       {myAccounts.length > 0 && (
-        <InquiryBox date={date} accounts={myAccounts} staffId={user?.id}
+        <InquiryBox date={opsDateFor(date)} today={date} role={user?.role}
+          accounts={myAccounts} staffId={user?.id}
           getWorkday={getWorkday} saveInquiry={saveInquiry} onErr={setErr} />
       )}
 
@@ -425,11 +430,14 @@ function ShotRow({ shots, onChange, onErr }) {
 }
 
 
-// ── 今天来了几个咨询 ────────────────────────────────────
+// ── 昨天来了几个咨询（T+1，2026-10-30）─────────────────
 // ⚠️ 判断「填了没有」看的是【有没有这条登记】，不是「人数大于 0」——
 //    今天 0 个咨询也是有效登记，不能逼人填个假数字出来。
 //    这一条和日报里的登记表是同一个规矩，别在这里走样。
-function InquiryBox({ date, accounts, staffId, getWorkday, saveInquiry, onErr }) {
+function InquiryBox({ date, today, role, accounts, staffId, getWorkday, saveInquiry, onErr }) {
+  // date 这里已经是【昨天】了（调用处传的 opsDateFor(today)）。
+  // 过了补填期限就只读 —— 真正拦住的是数据库里的 save_inquiry。
+  const editable = opsCanEdit(date, today, role)
   const [saved, setSaved] = useState({})     // accountId → 已存进库的数字
   const [draft, setDraft] = useState({})     // accountId → 正在输入的
   const [busy, setBusy] = useState('')
@@ -475,11 +483,14 @@ function InquiryBox({ date, accounts, staffId, getWorkday, saveInquiry, onErr })
 
   return (
     <div className="bg-white rounded-2xl p-4 shadow-sm">
-      <h2 className="font-bold text-sm">今天来了几个咨询</h2>
+      <h2 className="font-bold text-sm">
+        昨天来了几个咨询
+        <span className="ml-2 text-xs font-normal text-gray-400">{date}</span>
+      </h2>
       <p className="text-xs text-gray-400 mt-0.5 mb-3 leading-relaxed">
-        问搬家的人数，填你自己接待的。
-        <b className="text-gray-500">今天 0 个也要填 0</b> —— 空着不算登记。
-        这个数系统抓不到，只有你看得见，但它是判断客人从哪来的唯一依据。
+        填 <b className="text-gray-500">昨天（{date}）</b>问搬家的人数，你自己接待的那部分。
+        现在后台能看到昨天一整天的私信和新增关注，数得准 —— 当天填只能靠猜。
+        <b className="text-gray-500">昨天 0 个也要填 0</b> —— 空着不算登记。
       </p>
       <div className="space-y-1.5">
         {accounts.map(a => {
@@ -500,7 +511,7 @@ function InquiryBox({ date, accounts, staffId, getWorkday, saveInquiry, onErr })
               <input type="number" min="0" inputMode="numeric" value={val}
                 onChange={e => setDraft(d => ({ ...d, [a.id]: e.target.value }))}
                 onBlur={() => isDirty && saveOne(a.id)}
-                disabled={busy === a.id}
+                disabled={busy === a.id || !editable}
                 placeholder="待填"
                 className={`w-16 text-center border rounded-lg px-2 py-1.5 text-sm outline-none shrink-0
                   ${isDirty ? 'border-red-300 bg-red-50' : has ? 'border-gray-200' : 'border-amber-300 bg-amber-50'}
@@ -536,7 +547,7 @@ function InquiryBox({ date, accounts, staffId, getWorkday, saveInquiry, onErr })
         </p>
       ) : missing.length > 0 ? (
         <p className="text-xs text-amber-700 mt-2.5">
-          还差 {missing.map(a => a.name).join('、')} 没填 —— 下班前补上
+          还差 {missing.map(a => a.name).join('、')} 没填 —— 今天下班前补上
         </p>
       ) : (
         <p className="text-xs text-green-600 mt-2.5">今天的咨询数都登记好了 ✓</p>

@@ -7,7 +7,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { sydneyToday, addDays, sydneyDateOf } from '../utils/date'
-import { requiredAccounts, ownsAccount, inquiryProgress, weeklyVideo, weekRange } from '../utils/worklog'
+import { requiredAccounts, ownsAccount, inquiryProgress, weeklyVideo, weekRange,
+         opsDateFor, opsCanEdit } from '../utils/worklog'
 import { todayToPost, weekOutput, myEditsToday } from '../utils/content'
 import { todayTasks, weekTasks, progressOf, S } from '../utils/tasks'
 import { Check, ChevronRight, Clock, Coffee } from 'lucide-react'
@@ -19,6 +20,10 @@ export default function DailyProgress() {
   const isManager = user?.role === 'admin' || user?.role === 'manager'
 
   const [day, setDay] = useState({ logs: [], inquiries: [], posts: [] })
+  // ⚠️ 2026-10-30 T+1：待办里那条「平台咨询登记」要的是【昨天】的数。
+  //    不单独拉一天的话，今天这条永远显示没做 —— 待办天天亮红，人就不看了。
+  const opsDate = opsDateFor(date)
+  const [opsDay, setOpsDay] = useState({ logs: [], inquiries: [], posts: [] })
   const [content, setContent] = useState({ slots: [], items: [] })
   const [open, setOpen] = useState([])
   const [policy, setPolicy] = useState({})
@@ -29,10 +34,11 @@ export default function DailyProgress() {
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const [d, c, p, rs] = await Promise.all([
-        getWorkday(date), getContentRange(wk.from, wk.to), getPolicyText(), getRoster(date, date)])
+      const [d, c, p, rs, o] = await Promise.all([
+        getWorkday(date), getContentRange(wk.from, wk.to), getPolicyText(), getRoster(date, date),
+        getWorkday(opsDate)])
       if (!alive) return
-      setDay(d); setContent(c); setPolicy(p); setRoster(rs.roster || [])
+      setDay(d); setContent(c); setPolicy(p); setRoster(rs.roster || []); setOpsDay(o)
       if (isManager) openDays(addDays(date, -7), addDays(date, -1)).then(o => alive && setOpen(o))
     })()
     return () => { alive = false }
@@ -41,7 +47,10 @@ export default function DailyProgress() {
 
   const log = day.logs.find(l => l.staff_id === user?.id)
   const accounts = requiredAccounts(config.channelAccounts, user?.id, user?.role === 'admin')
-  const prog = inquiryProgress(accounts, day.inquiries, date, user?.id)
+  const prog = inquiryProgress(accounts, opsDay.inquiries, opsDate, user?.id)
+  // 过了补填期限就别再催了 —— 她已经填不了，天天亮红只会让人学会无视待办。
+  // 缺口不会消失，它会出现在老板后台的「超期未登记」里。
+  const opsEditable = opsCanEdit(opsDate, date, user?.role)
   // ⚠️ 发布任务要按【账号归属】算 —— 小洁只发朋友圈（它不显示 IP 属地），
   //    小红书和视频号归澳洲这边。不过滤的话她会被催发她发不了的号。
   const canPost = s => ownsAccount(
@@ -60,7 +69,8 @@ export default function DailyProgress() {
   const edits = myEditsToday(content.items, content.slots, user?.id, date, sydneyDateOf).length
 
   const tasks = todayTasks({
-    role: user?.role, log, inquiryOk: prog.ok, inquiryMissing: prog.missing,
+    role: user?.role, log, inquiryOk: prog.ok || !opsEditable, inquiryMissing: prog.missing,
+    inquiryDate: opsDate,
     slotsToday, quota: Number(policy.comment_quota) || 3,
     openDays: open, editedToday: edits,
     // 今天已完成的单 —— 这些现在就能核，不用等明天日结

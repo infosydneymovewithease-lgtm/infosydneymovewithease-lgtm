@@ -30,7 +30,13 @@ export default function TeamToday() {
   const [date, setDate] = useState(() => params.get('date') || sydneyToday())
   const [day, setDay] = useState({ logs: [], breaks: [], inquiries: [], posts: [] })
   const [week, setWeek] = useState([])
-  const [prevDay, setPrevDay] = useState([])
+  // ⚠️ 2026-10-30 T+1：运营数据（咨询 / 加微信）填的是前一天的。
+  //    所以这一页的「咨询漏斗」要看【昨天】那一天 ——
+  //    今天这一栏在今天永远是空的，照旧显示只会天天报假漏登记。
+  //    opsDay 是昨天整份（要 logs 里的 wechat_adds），
+  //    prevOps 是前天的咨询，只给可信度比对用。
+  const [opsDay, setOpsDay] = useState({ logs: [], breaks: [], inquiries: [], posts: [] })
+  const [prevOps, setPrevOps] = useState([])
   const [policy, setPolicy] = useState({})
   const [confirm, setConfirm] = useState(null)
   const [checked, setChecked] = useState(false)
@@ -47,8 +53,9 @@ export default function TeamToday() {
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const [d, w, p] = await Promise.all([
-        getWorkday(date), getInquiryWeek(wk.from, wk.to), getWorkday(addDays(date, -1))])
+      const [d, w, p, pp] = await Promise.all([
+        getWorkday(date), getInquiryWeek(wk.from, wk.to),
+        getWorkday(addDays(date, -1)), getWorkday(addDays(date, -2))])
       const [pol, cf, rt, op] = await Promise.all([
         getPolicyText(), getTeamConfirm(date), listWorkLogReturns(date, date),
         // 老板定的流程是第二天早上核前一天 —— 她北京 08:00 打开看到的是空白的今天，
@@ -56,7 +63,7 @@ export default function TeamToday() {
         openDays(addDays(date, -7), addDays(date, -1))])
       const rs = await getRoster(date, date)
       if (alive) setRoster(rs.roster || [])
-      if (alive) { setDay(d); setWeek(w); setPrevDay(p.inquiries || []); setPolicy(pol)
+      if (alive) { setDay(d); setWeek(w); setOpsDay(p); setPrevOps(pp.inquiries || []); setPolicy(pol)
                    setConfirm(cf); setChecked(false); setReturns(rt); setOpen(op) }
     })()
     return () => { alive = false }
@@ -83,18 +90,22 @@ export default function TeamToday() {
   const quota = Number(policy.comment_quota) || 3
   const accounts = requiredAccounts(config.channelAccounts)
 
-  // 今日漏斗：咨询 → 建单
-  // ⚠️ 分子必须是【今天建的单】，不是「今天搬家的单」。
+  // 咨询 → 建单 漏斗。整条都是【昨天】的（T+1，2026-10-30）。
+  // ⚠️ 分子必须是【建单时刻】那天建的单，不是「那天搬家的单」。
   //    咨询和建单是同一天发生的事，搬家是几天后（实测中位 2 天）。
   //    用服务日期当分子，分子分母根本不是一回事 —— 第一版我写错了。
-  const inquiries = day.inquiries.reduce((s, i) => s + (Number(i.count) || 0), 0)
+  // ⚠️ 三段必须同一天。咨询挪到昨天了，建单也要跟着挪，
+  //    否则「昨天问了 20 个 / 今天下了 3 单」这个转化率是假的。
+  const opsDate = addDays(date, -1)
+  const inquiries = opsDay.inquiries.reduce((s, i) => s + (Number(i.count) || 0), 0)
+  const opsOrders = bookedOn(orders, opsDate)
   const dayOrders = bookedOn(orders, date)
   const servedToday = orders.filter(o => String(o.date) === date && o.status === '已完成')
-  // 实际接待 = 微信新增好友，所有在岗的人加起来
-  const adds = day.logs.reduce((s, l) => s + (l.wechat_adds ?? 0), 0) || null
+  // 实际接待 = 微信新增好友，所有在岗的人加起来。跟着咨询一起看昨天。
+  const adds = opsDay.logs.reduce((s, l) => s + (l.wechat_adds ?? 0), 0) || null
   // 老板 10-12：「有时候是两个人，所以需要知道各自」
-  const perStaff = inquiryByStaff(day.inquiries, date).map(x => {
-    const booked = dayOrders.filter(o => o.createdBy === x.staff_id).length
+  const perStaff = inquiryByStaff(opsDay.inquiries, opsDate).map(x => {
+    const booked = opsOrders.filter(o => o.createdBy === x.staff_id).length
     return { ...x, booked, rate: x.total ? booked / x.total : null }
   })
 
@@ -128,9 +139,9 @@ export default function TeamToday() {
   // 咨询登记的可信度信号。⚠️ 只在这里显示，客服自己那页不提示 ——
   // 提示了等于教她怎么绕过。而且这些是「看起来不像真实数据」，不是证据。
   const trust = trustSignals({
-    today: day.inquiries, yesterday: prevDay,
-    clockIn: day.logs.find(l => onDuty.includes(l.staff_id))?.clock_in,
-    orderCount: dayOrders.length,
+    today: opsDay.inquiries, yesterday: prevOps,
+    clockIn: opsDay.logs.find(l => onDuty.includes(l.staff_id))?.clock_in,
+    orderCount: opsOrders.length,
     accounts,
     nameOf: id => staff.find(s => s.id === id)?.name || id,
   })
@@ -350,14 +361,17 @@ export default function TeamToday() {
         </div>
       )}
 
-      {/* ── 今日咨询登记明细（带凭证）──────────── */}
+      {/* ── 昨天的咨询登记明细（带凭证）──────────── */}
       <div className="bg-white rounded-2xl p-4 shadow-sm">
-        <h2 className="font-bold text-sm mb-1">今日咨询登记</h2>
+        <h2 className="font-bold text-sm mb-1">昨天的咨询登记
+          <span className="ml-2 text-xs font-normal text-gray-400">{opsDate}</span>
+        </h2>
         <p className="text-xs text-gray-400 mb-3">
-          数字无法验证，但「发了什么」可以去平台核对 —— 这才是能查的那一栏
+          2026-10-30 起运营数据都是隔天填的 —— 今天早上你核的就是这一天。
+          数字无法验证，但「发了什么」可以去平台核对，这才是能查的那一栏
         </p>
         {accounts.map(a => {
-          const r = day.inquiries.find(i => i.account_id === a.id)
+          const r = opsDay.inquiries.find(i => i.account_id === a.id)
           return (
             <div key={a.id} className="flex items-center gap-3 py-1.5 text-sm border-b border-gray-50 last:border-0">
               <span className="font-semibold w-16 shrink-0">{a.name}</span>
@@ -375,15 +389,17 @@ export default function TeamToday() {
 
       {/* ── 今日漏斗 ─────────────────────────── */}
       <div className="bg-white rounded-2xl p-4 shadow-sm">
-        <h2 className="font-bold text-sm mb-3">今天接待了多少 · 下了几单</h2>
+        <h2 className="font-bold text-sm mb-3">昨天接待了多少 · 下了几单
+          <span className="ml-2 text-xs font-normal text-gray-400">{opsDate} · 今天建了 {dayOrders.length} 单</span>
+        </h2>
         <div className="flex items-center gap-2 sm:gap-4">
           <Big label="平台咨询" value={inquiries} unit="人" tag="客服填" sub="应接待 · 7 个平台合计" />
           <Arrow />
           <Big label="加微信" value={adds} unit="人" tag="客服填" accent
             sub={inquiries > 0 && adds != null ? `平台来的留下 ${Math.round(adds / inquiries * 100)}%` : '实际接待'} />
           <Arrow />
-          <Big label="下单" value={dayOrders.length} unit="单" tag="自动"
-            sub={adds > 0 ? `加微信的成了 ${Math.round(dayOrders.length / adds * 100)}%` : '按建单时刻'} />
+          <Big label="下单" value={opsOrders.length} unit="单" tag="自动"
+            sub={adds > 0 ? `加微信的成了 ${Math.round(opsOrders.length / adds * 100)}%` : '按建单时刻'} />
         </div>
         {/* 分人 —— 两个人在岗时合计看不出谁干了多少 */}
         {perStaff.length > 0 && (

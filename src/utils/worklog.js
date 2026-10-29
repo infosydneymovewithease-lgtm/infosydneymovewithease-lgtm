@@ -13,7 +13,7 @@
 //    只有一个人在岗，休 3 小时没人接电话。老板 10-11 定：单人日只休 2 小时。
 
 import { currentSeason, toMinutes, toHHMM, isWorkingOn } from './shifts'
-import { sydneyDateOf } from './date'
+import { sydneyDateOf, addDays } from './date'
 
 /**
  * 某天该开放哪几段休息。
@@ -80,6 +80,84 @@ export function breakMinutes(rec, now = Date.now()) {
   if (!rec?.started_at) return 0
   const end = rec.ended_at ? new Date(rec.ended_at).getTime() : now
   return Math.max(0, Math.round((end - new Date(rec.started_at).getTime()) / 60000))
+}
+
+// ════════════════════════════════════════════════════════════
+// 运营数据的 T+1 规则（2026-10-30 老板定）
+// ════════════════════════════════════════════════════════════
+// 老板 10-29 原话：
+//   「事实上我们没有办法当天确认小红书的具体人数，除非上班到凌晨 12 点，
+//     只有第二天才能确认第一天具体咨询人数」
+//   「我发完当天的小红书，顺手就可以看昨天的人数，非常简单，流畅的操作」
+//
+// 以前要求当天填当天的咨询数 —— 那个数在当天【物理上不存在】。
+// 结果只有两条路：瞎填一个，或者空着交不了日报。
+// 14 天里只有 29% 的日报交上来，根子在这儿，不在人。
+//
+// 改成：日报还是今天的，但【运营数据那一块填昨天的】。
+//   当天填：出勤打卡、小红书评论条数、问题·想改进
+//   填昨天：各平台咨询数、加微信人数
+//
+// ⚠️ 统一，没有例外。老板 10-30：「朋友圈当天当然是最好，
+//    但是为了整体改成统一的不是更好吗」—— 一半当天一半隔天，
+//    每个人每天都要先想一下「这个号是哪天的」，那才是真的会填错。
+export const OPS_LAG_DAYS = 1
+
+/** 这份日报要收哪一天的运营数据。日报日期 - 1 天。 */
+export function opsDateFor(dateStr) {
+  return addDays(dateStr, -OPS_LAG_DAYS)
+}
+
+/**
+ * 补填上限：各角色最多能往回填几天。
+ *
+ * 老板 10-30：「经理最多可以补前天订单，我就可以随便一点，
+ *               客服哪里暂时就次天填写就好了」
+ *
+ * 数字是【log_date 最多比今天早几天】：
+ *   cs / ops  1 → 只能填昨天（正常节奏，没有补的余地）
+ *   manager   2 → 能补到前天（她要兜客服漏掉的）
+ *   admin   不限 → 老板补缺口，而且周六的小红书本来就归他
+ *
+ * ⚠️ 真正的闸门在数据库函数 save_inquiry 里，这里只是不显示输入框。
+ *    前端挡一道是为了别让人填完才被拒；挡不住的那一道在库里。
+ */
+export const OPS_BACKFILL_DAYS = { admin: null, manager: 2, cs: 1, ops: 1, worker: 0 }
+
+/** 这个角色现在还能不能填 logDate 这天的运营数据。 */
+export function opsCanEdit(logDate, today, role) {
+  if (!logDate || !today) return false
+  if (logDate > today) return false                 // 未来的数谁都没有
+  const limit = OPS_BACKFILL_DAYS[role]
+  if (limit === null || limit === undefined) return role === 'admin'
+  return logDate >= addDays(today, -limit)
+}
+
+/**
+ * 超期没填的日子 —— 只给老板看。
+ *
+ * 老板 10-30：「他那里超期没有不写，那我的后台要有提示了」
+ * 过了期限的日子不再占客服的待办（她已经填不了了，一直挂着只是噪音），
+ * 但缺口不能就这么消失 —— 它变成老板后台里的一条提示。
+ *
+ * @param inquiries 这段日期范围内的全部登记（任何人填的都算）
+ * @returns [{ date, missing: [account], }]，按日期倒序
+ */
+export function opsOverdue(channelAccounts, inquiries, today, days = 14) {
+  const need = (channelAccounts || []).filter(a => a.status === 'active')
+  if (!need.length) return []
+  const out = []
+  // 从「已经超过所有人补填上限」的那天往前数：今天 - 3 天起算
+  //（manager 能补到 T-2，所以 T-3 才算真的超期）
+  const maxLag = Math.max(...Object.values(OPS_BACKFILL_DAYS).filter(Boolean))
+  for (let i = maxLag + 1; i <= days; i++) {
+    const d = addDays(today, -i)
+    const done = new Set((inquiries || [])
+      .filter(x => String(x.log_date) === d).map(x => x.account_id))
+    const missing = need.filter(a => !done.has(a.id))
+    if (missing.length) out.push({ date: d, missing })
+  }
+  return out
 }
 
 /**

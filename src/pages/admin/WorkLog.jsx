@@ -9,10 +9,11 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
-import { sydneyToday, addDays, sydneyDateOf } from '../../utils/date'
+import { sydneyToday, addDays, sydneyDateOf, weekdayOf } from '../../utils/date'
 import { currentSeason, tzGapHours } from '../../utils/shifts'
 import {
   requiredAccounts, myChannels, ownsAccount, inquiryProgress, myPerformance, weeklyVideo, weekRange,
+  opsDateFor, opsCanEdit, opsOverdue,
 } from '../../utils/worklog'
 import { myEditsToday, weekOutput } from '../../utils/content'
 import { Plus, Check } from 'lucide-react'
@@ -25,12 +26,14 @@ const hhmm = iso => iso
   : '—'
 const money = n => `$${(Number(n) || 0).toFixed(2)}`
 
+const WD = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+
 export default function WorkLog() {
   const {
     user, orders, config, staff,
     getWorkday, upsertWorkLog, saveInquiry, addPost, getPolicyText,
     addChannelAccount, updateChannelAccount, deleteChannelAccount, channelUsage,
-    listWorkLogReturns, pendingReturns, getContentRange, openDays, logBackfill,
+    listWorkLogReturns, pendingReturns, getContentRange, openDays, logBackfill, getInquiryWeek,
   } = useApp()
   const navigate = useNavigate()
   // ⚠️ 默认今天。只有【被退回的日子】可以切过去改 ——
@@ -45,6 +48,12 @@ export default function WorkLog() {
   const [backfillReason, setBackfillReason] = useState('')  // 进入补录时填的原因，顶上一直显示
   const editingPast = date !== today
   const [day, setDay] = useState({ logs: [], breaks: [], inquiries: [], posts: [] })
+  // ⚠️ 2026-10-30 T+1：这份日报收的【运营数据】是前一天的。
+  //    老板 10-29：「事实上我们没有办法当天确认小红书的具体人数」——
+  //    那个数当天物理上不存在，以前逼人当天填，只能瞎填或者空着交不了。
+  //    所以这一页要同时装两天：今天的出勤/评论/问题 + 昨天的咨询/加微信。
+  const opsDate = opsDateFor(date)
+  const [opsDay, setOpsDay] = useState({ logs: [], breaks: [], inquiries: [], posts: [] })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [, setTick] = useState(0)
@@ -56,15 +65,32 @@ export default function WorkLog() {
   const [extraAdd, setExtraAdd] = useState(false)
   const [content, setContent] = useState({ slots: [], items: [] })
   const [openD, setOpenD] = useState([])
+  const [overdue, setOverdue] = useState([])   // 超期没人登记的日子（只有老板看）
 
-  const refresh = useCallback(async () => setDay(await getWorkday(date)), [getWorkday, date])
+  // 两天一起刷 —— 咨询存在昨天那一天，不一起刷的话填完数字原地不变
+  const refresh = useCallback(async () => {
+    const [d, o] = await Promise.all([getWorkday(date), getWorkday(opsDate)])
+    setDay(d); setOpsDay(o)
+  }, [getWorkday, date, opsDate])
   useEffect(() => {
     let alive = true
-    ;(async () => { const d = await getWorkday(date); if (alive) setDay(d) })()
+    ;(async () => {
+      const [d, o] = await Promise.all([getWorkday(date), getWorkday(opsDate)])
+      if (alive) { setDay(d); setOpsDay(o) }
+    })()
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date])
   useEffect(() => { getPolicyText().then(setPolicy) /* eslint-disable-next-line */ }, [])
+  // 超期未登记 —— 老板 10-30：「他那里超期没有不写，那我的后台要有提示了」
+  // 过了期限的日子不再占客服的待办，但缺口不能就这么消失，它落到这里。
+  // ⚠️ 只有 admin 拉这份数据 —— 别人看了也没用，还多一次请求。
+  useEffect(() => {
+    if (user?.role !== 'admin') return
+    getInquiryWeek(addDays(today, -21), today)
+      .then(rows => setOverdue(opsOverdue(config.channelAccounts, rows, today)))
+    // eslint-disable-next-line
+  }, [today, user?.role, config.channelAccounts])
   // 被经理退回过就要看到原因，否则她不知道该改哪里
   useEffect(() => { listWorkLogReturns(date, date).then(setReturns) /* eslint-disable-next-line */ }, [date])
   useEffect(() => { pendingReturns(addDays(today, -14)).then(setPending) /* eslint-disable-next-line */ }, [today, date])
@@ -86,13 +112,20 @@ export default function WorkLog() {
     // ⚠️ 这里不能用下面的 isBoss / backfillMode —— 它们声明在后面，
     //    写进依赖数组就是 TDZ 白屏（之前栽过一次）。所以内联算。
     // 最后那个参数＝补录模式：别人填过的号就算填了，不要求老板再填一遍。
-    () => inquiryProgress(config.channelAccounts, day.inquiries, date, user?.id,
+    () => inquiryProgress(config.channelAccounts, opsDay.inquiries, opsDate, user?.id,
       user?.role === 'admin', user?.role === 'admin' && date !== today),
-    [config.channelAccounts, day.inquiries, date, user?.id, user?.role, today])
+    [config.channelAccounts, opsDay.inquiries, opsDate, date, user?.id, user?.role, today])
   const perf = useMemo(() => myPerformance(orders, user?.id, date), [orders, user?.id, date])
+  // 漏斗三段必须同一天才有意义：咨询和加微信都是昨天的，下单也取昨天的。
+  // 否则「昨天问了 20 个 / 今天下了 3 单」这个百分比算出来是假的。
+  const opsPerf = useMemo(() => myPerformance(orders, user?.id, opsDate), [orders, user?.id, opsDate])
   const wk = weekRange(date)
   const video = weeklyVideo(day.posts, wk.from, wk.to)
-  const adds = mine?.wechat_adds ?? null
+  // 加微信人数跟着咨询一起挪到昨天 —— 咨询→加微信→下单是一条漏斗，
+  // 分母在昨天分子在今天，这个转化率就是假的。存在【昨天那一行】，
+  // 所以周月汇总不用改一行代码，日期本来就是对的。
+  const opsMine = opsDay.logs.find(l => l.staff_id === user?.id)
+  const adds = opsMine?.wechat_adds ?? null
   const isManager = user?.role === 'admin' || user?.role === 'manager'
   // 老板两边都管，而且他是唯一要检查客服那张卡长什么样的人 —— 看不到就没法验。
   // 所以三档：客服只看小红书、经理只看企业开发、老板两个都看（都不卡他）。
@@ -134,7 +167,21 @@ export default function WorkLog() {
   //    ⚠️ 只对 admin 的补录放开（backfillMode），客服和经理一点没松。
   const backfillMode = isBoss && editingPast
   const clockOk = backfillMode || !!mine?.clock_in
-  const canSubmit = clockOk && prog.ok && commentOk && issuesOk && (!policy.truth_declaration || truth)
+
+  // ── 昨天那块数据，现在还轮得到我填吗 ──────────────────────
+  // 老板 10-30 定的三档：客服只能填昨天、经理能补到前天、老板不限。
+  // ⚠️ 前端只管「显不显示输入框」。真正拦住的是数据库函数 save_inquiry ——
+  //    前端有 bug 也绕不过去，这条规矩从第一版起就没变过。
+  const opsEditable = opsCanEdit(opsDate, today, user?.role)
+  // 昨天我在岗吗 —— 用「有没有打卡记录」判断，不另外去拉排班表。
+  // 周一打开日报，昨天是周日她根本没上班，不该因为周日的小红书没人填
+  // 就卡住她周一的日报。Annie 周末休，周六的小红书老板 10-30 说他自己管。
+  const workedOps = !!opsDay.logs.find(l => l.staff_id === user?.id)?.clock_in
+  // 超期的日子不再占她的待办 —— 她已经填不了了，一直挂着只是噪音。
+  // 缺口不会消失：它变成老板后台「超期未登记」里的一条（老板 10-30 要的提示）。
+  const opsRequired = opsEditable && (workedOps || backfillMode)
+  const canSubmit = clockOk && (!opsRequired || prog.ok)
+    && commentOk && issuesOk && (!policy.truth_declaration || truth)
   const submitted = !!mine?.submitted_at
 
   return (
@@ -275,7 +322,7 @@ export default function WorkLog() {
 
       {/* ── 平台咨询登记 ──────────────────────── */}
       <div id="inquiry-section" className="scroll-mt-4" />
-      <Card title="平台咨询登记" hint="每个触点每天逐个检查，填你自己接待的人数。今天 0 个也要登记 —— 填 0 就行，不填不算。前面几个是发内容的号；老客户回访和企业客户预订是客人来的别的路子，一样要记。归别人管的号只显示对方填了多少，你不用填。左边显示你在「今天发了什么」里登记的内容，不用重复填。鼠标移到行上，右边 ✕ 可以删掉这个号">
+      <Card title={`平台咨询登记 · ${opsDate}（${WD[weekdayOf(opsDate)]}）`} hint="填的是【昨天】的人数 —— 平台上的咨询要到第二天才数得准，这是老板 10-30 定的。每个触点逐个检查，填你自己接待的。昨天 0 个也要登记 —— 填 0 就行，不填不算。前面几个是发内容的号；老客户回访和企业客户预订是客人来的别的路子，一样要记。归别人管的号只显示对方填了多少，你不用填。左边显示你在「今天发了什么」里登记的内容，不用重复填。鼠标移到行上，右边 ✕ 可以删掉这个号">
         <div className="space-y-1.5">
           {/* ⚠️ 2026-10-20 老板：「经理看不到小红书迁喜和盼达的登记，
               我想大家同步都可以看到」。
@@ -292,7 +339,7 @@ export default function WorkLog() {
             //    所以经理不会因为小红书没填而交不了日报。
             const mine = ownsAccount(a, user?.id, isBoss) || isManager
             // 只显示自己填的 —— 两个人在岗时各填各的
-            const rec = day.inquiries.find(i => i.account_id === a.id && i.staff_id === user?.id)
+            const rec = opsDay.inquiries.find(i => i.account_id === a.id && i.staff_id === user?.id)
             // 归别人管的号：显示【所有其他人】填了多少，只读。
             // ⚠️ 2026-10-22：原来只看负责人（owner_staff_id）填了没有 ——
             //    老板自己填了迁喜 6、盼达 2，小洁那边却显示「归 Annie 填 · 还没填」。
@@ -304,13 +351,13 @@ export default function WorkLog() {
             //    永远看到一个空框 —— 以为没人填，再填一遍，合计就翻倍。
             //    咨询登记是按人存的，两个人各填 1，公司总数就是 2。
             //    所以不管归谁，别人填过的都要摆在他眼前。
-            const theirs = day.inquiries.filter(i => i.account_id === a.id && i.staff_id !== user?.id)
+            const theirs = opsDay.inquiries.filter(i => i.account_id === a.id && i.staff_id !== user?.id)
             const theirSum = theirs.reduce((n, i) => n + (Number(i.count) || 0), 0)
             const theirWho = [...new Set(theirs.map(i =>
               staff?.find?.(x => x.id === i.staff_id)?.name || i.staff_id))].join('、')
             const ownerName = staff?.find?.(x => x.id === a.owner_staff_id)?.name
               || a.owner_staff_id || '公共'
-            const myPosts = day.posts.filter(p => p.account_id === a.id && p.posted_by === user?.id)
+            const myPosts = opsDay.posts.filter(p => p.account_id === a.id && p.posted_by === user?.id)
             const planned = a.status !== 'active'
             const done = !!rec
             // 老板 10-13：「删除或更改某一条信息」—— 每行要能改也能删，
@@ -376,7 +423,7 @@ export default function WorkLog() {
                             {myPosts[0].kind === 'video' ? '🎬' : '📝'} {myPosts[0].title || '（没写标题）'}
                             {myPosts.length > 1 && ` 等 ${myPosts.length} 条`}
                           </span>
-                        : <span className="text-gray-300">今天没登记发布</span>}
+                        : <span className="text-gray-300">昨天没登记发布</span>}
                     </span>
                     {/* 别人已经填过的 —— 摆在输入框左边，填之前一眼看得到，
                         免得又填一遍把合计顶成两倍 */}
@@ -385,11 +432,18 @@ export default function WorkLog() {
                         ? <span className="text-green-700 font-semibold">{theirWho}已填 {theirSum}</span>
                         : <span className="text-gray-300">归 {ownerName}</span>}
                     </span>
-                    <input type="number" min="0" step="1" placeholder="待填"
-                      defaultValue={rec?.count ?? ''}
-                      onBlur={e => { if (e.target.value !== '') run(() => saveInquiry(date, a.id, e.target.value)) }}
-                      className={`w-20 border rounded-lg px-2 py-1 text-sm font-mono text-right outline-none focus:border-red-400 shrink-0 ${
-                        done ? 'border-green-200 bg-green-50' : 'border-amber-300 bg-amber-50'}`} />
+                    {opsEditable ? (
+                      <input type="number" min="0" step="1" placeholder="待填"
+                        defaultValue={rec?.count ?? ''}
+                        onBlur={e => { if (e.target.value !== '') run(() => saveInquiry(opsDate, a.id, e.target.value)) }}
+                        className={`w-20 border rounded-lg px-2 py-1 text-sm font-mono text-right outline-none focus:border-red-400 shrink-0 ${
+                          done ? 'border-green-200 bg-green-50' : 'border-amber-300 bg-amber-50'}`} />
+                    ) : (
+                      /* 过了补填期限 —— 看得到，改不了。谁能补多久见 OPS_BACKFILL_DAYS */
+                      <span className="w-20 text-right text-sm font-mono shrink-0 text-gray-400">
+                        {rec?.count ?? '—'}
+                      </span>
+                    )}
                   </>
                 )}
               </div>
@@ -421,22 +475,67 @@ export default function WorkLog() {
         )}
 
         <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100 text-sm">
-          <span className="text-gray-500">我今天接待合计</span>
+          <span className="text-gray-500">我昨天接待合计</span>
           <span className="font-mono font-bold text-lg">{prog.total} 人</span>
         </div>
-        {!prog.ok && (
+        {!prog.ok && opsRequired && (
           <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 mt-2">
-            ⚠️ 还差 {prog.missing.map(a => a.name).join('、')} 没登记 ——
-            {backfillMode ? '这几个号那天一个人都没登记，补上才能提交' : '填完才能提交日报、才能下班'}
+            ⚠️ {opsDate} 还差 {prog.missing.map(a => a.name).join('、')} 没登记 ——
+            {backfillMode ? '这几个号那天一个人都没登记，补上才能提交' : '填完才能提交今天的日报'}
+          </p>
+        )}
+        {/* 能看、不能填的两种情况，都要说清为什么，不然就是一张静悄悄的死表 */}
+        {!opsEditable && (
+          <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 mt-2">
+            {opsDate} 已经过了你的补填期限，这一天只能看不能改。
+            {user?.role === 'cs' && '客服只填前一天；'}
+            {user?.role === 'manager' && '经理最多补到前天；'}
+            漏掉的日子会出现在老板后台的「超期未登记」里。
+          </p>
+        )}
+        {opsEditable && !opsRequired && !prog.ok && (
+          <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 mt-2">
+            你{opsDate}没打卡（不在岗），这一天的登记不卡你的日报 —— 想补也可以直接填。
           </p>
         )}
       </Card>
 
-      {/* ── 今天接待多少、下单几个 ───────────────
+      {/* ── 超期未登记（只有老板看得到）───────────
+          老板 10-30 要的那条提示。客服／经理那边已经过了补填期限，
+          待办上不再催她们 —— 但账不能就这么平了，它出现在这里。
+          点一下直接跳到那天的补录。 */}
+      {isBoss && overdue.length > 0 && (
+        <Card title={`超期未登记 · ${overdue.length} 天`}
+          hint="这些日子已经过了客服和经理的补填期限，她们填不了了。只有你能补。空着也行，但周月汇总里这几天的转化率就是假的">
+          <div className="space-y-1.5">
+            {overdue.slice(0, 10).map(o => (
+              <div key={o.date} className="flex items-center gap-2.5 flex-wrap bg-amber-50 rounded-xl px-3 py-2">
+                <span className="text-sm font-mono font-semibold text-amber-900">{o.date}</span>
+                <span className="text-xs text-gray-500">（{WD[weekdayOf(o.date)]}）</span>
+                <span className="text-xs text-gray-600 flex-1 min-w-0">
+                  缺 {o.missing.map(a => a.name).join('、')}
+                </span>
+                <button className="text-xs font-semibold text-red-700 underline shrink-0"
+                  onClick={() => setBackfill({ date: addDays(o.date, 1), reason: `补 ${o.date} 的运营数据` })}>
+                  我来补
+                </button>
+              </div>
+            ))}
+            {overdue.length > 10 && (
+              <p className="text-xs text-gray-400 pt-1">还有 {overdue.length - 10} 天没列出来</p>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {/* ── 昨天接待多少、下单几个 ───────────────
            老板 10-12：「我们需要了解的主要东西是今天客服一共接待了多少人，
            下单几个」—— 这是整页最重要的一行，不该拆在两张卡片里。 */}
       <div className="bg-white rounded-2xl p-4 shadow-sm">
-        <h2 className="font-bold text-gray-900 text-sm mb-3">今天接待了多少 · 下了几单</h2>
+        <h2 className="font-bold text-gray-900 text-sm mb-3">
+          昨天接待了多少 · 下了几单
+          <span className="ml-2 text-xs font-normal text-gray-400">{opsDate}（{WD[weekdayOf(opsDate)]}）</span>
+        </h2>
         <div className="flex items-center gap-1.5 sm:gap-3">
           {/* 老板 10-12/13 两次反馈：先是「写了手填但点不动」，
               改成跳转后又说「只是希望在我接待那里点选填写」——
@@ -451,23 +550,27 @@ export default function WorkLog() {
             onClick={() => setQuickFill(v => !v)} />
           <Arrow />
           <Big label="加微信" value={adds} unit="人" tag="手填" accent
-            sub={prog.total > 0 && adds != null ? `平台来的留下 ${Math.round(adds / prog.total * 100)}%` : '微信今天新增好友'}
+            sub={prog.total > 0 && adds != null ? `平台来的留下 ${Math.round(adds / prog.total * 100)}%` : '昨天微信新增好友'}
             onClick={() => document.getElementById('wechat-adds')?.focus()} />
           <Arrow />
-          <Big label="下单" value={perf.booked} unit="单" tag="自动"
-            sub={adds > 0 ? `加微信的成了 ${Math.round(perf.booked / adds * 100)}%` : '你今天建的单'} />
+          {/* ⚠️ 这里取 opsPerf 不是 perf —— 三段必须同一天。
+              分母是昨天的咨询，分子拿今天的单，算出来的转化率是假的。 */}
+          <Big label="下单" value={opsPerf.booked} unit="单" tag="自动"
+            sub={adds > 0 ? `加微信的成了 ${Math.round(opsPerf.booked / adds * 100)}%` : '昨天你建的单'} />
         </div>
 
         {/* 实际接待 —— 一个数，不分平台 */}
         <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100">
-          <span className="text-sm text-gray-600 shrink-0">今天微信加了几个人</span>
+          <span className="text-sm text-gray-600 shrink-0">昨天微信加了几个人</span>
           <input id="wechat-adds" type="number" min="0" step="1" placeholder="待填"
-            defaultValue={mine?.wechat_adds ?? ''}
-            onBlur={e => { if (e.target.value !== '') run(() => upsertWorkLog(date, { wechat_adds: Number(e.target.value) })) }}
+            key={`adds-${opsDate}-${opsMine?.wechat_adds ?? ''}`}
+            defaultValue={opsMine?.wechat_adds ?? ''}
+            disabled={!opsEditable}
+            onBlur={e => { if (e.target.value !== '') run(() => upsertWorkLog(opsDate, { wechat_adds: Number(e.target.value) })) }}
             className={`w-24 border rounded-lg px-2 py-1 text-sm font-mono text-right outline-none focus:border-red-400 shrink-0 ${
               adds != null ? 'border-green-200 bg-green-50' : 'border-amber-300 bg-amber-50'}`} />
           <span className="text-xs text-gray-400 flex-1 min-w-0">
-            这是<b>实际接待</b> —— 真的加上「迁喜生活服务」的人。
+            这是<b>实际接待</b> —— 昨天真的加上「迁喜生活服务」的人。
             平台上问了但没加的不算，那部分流失正是要看的
           </span>
         </div>
@@ -475,7 +578,7 @@ export default function WorkLog() {
         {quickFill && (
           <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
             {prog.need.map(a => {
-              const rec = day.inquiries.find(i => i.account_id === a.id && i.staff_id === user?.id)
+              const rec = opsDay.inquiries.find(i => i.account_id === a.id && i.staff_id === user?.id)
               return (
                 <div key={a.id} className="flex items-center gap-3">
                   <span className="text-xs text-gray-400 w-10 shrink-0">{a.platform}</span>
@@ -483,14 +586,15 @@ export default function WorkLog() {
                   <span className="text-xs text-gray-400 flex-1 truncate min-w-0">{a.positioning}</span>
                   <input type="number" min="0" step="1" placeholder="待填"
                     defaultValue={rec?.count ?? ''}
-                    onBlur={e => { if (e.target.value !== '') run(() => saveInquiry(date, a.id, e.target.value)) }}
+                    disabled={!opsEditable}
+                    onBlur={e => { if (e.target.value !== '') run(() => saveInquiry(opsDate, a.id, e.target.value)) }}
                     className={`w-20 border rounded-lg px-2 py-1 text-sm font-mono text-right outline-none focus:border-red-400 shrink-0 ${
                       rec ? 'border-green-200 bg-green-50' : 'border-amber-300 bg-amber-50'}`} />
                 </div>
               )
             })}
             <p className="text-xs text-gray-400 pt-1">
-              今天 0 个也要填 0 —— 空着不算登记。未开通的号在下面的登记表里，这里不显示
+              填的是 <b>{opsDate}</b> 的数。昨天 0 个也要填 0 —— 空着不算登记。未开通的号在下面的登记表里，这里不显示
             </p>
           </div>
         )}
@@ -503,11 +607,13 @@ export default function WorkLog() {
             这对复购是直接伤害。单数才是她真实的产出。 */}
         <div className="grid grid-cols-2 gap-3 mt-4 pt-3 border-t border-gray-100">
           <Stat label="今天搬的（我接的）" value={`${perf.served} 单`} />
+          <Stat label="今天你建的单" value={`${perf.booked} 单`} />
           {isManager && <Stat label="完成金额" value={money(perf.servedAmount)} />}
         </div>
         <p className="text-xs text-gray-400 mt-2 leading-relaxed">
-          <b>两个数要你填</b>：平台咨询（分平台登记）和加微信人数。
-          微信、小红书里发生的事系统看不见，只能你报。<br />
+          <b>两个数要你填</b>：平台咨询（分平台登记）和加微信人数，
+          填的都是 <b>昨天（{opsDate}）</b> 的 ——
+          平台上的咨询要第二天才数得准，当天填只能靠猜。<br />
           「下单」和「今天搬的」都是系统按你的账号自动算的，不用管。
           多数单几天后才搬，所以「今天搬的」和「今天下单的」不是同一批。
         </p>
@@ -727,15 +833,15 @@ export default function WorkLog() {
               className="w-full text-white font-bold py-3 rounded-xl disabled:opacity-40"
               style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
               {!clockOk ? '先打上班卡'
-                : !prog.ok ? `提交今日记录 · 还差 ${prog.missing.length} 个平台`
+                : (opsRequired && !prog.ok) ? `提交今日记录 · 昨天还差 ${prog.missing.length} 个平台`
                 : !commentOk ? `小红书评论还差 ${quota - commentCount} 条`
                 : !issuesOk ? '还没写今天的问题 · 想改进的地方'
                 : !truth && policy.truth_declaration ? '请先勾选上面的确认'
                 : '提交今日记录'}
             </button>
-            {!prog.ok && (
+            {opsRequired && !prog.ok && (
               <p className="text-xs text-gray-400 text-center mt-2">
-                7 个触点逐个登记完才能提交 —— 0 个咨询也要填 0
+                昨天（{opsDate}）那几个触点逐个登记完才能提交 —— 0 个咨询也要填 0
               </p>
             )}
           </>

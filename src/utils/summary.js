@@ -9,7 +9,7 @@
 
 import { hourlyRateFor } from './wageRates'
 import { participants } from './reconcile'
-import { sydneyDateOf } from './date'
+import { sydneyDateOf, addDays } from './date'
 
 const num = v => Number(v) || 0
 const inRange = (d, from, to) => d && String(d) >= from && String(d) <= to
@@ -209,10 +209,13 @@ export function gaps(opts) {
   }
 
   // 平台漏登记
+  // ⚠️ 2026-10-30 T+1：咨询数是【第二天】填的，所以昨天那天还不算漏 ——
+  //    她今天才填。往前错一天判断，否则每天早上都会凭空多出一条假告警。
+  const inqPast = past.filter(d => d < addDays(today, -1))
   const need = (accounts || []).filter(a => a.status === 'active')
   for (const a of need) {
-    const miss = past.filter(d =>
-      (orders || []).length >= 0 && !(inquiries || []).some(i => i.account_id === a.id && String(i.log_date) === d))
+    const miss = inqPast.filter(d =>
+      !(inquiries || []).some(i => i.account_id === a.id && String(i.log_date) === d))
     if (miss.length) out.push({ sev: 'mid', text: `${a.name} 漏登记 ${miss.length} 天咨询数` })
   }
 
