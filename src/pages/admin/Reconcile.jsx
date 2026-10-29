@@ -412,6 +412,10 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, o
         return String(v ?? '') !== String(cur ?? '')
       }))
   const nChanges = Object.keys(changes).length
+  // 填了其他费用就必须写清是什么 —— 没有说明的费用，三周后和凭空多出一个数字没区别
+  const needOtherNote =
+    Number(draft.otherFee ?? order.otherFee ?? 0) !== 0 &&
+    !String(draft.otherFeeNote ?? order.otherFeeNote ?? '').trim()
   const impactRaw = nChanges ? impactOf(order, changes, staffRates) : null
   // 有改动但金额工时都没动（比如只改了收款方式）→ 不显示空的影响框
   const impact = impactRaw && (impactRaw.wages.length
@@ -571,6 +575,20 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, o
                         : `$${unitPriceOf(order, f.key, b2b)}/${f.unit}`}
                     </span>
                   )}
+                  {/* 老板 10-29：「我希望再加一条其他费用，加备注」
+                      ⚠️ 备注不是可选项 —— 一笔没有说明的「其他费用」，
+                         三周后翻回来和凭空多出一个数字没有区别。
+                         所以只要填了金额，备注框就出现在旁边。 */}
+                  {f.key === 'otherFee' && Number(draft.otherFee ?? order.otherFee ?? 0) !== 0 && (
+                    <input
+                      value={draft.otherFeeNote ?? order.otherFeeNote ?? ''}
+                      onChange={e => edit('otherFeeNote', e.target.value)}
+                      placeholder="这笔是什么？（必填）—— 例：垃圾处理费、临时买胶带"
+                      className={`border rounded-lg px-2 py-1 text-sm w-full outline-none focus:border-red-400 ${
+                        String(draft.otherFeeNote ?? order.otherFeeNote ?? '').trim()
+                          ? 'border-gray-200' : 'border-red-300 bg-red-50'}`}
+                    />
+                  )}
                   </div>
                 </Fragment>
               )
@@ -605,6 +623,9 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, o
                 <Line label={b.method === 'transfer' ? 'GST 10%' : 'GST（现金不收）'} value={money(b.gst)}
                   dim={b.gst === 0} />
                 <Line label="定金" value={b.deposit ? `−${money(b.deposit)}` : money(0)} dim={!b.deposit} />
+                {b.other !== 0 && (
+                  <Line label={`其他费用${b.otherNote ? `（${b.otherNote}）` : ''}`} value={money(b.other)} />
+                )}
                 <Line label="优惠" value={b.discount ? `−${money(b.discount)}` : money(0)} dim={!b.discount} />
                 <div className="border-t border-gray-200 mt-1.5 pt-1.5">
                   <Line label="实收金额" value={money(b.total)} bold />
@@ -644,13 +665,16 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, o
             <input value={reason} onChange={e => setReason(e.target.value)}
               placeholder="补录原因（会留痕）"
               className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-red-400 outline-none" />
+            {/* ⚠️ 填了其他费用就必须写清是什么 —— 和「跳过要填原因」「退回要填原因」
+                同一条规矩：做不到／说不清的事可以做，但要留下为什么。 */}
             <button
-              disabled={!nChanges || disabled}
+              disabled={!nChanges || disabled || needOtherNote}
               onClick={() => onSave(changes, reason)}
               className={`rounded-lg text-white font-bold disabled:opacity-30 shrink-0 transition-all ${
                 nChanges ? 'px-6 py-2.5 text-sm shadow-md' : 'px-4 py-2 text-sm'}`}
               style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
-              {nChanges ? `保存这 ${nChanges} 项改动` : '保存'}
+              {needOtherNote ? '其他费用要写清是什么'
+                : nChanges ? `保存这 ${nChanges} 项改动` : '保存'}
             </button>
           </div>
           {nChanges > 0 && (

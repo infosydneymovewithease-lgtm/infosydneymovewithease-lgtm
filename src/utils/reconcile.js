@@ -148,6 +148,9 @@ export const RECONCILE_FIELDS = [
   // 老板 10-21：师傅端的「九折/九五折」改成固定金额优惠（$10/$20），
   // 超过 $20 要先打电话给客服说明缘由，由客服或经理在这里填。
   // 历史上师傅按比例给出去最大一笔是 $120 —— 比例在大单上没有上限。
+  // ⚠️ 其他费用必须配备注 —— 一笔没有说明的「其他费用」，三周后翻回来
+  //    和凭空多出一个数字没有区别。备注的输入框在界面上紧跟这一行。
+  { key: 'otherFee',      label: '其他费用', type: 'money' },
   { key: 'discountAmount', label: '优惠',    type: 'money' },
   { key: 'finalAmount',   label: '实收金额', type: 'money' },
 ]
@@ -216,6 +219,10 @@ export function feeToQty(order, key, fee, b2bCustomers) {
 export const SUMMED_FEES = [
   'timeFee', 'returnFee', 'stairFee', 'overtimeFee',
   'heavyFee', 'highwayFee', 'parkingFee', 'suppliesFee', 'fuelFee',
+  // 老板 10-29：「我希望再加一条其他费用，加备注」
+  // 现场总有不属于固定类目的开销（过路、垃圾处理、临时买材料、客人加的活）。
+  // 没有这一项的话只能硬塞进某个类目，塞进去就再也看不出那是什么钱了。
+  'otherFee',
 ]
 
 const num = v => (v === '' || v === null || v === undefined) ? 0 : (Number(v) || 0)
@@ -296,8 +303,10 @@ export function breakdown(order, draft = {}) {
   //    优惠【不参与 GST】—— 税基是优惠前的金额。
   //    （先减优惠再算税会少交一点 GST，但老板要的是客人更好理解的算法。）
   const discount = get('discountAmount')
+  const other = get('otherFee')
+  const otherNote = pick(order, draft, 'otherFeeNote') || ''
   return {
-    fees, van, sub, gst, deposit, discount, method,
+    fees, van, sub, gst, deposit, discount, other, otherNote, method,
     total: Math.round((sub + gst - deposit - discount) * 100) / 100,
     people: v?.people || 1,
   }

@@ -1285,6 +1285,7 @@ const EDIT_FIELDS = [
   { key: 'parkingFee',  label: '停车违规费' },
   { key: 'suppliesFee', label: '物资费' },
   { key: 'fuelFee',     label: '油费' },
+  { key: 'otherFee',       label: '其他费用' },
   { key: 'discountAmount', label: '优惠（减）' },
 ]
 
@@ -1306,6 +1307,9 @@ function EditBillModal({ order, onClose, onSave }) {
     + num('returnFee') + num('stairFee') + num('overtimeFee')
     + num('heavyFee') + num('highwayFee') + num('parkingFee')
     + num('suppliesFee') + num('fuelFee')
+    // 其他费用（2026-10-29）—— 三处算钱的地方口径必须一致：
+    // utils/pricing.js（师傅端）· utils/reconcile.js（对账）· 这里（订单详情）
+    + num('otherFee')
     - vanDiscount
   // ⚠️ 2026-10-21 老板定的口径：「总金额 + GST − 定金 − 优惠」
   //    优惠【不参与 GST】—— 税基是优惠前的金额。三处要一致：
