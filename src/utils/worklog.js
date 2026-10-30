@@ -14,6 +14,7 @@
 
 import { currentSeason, toMinutes, toHHMM, isWorkingOn } from './shifts'
 import { sydneyDateOf, addDays } from './date'
+import { BACKLOG_FROM } from '../config/features'
 
 /**
  * 某天该开放哪几段休息。
@@ -140,10 +141,16 @@ export function opsCanEdit(logDate, today, role) {
  * 过了期限的日子不再占客服的待办（她已经填不了了，一直挂着只是噪音），
  * 但缺口不能就这么消失 —— 它变成老板后台里的一条提示。
  *
+ * ⚠️ since 是硬下限。老板 10-23 定过「之前的不管，从今天开始」——
+ *    不设这条线的话，他一打开日报就看到一串 10 月中旬的旧账，
+ *    那是他明确说过不追的。翻出来只会让这张卡被当成噪音忽略掉，
+ *    而它要管的是【从今往后】别再漏。
+ *
  * @param inquiries 这段日期范围内的全部登记（任何人填的都算）
+ * @param since     不早于这天（默认 BACKLOG_FROM）
  * @returns [{ date, missing: [account], }]，按日期倒序
  */
-export function opsOverdue(channelAccounts, inquiries, today, days = 14) {
+export function opsOverdue(channelAccounts, inquiries, today, days = 14, since = BACKLOG_FROM) {
   const need = (channelAccounts || []).filter(a => a.status === 'active')
   if (!need.length) return []
   const out = []
@@ -152,6 +159,7 @@ export function opsOverdue(channelAccounts, inquiries, today, days = 14) {
   const maxLag = Math.max(...Object.values(OPS_BACKFILL_DAYS).filter(Boolean))
   for (let i = maxLag + 1; i <= days; i++) {
     const d = addDays(today, -i)
+    if (since && d < since) break
     const done = new Set((inquiries || [])
       .filter(x => String(x.log_date) === d).map(x => x.account_id))
     const missing = need.filter(a => !done.has(a.id))
