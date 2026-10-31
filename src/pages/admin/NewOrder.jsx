@@ -39,11 +39,14 @@ const SERVICE_TYPES = ['搬家', '寄存', 'IKEA 提货', '清洁服务', '二�
 const VEHICLE_KEYS = Object.keys(VEHICLES)
 const SOURCES = ['官网', '微信', '小红书', '抖音', 'TikTok', '转介绍', '师傅内部介绍', '商业合作', '电话', '其他']
 const FRAGILE_OPTIONS = ['大理石桌', '玻璃餐桌', '鱼缸', '镜子', '艺术品', '高端家具', '钢琴', '大电视(65寸+)', '易损柜体', '其他']
-const DISCOUNT_OPTIONS = [
-  { label: '无折扣', value: 1 },
-  { label: '九五折 (5%)', value: 0.95 },
-  { label: '九折 (10%)', value: 0.9 },
-]
+// ⚠️ 2026-10-31 老板：建单取消折扣。两个理由，各自独立：
+//   ①「师傅和客服不需要那么大的优惠权利」—— 九折在 $500 的单上是 $50，
+//      比例折扣在大单上没有上限，而建单时根本看不出自己送出去多少钱。
+//   ②「九折实际上运用特别少，给别人这样折扣又多、结果也不是整数，很麻烦」
+// 优惠统一改成固定金额，由【师傅端 $10/$20】或【每日对账】填，超过 $20 要老板批。
+// 原来这里的百分比折扣还有个更糟的毛病：它只是把 quote 直接乘小，
+// discount 这个值【根本没写进数据库】—— 单子存进去就是个折后价，
+// 谁批的、为什么、原价多少，一概查不到。
 
 // Aligned with customer-side MoveBooking
 const MATERIAL_PRICES = { boxes: 5, mattressCovers: 10, wrapItems: 3, packingItems: 5 }
@@ -143,7 +146,6 @@ export default function NewOrder() {
     deposit: 30,
     depositStatus: '',   // '' | 'paid' | 'pending' | 'unpaid'
     depositPaid: false,
-    discount: 1,
     paymentMethod: 'cash',
     status: '待确认',
   })
@@ -301,7 +303,6 @@ export default function NewOrder() {
   const vanDiscount = form.vehicle === '面包车' ? VAN_PROMO_DISCOUNT : 0
   const suggestedQuote = baseQuote + remote.total + materialsCost + stairsFee + heavyFeeNum - vanDiscount
   const finalQuote = parseFloat(form.quote) || suggestedQuote
-  const discountedQuote = Math.round(finalQuote * form.discount)
 
   const customerLevel = existingCustomer ? getCustomerLevel(existingCustomer.orderCount) : null
 
@@ -328,7 +329,7 @@ export default function NewOrder() {
       stairsFee > 0 ? `+ 楼梯 $${stairsFee}` : null,
       heavyFeeNum > 0 ? `+ 重物 $${heavyFeeNum}` : null,
       materialsCost > 0 ? `+ 物资 $${materialsCost}` : null,
-      discountedQuote !== suggestedQuote ? `折后 $${discountedQuote}起` : `= $${discountedQuote}起`,
+      `= $${finalQuote}起`,
     ].filter(Boolean).join(' ') : ''
 
     // Reuse existing customer_code if any; otherwise generate fresh archive code
@@ -442,7 +443,7 @@ export default function NewOrder() {
         heavyItems: form.heavyItems || {},
         heavyDescription: form.heavyDescription || null,
         materialsCost,
-        quote: discountedQuote,
+        quote: finalQuote,
         quoteNote: form.quoteNote || autoQuoteNote,
         fragileEstimatedFee: parseFloat(form.fragileEstimatedFee) || 0,
       }
@@ -498,7 +499,6 @@ export default function NewOrder() {
       deposit: 30,
       depositStatus: '',
       depositPaid: false,
-      discount: 1,
       paymentMethod: 'cash',
       status: '待确认',
     })
@@ -1424,19 +1424,7 @@ export default function NewOrder() {
                 className={inputCls}
               />
             </Field>
-            <Field label="折扣">
-              <select value={form.discount} onChange={e => set('discount', parseFloat(e.target.value))} className={selectCls}>
-                {DISCOUNT_OPTIONS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
-              </select>
-            </Field>
           </div>
-
-          {form.discount < 1 && (
-            <div className="bg-green-50 border border-green-200 rounded-xl px-3 py-2 text-sm flex justify-between">
-              <span className="text-green-700">折后金额</span>
-              <span className="text-green-700 font-bold">${discountedQuote}</span>
-            </div>
-          )}
 
           {!isB2B && (
             <div className="grid grid-cols-2 gap-3">

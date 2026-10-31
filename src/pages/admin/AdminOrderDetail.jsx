@@ -1142,6 +1142,7 @@ export default function AdminOrderDetail() {
       {showEditBill && (
         <EditBillModal
           order={order}
+          isAdmin={user?.role === 'admin'}
           onClose={() => setShowEditBill(false)}
           onSave={(updates, reason) => {
             updateOrder(id, {
@@ -1289,7 +1290,7 @@ const EDIT_FIELDS = [
   { key: 'discountAmount', label: '优惠（减）' },
 ]
 
-function EditBillModal({ order, onClose, onSave }) {
+function EditBillModal({ order, isAdmin, onClose, onSave }) {
   const initial = Object.fromEntries(
     EDIT_FIELDS.map(f => [f.key, String(order[f.key] ?? 0)])
   )
@@ -1322,7 +1323,14 @@ function EditBillModal({ order, onClose, onSave }) {
   const finalAmount = Math.round((subtotalBeforeDiscount + gst - depositSub - discountSub) * 100) / 100
 
   const finalReason = reasonPreset === '其他' ? reason.trim() : reasonPreset
-  const canSave = !!finalReason
+  // 老板 10-31：「超过 20 刀需要我批准更好」。
+  // ⚠️ 只在【改大】时拦 —— 历史上已经存着 $50 的单，经理还是要能改别的项，
+  //    拦住一个她根本没动过的旧值，等于把这张单锁死。
+  const DISCOUNT_CAP = 20
+  const discountOverCap = !isAdmin
+    && num('discountAmount') > DISCOUNT_CAP
+    && num('discountAmount') > (Number(order.discountAmount) || 0)
+  const canSave = !!finalReason && !discountOverCap
 
   function handleSave() {
     if (!canSave) return
@@ -1464,7 +1472,7 @@ function EditBillModal({ order, onClose, onSave }) {
             disabled={!canSave}
             className="flex-1 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
-            保存修改
+            {discountOverCap ? `优惠超过 $${DISCOUNT_CAP} 要老板批` : '保存修改'}
           </button>
         </div>
       </div>

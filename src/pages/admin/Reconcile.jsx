@@ -79,7 +79,7 @@ function composeDT(order, key, hhmm, draft) {
 }
 
 export default function Reconcile() {
-  const { orders, staffRates, staff, reconcileOrder, undoReconcile, closeDay, reopenDay,
+  const { user, orders, staffRates, staff, reconcileOrder, undoReconcile, closeDay, reopenDay,
           getReconcile, markReconciled, unmarkReconciled, markAllReconciled, b2bCustomers } = useApp()
   // 从「团队今日」的「去对账」跳过来时带着 ?date= ——
   // 老板定的流程是第二天早上核前一天，落地页必须直接是那一天，
@@ -241,7 +241,7 @@ export default function Reconcile() {
             staffRates={staffRates} staff={staff} medians={medians}
             checkedBy={checked.find(c => c.order_id === o.id)} b2b={b2bCustomers}
             open={openId === o.id} onToggle={() => setOpenId(openId === o.id ? null : o.id)}
-            disabled={busy}
+            disabled={busy} isAdmin={user?.role === 'admin'}
             onSave={(changes, reason) => run(() => reconcileOrder(o.id, date, changes, reason))}
             onCheck={v => run(() => v ? markReconciled(o.id, date) : unmarkReconciled(o.id))}
             onDirty={n => setDirty(d => (d[o.id] || 0) === n ? d : { ...d, [o.id]: n })} />
@@ -359,7 +359,7 @@ function Stat({ label, value, good, warn, sub }) {
 
 // key 里带了 open 状态 —— 开合时组件重新挂载，草稿自然清空。
 // 比用 effect 清 state 干净：没有「渲染完再 setState」那一拍级联渲染。
-function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, open, onToggle, onSave, onCheck, onDirty, disabled }) {
+function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, open, onToggle, onSave, onCheck, onDirty, disabled, isAdmin }) {
   const [draft, setDraft] = useState({})
   // auto 记录哪些值是系统算出来的（而不是人手敲的）——
   // 界面上标「自动」，并且后续重算时可以放心覆盖它们
@@ -416,6 +416,14 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, o
   const needOtherNote =
     Number(draft.otherFee ?? order.otherFee ?? 0) !== 0 &&
     !String(draft.otherFeeNote ?? order.otherFeeNote ?? '').trim()
+  // 老板 10-31：「超过 20 刀需要我批准更好」。
+  // 师傅端只有 $10/$20 两个按钮，天然超不过；能填任意数的就是这里和订单详情。
+  // ⚠️ 只在【改大】时拦。历史上已经存着 $50 的单，经理照样要能对账 ——
+  //    拦住一个她没动过的旧值，等于把那天的账锁死。
+  const DISCOUNT_CAP = 20
+  const discountNow = Number(draft.discountAmount ?? order.discountAmount ?? 0)
+  const discountWas = Number(order.discountAmount ?? 0)
+  const discountOverCap = !isAdmin && discountNow > DISCOUNT_CAP && discountNow > discountWas
   const impactRaw = nChanges ? impactOf(order, changes, staffRates) : null
   // 有改动但金额工时都没动（比如只改了收款方式）→ 不显示空的影响框
   const impact = impactRaw && (impactRaw.wages.length
@@ -568,6 +576,28 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, o
                       </span>
                     )
                   })()}
+                  {/* 老板 10-31：优惠改成固定金额，$10/$20 两档，超过 $20 只有老板能批。
+                      和师傅端那三个按钮保持一模一样 —— 两边口径不一致就会有人按自己那套填。 */}
+                  {f.key === 'discountAmount' && (() => {
+                    const cur = Number(draft.discountAmount ?? order.discountAmount ?? 0)
+                    return (
+                      <span className="flex items-center gap-1 shrink-0">
+                        {[['0', '无'], ['10', '$10'], ['20', '$20']].map(([v, l]) => (
+                          <button key={v} onClick={() => edit('discountAmount', v)}
+                            className={`text-xs rounded px-2 py-0.5 border whitespace-nowrap transition-colors ${
+                              cur === Number(v)
+                                ? 'border-red-400 bg-red-50 text-red-700 font-semibold'
+                                : 'border-gray-200 text-gray-400 hover:text-gray-600'}`}>
+                            {l}
+                          </button>
+                        ))}
+                        <span className={`text-xs whitespace-nowrap ${
+                          discountOverCap ? 'text-red-700 font-semibold' : 'text-gray-300'}`}>
+                          {discountOverCap ? '超 $20 要老板批' : isAdmin ? '更多←左边框填' : '更多要老板批'}
+                        </span>
+                      </span>
+                    )
+                  })()}
                   {f.type === 'qty' && (
                     <span className="text-xs text-gray-400 whitespace-nowrap w-28 shrink-0">
                       {qty[f.key]
@@ -668,12 +698,13 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, o
             {/* ⚠️ 填了其他费用就必须写清是什么 —— 和「跳过要填原因」「退回要填原因」
                 同一条规矩：做不到／说不清的事可以做，但要留下为什么。 */}
             <button
-              disabled={!nChanges || disabled || needOtherNote}
+              disabled={!nChanges || disabled || needOtherNote || discountOverCap}
               onClick={() => onSave(changes, reason)}
               className={`rounded-lg text-white font-bold disabled:opacity-30 shrink-0 transition-all ${
                 nChanges ? 'px-6 py-2.5 text-sm shadow-md' : 'px-4 py-2 text-sm'}`}
               style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
               {needOtherNote ? '其他费用要写清是什么'
+                : discountOverCap ? `优惠超过 $${DISCOUNT_CAP} 要老板批`
                 : nChanges ? `保存这 ${nChanges} 项改动` : '保存'}
             </button>
           </div>
