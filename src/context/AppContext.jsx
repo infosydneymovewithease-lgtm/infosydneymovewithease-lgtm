@@ -1010,6 +1010,30 @@ export function AppProvider({ children }) {
     bg(supabase.from('orders').update(pickOrder(patch)).eq('id', orderId), '工作计时同步')
   }
 
+  // 【收工 10-31】点「结束」必须等服务器确认 —— async + throw，不走 bg()。
+  //
+  // 2026-10-31 Yo-yo 那单（QX2610075）：师傅端显示已完成，对账却是「10:00–缺结束」。
+  // 原因就是收工走的 updateOrderTimer → bg()「发了不管」：
+  // 界面先翻成「工作结束」，「填写账单」按钮立刻跳出来，
+  // 网络抖一下 workEndedAt 没进库，师傅照样把账单交了，单子变已完成。
+  //
+  // 对比太刺眼：开始那一头是 7/13 做的并发闸门（条件原子写、等结果、抢不到会同步真实状态），
+  // 结束这一头跟「备注」是同一个级别的次要写 —— 而收工时间是算工资的输入。
+  //
+  // ⚠️ 失败时【把本地状态退回去】。不退的话界面还显示「工作结束」，
+  //    师傅照样能进账单页，等于什么都没堵住。
+  async function stopWork(orderId, patch) {
+    const snapshot = orders.find(o => o.id === orderId)
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...patch } : o))
+    const { error } = await supabase.from('orders')
+      .update(pickOrder(patch)).eq('id', orderId)
+    if (error) {
+      if (snapshot) setOrders(prev => prev.map(o => o.id === orderId ? snapshot : o))
+      console.error('[Supabase] stopWork failed:', error)
+      throw new Error(error.message || '收工时间没存上，请再点一次结束')
+    }
+  }
+
   // 派单 — async + throw 版
   // Why: 派单失败不能让客服误以为派出去了，导致漏单
   // 老板 10-15：「这个派单管理我感觉大家都没怎么用过似的」
@@ -1283,6 +1307,7 @@ export function AppProvider({ children }) {
       config, updateChannelAccount, updateStaffSchedule,
       reconcileOrder, undoReconcile, closeDay, reopenDay, getReconcile,
       markReconciled, unmarkReconciled, markAllReconciled,
+      stopWork,
       getWorkday, upsertWorkLog, startBreak, endBreak, saveInquiry, addPost, deletePost, getInquiryWeek,
       getPeriodData, getSummaryNote, saveSummaryNote,
       getPolicyText, confirmTeamDay, getTeamConfirm, addChannelAccount, deleteChannelAccount, channelUsage,

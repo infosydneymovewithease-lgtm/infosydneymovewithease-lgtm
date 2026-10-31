@@ -10,7 +10,7 @@ import { ArrowLeft, Upload, X } from 'lucide-react'
 export default function FormPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { orders, completeOrder, updateOrder } = useApp()
+  const { orders, completeOrder, updateOrder, stopWork } = useApp()
   const order = orders.find(o => o.id === id)
   const v = VEHICLES[order?.vehicle]
 
@@ -28,6 +28,26 @@ export default function FormPage() {
   })
   const startTime = order?.workStartedAt
   const endTime = order?.workEndedAt
+  // 【兜底 10-31】收工时间是空的就不让交单。
+  // Yo-yo QX2610075：界面显示「工作结束」、账单交了、单子已完成，
+  // 库里 workEndedAt 却是空的 —— 对账那边只能报「缺结束」，谁也说不清几点收的工。
+  // ⚠️ 不自动补一个时间进去。凭空写「现在」正是 QX2608021 变成 $21,364 的那个坑。
+  //    让师傅自己点一下，点的是真实动作。
+  // ⚠️ workEndedAt【不参与算钱】—— 工时取的是计时器累计秒数（elapsed）。
+  //    所以补记它不会改金额，只是把「几点收的工」这条记录补上。
+  const needEndTime = !!startTime && !endTime
+  const [fixingEnd, setFixingEnd] = useState(false)
+  const [fixEndErr, setFixEndErr] = useState('')
+  async function recordEndNow() {
+    if (fixingEnd) return
+    setFixingEnd(true); setFixEndErr('')
+    try {
+      await stopWork(id, { workStatus: 'stopped', workRunStartedAt: null,
+                           workEndedAt: new Date().toISOString() })
+    } catch (err) {
+      setFixEndErr(err.message || '还是没存上，换个网络再试')
+    } finally { setFixingEnd(false) }
+  }
 
   // 回程费
   const [returnFee, setReturnFee] = useState(String(snapReturn ?? ''))
@@ -617,13 +637,27 @@ export default function FormPage() {
               ⚠️ {submitError}
             </div>
           )}
+          {needEndTime && (
+            <div className="mb-2 px-3 py-2.5 rounded-lg bg-red-50 border-2 border-red-300 text-red-800 text-sm">
+              <b>⚠️ 这单的收工时间没存上</b>
+              <p className="text-xs mt-1 leading-relaxed">
+                刚才点「结束」的时候网络没通。金额和工时不受影响，
+                但要补一下几点收的工，不然对账那边对不上。
+              </p>
+              <button onClick={recordEndNow} disabled={fixingEnd}
+                className="mt-2 w-full bg-red-600 text-white py-2.5 rounded-lg font-bold text-sm disabled:opacity-50">
+                {fixingEnd ? '保存中…' : '补记收工时间（现在）'}
+              </button>
+              {fixEndErr && <p className="text-xs mt-1.5">{fixEndErr}</p>}
+            </div>
+          )}
           <button
             onClick={handleSubmit}
-            disabled={(paymentMethod === 'transfer' && !transferScreenshot) || submitting}
+            disabled={(paymentMethod === 'transfer' && !transferScreenshot) || submitting || needEndTime}
             className="w-full text-white py-4 rounded-xl font-bold text-base active:opacity-90 disabled:opacity-40"
             style={{ background: 'linear-gradient(135deg, #8B1A1A, #c0392b)' }}
           >
-            {submitting ? '提交中…' : '确认提交'}
+            {needEndTime ? '先补记收工时间' : submitting ? '提交中…' : '确认提交'}
           </button>
         </div>
       )}

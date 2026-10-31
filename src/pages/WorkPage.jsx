@@ -12,12 +12,14 @@ import { ArrowLeft, Play, Pause, StopCircle, Clock, CheckCircle } from 'lucide-r
 export default function WorkPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { orders, updateOrderTimer, startWork, finishWorkWithCorrection, user } = useApp()
+  const { orders, updateOrderTimer, startWork, stopWork, finishWorkWithCorrection, user } = useApp()
   const order = orders.find(o => o.id === id)
   const [startNote, setStartNote] = useState('')
   const [starting, setStarting] = useState(false)
   // 补填弹窗。fix = { order, mode }；mode: 'gate'（上一单挡着）| 'late'（这单结束得太晚）
   const [fix, setFix] = useState(null)
+  const [stopping, setStopping] = useState(false)
+  const [stopErr, setStopErr] = useState('')
 
   // 计时状态上云：直接读订单行的 work* 字段，靠 realtime 同步给同组师傅
   // 用墙上时钟时间差计算，免疫手机锁屏 JS 暂停 bug
@@ -93,7 +95,7 @@ export default function WorkPage() {
       workRunStartedAt: new Date().toISOString(),
     })
   }
-  function handleStop() {
+  async function handleStop() {
     // 【迟到的结束 10/11】计时超过 14 小时才点结束 —— 几乎必然是忘了点。
     // 这时候不能静默写「现在」当收工时间，那就是 QX2608021 变成 $21,364 的原因。
     // 数据说明必须单独挡这一条：那 10 单跑飞的里只有 3 单会被开工闸门拦到，
@@ -102,13 +104,26 @@ export default function WorkPage() {
       setFix({ order, mode: 'late' })
       return
     }
-    // 同样把最后一段折进去，并记录真实收工时间
-    updateOrderTimer(id, {
-      workStatus: 'stopped',
-      workAccumulatedSec: computeElapsed({ accumulatedSec, runStartedAt }),
-      workRunStartedAt: null,
-      workEndedAt: new Date().toISOString(),
-    })
+    // 同样把最后一段折进去，并记录真实收工时间。
+    // ⚠️ 10-31 改成等服务器确认（stopWork 而不是 updateOrderTimer）——
+    //    收工时间是算工资的输入，不能用「发了不管」的写法。
+    //    Yo-yo QX2610075 就是这么丢的：界面翻成「工作结束」、账单也交了，
+    //    库里 workEndedAt 还是空的，对账报「缺结束」。
+    if (stopping) return
+    setStopping(true); setStopErr('')
+    try {
+      await stopWork(id, {
+        workStatus: 'stopped',
+        workAccumulatedSec: computeElapsed({ accumulatedSec, runStartedAt }),
+        workRunStartedAt: null,
+        workEndedAt: new Date().toISOString(),
+      })
+    } catch (err) {
+      // 失败就停在原地 —— 计时继续跑，「填写账单」不会出现，师傅只能再点一次
+      setStopErr(err.message || '收工时间没存上，请再点一次结束')
+    } finally {
+      setStopping(false)
+    }
   }
   function handleGoForm() { navigate(`/order/${id}/form`) }
 
@@ -251,15 +266,24 @@ export default function WorkPage() {
                 </div>
               )}
 
+              {/* 收工没存上 —— 必须说清「还没结束」，不然师傅以为完了就走了 */}
+              {stopErr && (
+                <div className="bg-red-50 border-2 border-red-300 rounded-xl p-3 text-red-800 text-sm text-center">
+                  <b>收工时间没存上，这单还没结束</b><br />
+                  {stopErr}<br />
+                  <span className="text-xs text-red-600">换个网络或等几秒，再点一次「结束」</span>
+                </div>
+              )}
+
               {status === 'running' && (
                 <div className="grid grid-cols-2 gap-3">
                   <button onClick={handlePause}
                     className="bg-amber-500 text-white py-4 rounded-xl font-semibold text-base flex items-center justify-center gap-2 hover:bg-amber-600 transition-colors">
                     <Pause size={20} />暂停
                   </button>
-                  <button onClick={handleStop}
-                    className="bg-red-600 text-white py-4 rounded-xl font-semibold text-base flex items-center justify-center gap-2 hover:bg-red-700 transition-colors">
-                    <StopCircle size={20} />结束
+                  <button onClick={handleStop} disabled={stopping}
+                    className="bg-red-600 text-white py-4 rounded-xl font-semibold text-base flex items-center justify-center gap-2 hover:bg-red-700 transition-colors disabled:opacity-50">
+                    <StopCircle size={20} />{stopping ? '保存中…' : '结束'}
                   </button>
                 </div>
               )}
@@ -270,9 +294,9 @@ export default function WorkPage() {
                     className="bg-green-600 text-white py-4 rounded-xl font-semibold text-base flex items-center justify-center gap-2 hover:bg-green-700 transition-colors">
                     <Play size={20} />继续
                   </button>
-                  <button onClick={handleStop}
-                    className="bg-red-600 text-white py-4 rounded-xl font-semibold text-base flex items-center justify-center gap-2 hover:bg-red-700 transition-colors">
-                    <StopCircle size={20} />结束
+                  <button onClick={handleStop} disabled={stopping}
+                    className="bg-red-600 text-white py-4 rounded-xl font-semibold text-base flex items-center justify-center gap-2 hover:bg-red-700 transition-colors disabled:opacity-50">
+                    <StopCircle size={20} />{stopping ? '保存中…' : '结束'}
                   </button>
                 </div>
               )}
