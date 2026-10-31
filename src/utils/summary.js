@@ -229,7 +229,14 @@ export function gaps(opts) {
     (Date.now() - new Date(o.completedAt)) / 3600000 > 48)
   if (unpaid.length) {
     const amt = unpaid.reduce((s, o) => s + num(o.finalAmount), 0)
-    out.push({ sev: 'mid', text: `${unpaid.length} 单完成超 48 小时未收款，合计 $${amt.toFixed(2)}` })
+    // ⚠️ 必须写出是哪几单。老板 10-31 看到这条第一句话就是「那两个订单？」——
+    //    一条催账提示不告诉你催谁，等于逼人去数据库里查，那就没人会去查。
+    const who = unpaid
+      .map(o => `${o.orderNo || o.id}（${o.customerName || '?'} $${num(o.finalAmount).toFixed(0)}）`)
+      .slice(0, 5).join('、')
+    out.push({ sev: 'mid',
+      text: `${unpaid.length} 单完成超 48 小时未收款，合计 $${amt.toFixed(2)} —— ${who}`
+            + (unpaid.length > 5 ? ' 等' : '') })
   }
 
   // 费率未录入
