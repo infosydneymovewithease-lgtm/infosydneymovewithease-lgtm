@@ -89,7 +89,7 @@ export function todayTasks(ctx) {
   t.push({
     // ⚠️ 2026-10-30 T+1：填的是【昨天】的数。标签里必须把日期写出来 ——
     //    不写的话她会以为是今天的，而今天的数当天根本还没发生。
-    key: 'inquiry', label: `平台咨询登记${inquiryDate ? `（${inquiryDate}）` : ''}`,
+    key: 'inquiry', label: inquiryDate ? `登记【昨天】的平台咨询（${inquiryDate}）` : '平台咨询登记',
     state: inquiryOk ? S.done : S.todo,
     hint: inquiryOk ? null
       : `昨天的数 · 还差 ${(inquiryMissing || []).length} 个平台 · 0 个也要填 0`,

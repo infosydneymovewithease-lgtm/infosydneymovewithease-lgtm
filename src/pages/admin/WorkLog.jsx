@@ -322,7 +322,20 @@ export default function WorkLog() {
 
       {/* ── 平台咨询登记 ──────────────────────── */}
       <div id="inquiry-section" className="scroll-mt-4" />
-      <Card title={`平台咨询登记 · ${opsDate}（${WD[weekdayOf(opsDate)]}）`} hint="填的是【昨天】的人数 —— 平台上的咨询要到第二天才数得准，这是老板 10-30 定的。每个触点逐个检查，填你自己接待的。昨天 0 个也要登记 —— 填 0 就行，不填不算。前面几个是发内容的号；老客户回访和企业客户预订是客人来的别的路子，一样要记。归别人管的号只显示对方填了多少，你不用填。左边显示你在「今天发了什么」里登记的内容，不用重复填。鼠标移到行上，右边 ✕ 可以删掉这个号">
+      <Card title={`填【昨天】的平台咨询 · ${opsDate} ${WD[weekdayOf(opsDate)]}`} hint="填的是【昨天】的人数 —— 平台上的咨询要到第二天才数得准，这是老板 10-30 定的。每个触点逐个检查，填你自己接待的。昨天 0 个也要登记 —— 填 0 就行，不填不算。前面几个是发内容的号；老客户回访和企业客户预订是客人来的别的路子，一样要记。归别人管的号只显示对方填了多少，你不用填。左边显示你在「今天发了什么」里登记的内容，不用重复填。鼠标移到行上，右边 ✕ 可以删掉这个号">
+        {/* ⚠️ 客服 11-02 第一次用就误判成故障：「今天是 2 号，这个系统还停留在 1 号的内容」。
+            满屏日期都是昨天，而标题只写了个日期 —— 换谁都会以为系统卡住了。
+            这一条要顶在最上面，而且必须把「不是卡住了」这句话直说出来。 */}
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2.5 mb-3 text-sm leading-relaxed">
+          <b className="text-blue-900">这里填的是昨天（{opsDate} {WD[weekdayOf(opsDate)]}）的数，不是今天的。</b>
+          <span className="text-blue-800">
+            {' '}今天（{date}）的咨询数<b>明天再填</b> —— 平台上的私信和新增关注要到第二天才数得准。
+            <br />
+            <span className="text-blue-600 text-xs">
+              这不是系统卡住了。10-30 起改的规矩：打卡、小红书评论、问题反馈还是填今天，只有咨询数和加微信填昨天。
+            </span>
+          </span>
+        </div>
         <div className="space-y-1.5">
           {/* ⚠️ 2026-10-20 老板：「经理看不到小红书迁喜和盼达的登记，
               我想大家同步都可以看到」。
@@ -533,8 +546,10 @@ export default function WorkLog() {
            下单几个」—— 这是整页最重要的一行，不该拆在两张卡片里。 */}
       <div className="bg-white rounded-2xl p-4 shadow-sm">
         <h2 className="font-bold text-gray-900 text-sm mb-3">
-          昨天接待了多少 · 下了几单
-          <span className="ml-2 text-xs font-normal text-gray-400">{opsDate}（{WD[weekdayOf(opsDate)]}）</span>
+          <b>昨天</b>接待了多少 · 下了几单
+          <span className="ml-2 text-xs font-normal text-gray-400">
+            {opsDate} {WD[weekdayOf(opsDate)]} · 今天的明天填
+          </span>
         </h2>
         <div className="flex items-center gap-1.5 sm:gap-3">
           {/* 老板 10-12/13 两次反馈：先是「写了手填但点不动」，

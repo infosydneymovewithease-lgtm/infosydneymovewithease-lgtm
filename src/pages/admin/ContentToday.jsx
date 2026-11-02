@@ -484,8 +484,8 @@ function InquiryBox({ date, today, role, accounts, staffId, getWorkday, saveInqu
   return (
     <div className="bg-white rounded-2xl p-4 shadow-sm">
       <h2 className="font-bold text-sm">
-        昨天来了几个咨询
-        <span className="ml-2 text-xs font-normal text-gray-400">{date}</span>
+        填【昨天】来了几个咨询
+        <span className="ml-2 text-xs font-normal text-gray-400">{date} · 今天的明天填</span>
       </h2>
       <p className="text-xs text-gray-400 mt-0.5 mb-3 leading-relaxed">
         填 <b className="text-gray-500">昨天（{date}）</b>问搬家的人数，你自己接待的那部分。
