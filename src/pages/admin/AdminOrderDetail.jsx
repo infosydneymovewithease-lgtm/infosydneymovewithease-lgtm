@@ -1560,7 +1560,26 @@ function EditOrderModal({ order, onClose, onSave }) {
               {!MOVING_VEHICLES.includes(vehicle) && vehicle && <option value={vehicle}>{vehicle}</option>}
               {MOVING_VEHICLES.map(v => <option key={v} value={v}>{v}</option>)}
             </select>
-            <p className="text-xs text-gray-400 mt-1">改车型不影响最终账单（账单按实际工时计）</p>
+            {/* ⚠️ 原来这里写的是「改车型不影响最终账单（账单按实际工时计）」——
+                那句话是反的。账单 = 工时 × 【车型单价】，改车型当然影响账单，
+                只是系统不会自动重算。QX2610062 就栽在这上面：
+                2 人大卡车改成小卡三人，时间费 $720 = 6 × $120 原封不动留着，
+                而 $120 是大卡车的价，小卡三人是 $160。
+                这句「放心改」的提示正是出错的由来。
+                ⚠️ 不自动重算是对的 —— 师傅跟客人谈的 $150 会被标准价 $160 冲掉。
+                   要做的是把真相说出来，让人知道改完还得去对账核一遍。 */}
+            {vehicle !== order.vehicle && VEHICLES[vehicle] && VEHICLES[order.vehicle] ? (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 mt-1.5 leading-relaxed">
+                ⚠️ 单价从 <b>${VEHICLES[order.vehicle].hourlyRate}/小时</b> 变成
+                <b> ${VEHICLES[vehicle].hourlyRate}/小时</b>，
+                但<b>已经算好的时间费不会自动重算</b>。
+                这单如果已经交过账单，改完要去「每日对账」核一遍时间费。
+              </p>
+            ) : (
+              <p className="text-xs text-gray-400 mt-1">
+                账单 = 实际工时 × 车型单价。改了车型，已算好的时间费不会自动重算
+              </p>
+            )}
           </div>
 
           {/* 时段 */}

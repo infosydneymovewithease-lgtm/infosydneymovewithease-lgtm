@@ -50,6 +50,37 @@ export function detectIssues(order, { medians = {}, staffRates = [], hoursFactor
       `计费 ${order.billedHours} 小时，远超${order.vehicle}常规（中位 ${med} 小时）`)
   }
 
+  // ── 时间费按错车型算了（2026-11-02）────────────────────────
+  //
+  // QX2610062：2 人大卡车现场改成小卡三人，时间费 $720 = 6 × $120 原封不动留着 ——
+  // $120 是【大卡车(2人)】的价，小卡三人是 $160。老板原话：
+  //   「现在不合理就是人是 3 人单，但是按 2 人大车的方式核算」
+  //
+  // 根子在 EditOrderModal：改车型只存 vehicle，时间费/回程/楼梯单价一分钱都不重算，
+  // 而且没有任何提示。
+  //
+  // ⚠️ 为什么不自动重算：师傅跟客人谈的是 $150/小时，标准价是 $160。
+  //    自动重算会把谈好的价冲掉 —— 那比算错更难发现。
+  //
+  // ⚠️ 为什么只在「正好等于另一个车型的单价」时才报：
+  //    谈出来的 $150 不等于任何车型的标准价，不该报。
+  //    而 $120 精确命中大卡车 —— 这不是巧合，是按错车型算的铁证。
+  //    用「和标准价不一样就报」的话，每一单谈过价的都会天天亮红，
+  //    红字一多人就不看红字了，真正跑飞的那单也跟着被忽略。
+  if (order.billedHours > 0 && num(order.timeFee) > 0 && order.vehicle) {
+    const perHour = num(order.timeFee) / Number(order.billedHours)
+    const mine = VEHICLES[order.vehicle]?.hourlyRate
+    if (mine && Math.abs(perHour - mine) >= 1) {
+      const hit = Object.entries(VEHICLES)
+        .find(([name, v]) => name !== order.vehicle && Math.abs(v.hourlyRate - perHour) < 1)
+      if (hit) {
+        add('high', 'wrongVehicleRate',
+          `时间费按 $${perHour.toFixed(0)}/小时 算的 —— 那是「${VEHICLES[hit[0]].label}」的价，`
+          + `这单是${order.vehicle}（$${mine}/小时）。多半是改过车型没重算`)
+      }
+    }
+  }
+
   if (order.status === '已完成' && !order.paymentMethod) add('high', 'noPayMethod', '没标收款方式')
 
   if (order.status === '已完成' && order.paymentStatus !== 'paid' && order.completedAt) {
