@@ -47,7 +47,11 @@ export default function DailyProgress() {
 
   const log = day.logs.find(l => l.staff_id === user?.id)
   const accounts = requiredAccounts(config.channelAccounts, user?.id, user?.role === 'admin')
-  const prog = inquiryProgress(accounts, opsDay.inquiries, opsDate, user?.id)
+  // ⚠️ 2026-11-02：admin 看的是【全公司】有没有登记，不是他自己填了没有。
+  //    他不在排班里、本来就不接待咨询，按「他自己填的」算永远是 0，
+  //    待办会天天挂着一条他做不到也不该做的事。和「我的日报」同一个口径。
+  const prog = inquiryProgress(accounts, opsDay.inquiries, opsDate, user?.id,
+    user?.role === 'admin', user?.role === 'admin')
   // 过了补填期限就别再催了 —— 她已经填不了，天天亮红只会让人学会无视待办。
   // 缺口不会消失，它会出现在老板后台的「超期未登记」里。
   const opsEditable = opsCanEdit(opsDate, date, user?.role)

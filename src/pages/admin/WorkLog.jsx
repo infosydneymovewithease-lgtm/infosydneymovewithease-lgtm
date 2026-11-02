@@ -111,8 +111,15 @@ export default function WorkLog() {
     // ⚠️ 这里不能用下面的 isBoss / backfillMode —— 它们声明在后面，
     //    写进依赖数组就是 TDZ 白屏（之前栽过一次）。所以内联算。
     // 最后那个参数＝补录模式：别人填过的号就算填了，不要求老板再填一遍。
+    // ⚠️ 2026-11-02：最后那个 anyStaff 对 admin 【一律】为 true。
+    //    原来只在补录历史日时才给，于是老板打开自己的日报看到的是
+    //    「平台咨询 0 人 · 还差 5 个」—— 小洁明明已经全填了。
+    //    根子是两套口径：need 按 seeAll 算全部 7 个号，filled 只算他自己填的。
+    //    老板本来就不接待咨询（他不在排班里），自己填的永远是 0。
+    //    而往上滚到登记表，每一行都写着「小洁已填 N」—— 同一页两处互相矛盾。
+    //    对老板来说这个数是【全公司合计】，不是他个人的接待量。
     () => inquiryProgress(config.channelAccounts, opsDay.inquiries, opsDate, user?.id,
-      user?.role === 'admin', user?.role === 'admin' && date !== today),
+      user?.role === 'admin', user?.role === 'admin'),
     [config.channelAccounts, opsDay.inquiries, opsDate, date, user?.id, user?.role, today])
   const perf = useMemo(() => myPerformance(orders, user?.id, date), [orders, user?.id, date])
   // 漏斗三段必须同一天才有意义：咨询和加微信都是昨天的，下单也取昨天的。
@@ -487,7 +494,7 @@ export default function WorkLog() {
         )}
 
         <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100 text-sm">
-          <span className="text-gray-500">我昨天接待合计</span>
+          <span className="text-gray-500">{isBoss ? '全公司昨天接待合计' : '我昨天接待合计'}</span>
           <span className="font-mono font-bold text-lg">{prog.total} 人</span>
         </div>
         {!prog.ok && opsRequired && (
@@ -545,7 +552,7 @@ export default function WorkLog() {
            下单几个」—— 这是整页最重要的一行，不该拆在两张卡片里。 */}
       <div className="bg-white rounded-2xl p-4 shadow-sm">
         <h2 className="font-bold text-gray-900 text-sm mb-3">
-          <b>昨天</b>接待了多少 · 下了几单
+          <b>昨天</b>{isBoss ? '全公司' : ''}接待了多少 · 下了几单
           <span className="ml-2 text-xs font-normal text-gray-400">
             {opsDate} {WD[weekdayOf(opsDate)]} · 今天的明天填
           </span>
@@ -559,7 +566,8 @@ export default function WorkLog() {
               平台上有人问 → 真的加了微信 → 下单。
               中间那一跳的流失率才是有用的 —— 问了 20 个只加 5 个，
               说明文案或回复有问题。混成一个数就看不出来。 */}
-          <Big label="平台咨询" value={prog.total} unit="人" tag={quickFill ? '收起' : '点这里填'}
+          <Big label={isBoss ? '平台咨询（全公司）' : '平台咨询'}
+            value={prog.total} unit="人" tag={quickFill ? '收起' : '点这里填'}
             sub={prog.ok ? `${prog.need.length} 个平台都登记了` : `还差 ${prog.missing.length} 个`}
             onClick={() => setQuickFill(v => !v)} />
           <Arrow />
