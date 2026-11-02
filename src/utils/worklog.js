@@ -244,11 +244,24 @@ export function inquiryByStaff(inquiries, dateStr) {
  *   booked   我今天接了几单（她今天的产出）
  *   served   今天搬家且我建的单（那天的活，可能是上周接的）
  */
+/**
+ * ⚠️ staffId 传 null = 【全公司】。2026-11-02 老板问：
+ *    「这个不是自动吗，昨天她登记几单这里不应该显示吗」——
+ *    他看到「下单 0 单」，因为算的是【他自己】建的单。
+ *    老板不接单（他不在排班里），按他个人算永远是 0。
+ *    而旁边「平台咨询」已经改成全公司口径了 —— 一个漏斗混两套口径，
+ *    「全公司咨询 ÷ 你一个人的单」算出来的转化率是假的。
+ */
 export function myPerformance(orders, staffId, dateStr) {
+  // ⚠️ 必须是 === null，不能用 !staffId。
+  //    user 还没加载好时 user?.id 是 undefined，用 !staffId 的话
+  //    客服会瞬间看到全公司的数字 —— 一闪而过的越权，最难发现的那种。
+  //    undefined 走下面那条，谁都匹配不上，显示 0，安全。
+  const byMe = o => staffId === null || o.createdBy === staffId
   const booked = (orders || []).filter(o =>
-    o.createdBy === staffId && sydneyDateOf(o.createdAt) === dateStr && o.status !== '已取消')
+    byMe(o) && sydneyDateOf(o.createdAt) === dateStr && o.status !== '已取消')
   const served = (orders || []).filter(o =>
-    o.createdBy === staffId && String(o.date) === dateStr && o.status === '已完成')
+    byMe(o) && String(o.date) === dateStr && o.status === '已完成')
   return {
     booked: booked.length,
     bookedAmount: booked.reduce((s, o) => s + (Number(o.finalAmount) || Number(o.quote) || 0), 0),

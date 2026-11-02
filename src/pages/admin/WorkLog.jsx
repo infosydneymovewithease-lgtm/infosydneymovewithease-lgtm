@@ -121,17 +121,23 @@ export default function WorkLog() {
     () => inquiryProgress(config.channelAccounts, opsDay.inquiries, opsDate, user?.id,
       user?.role === 'admin', user?.role === 'admin'),
     [config.channelAccounts, opsDay.inquiries, opsDate, date, user?.id, user?.role, today])
-  const perf = useMemo(() => myPerformance(orders, user?.id, date), [orders, user?.id, date])
+  // ⚠️ 不能用 isBoss —— 它声明在后面，写进依赖数组就是 TDZ 白屏。内联。
+  //    老板看全公司（传 null），其他人看自己。
+  const perfWho = user?.role === 'admin' ? null : user?.id
+  const perf = useMemo(() => myPerformance(orders, perfWho, date), [orders, perfWho, date])
   // 漏斗三段必须同一天才有意义：咨询和加微信都是昨天的，下单也取昨天的。
   // 否则「昨天问了 20 个 / 今天下了 3 单」这个百分比算出来是假的。
-  const opsPerf = useMemo(() => myPerformance(orders, user?.id, opsDate), [orders, user?.id, opsDate])
+  const opsPerf = useMemo(() => myPerformance(orders, perfWho, opsDate), [orders, perfWho, opsDate])
   const wk = weekRange(date)
   const video = weeklyVideo(day.posts, wk.from, wk.to)
   // 加微信人数跟着咨询一起挪到昨天 —— 咨询→加微信→下单是一条漏斗，
   // 分母在昨天分子在今天，这个转化率就是假的。存在【昨天那一行】，
   // 所以周月汇总不用改一行代码，日期本来就是对的。
   const opsMine = opsDay.logs.find(l => l.staff_id === user?.id)
-  const adds = opsMine?.wechat_adds ?? null
+  // 老板看全公司合计（他自己那一行永远是空的）；其他人看自己填的
+  const adds = user?.role === 'admin'
+    ? (opsDay.logs.reduce((n, l) => n + (Number(l.wechat_adds) || 0), 0) || null)
+    : (opsMine?.wechat_adds ?? null)
   const isManager = user?.role === 'admin' || user?.role === 'manager'
   // 老板两边都管，而且他是唯一要检查客服那张卡长什么样的人 —— 看不到就没法验。
   // 所以三档：客服只看小红书、经理只看企业开发、老板两个都看（都不卡他）。
@@ -571,14 +577,16 @@ export default function WorkLog() {
             sub={prog.ok ? `${prog.need.length} 个平台都登记了` : `还差 ${prog.missing.length} 个`}
             onClick={() => setQuickFill(v => !v)} />
           <Arrow />
-          <Big label="加微信" value={adds} unit="人" tag="手填" accent
+          <Big label={isBoss ? '加微信（全公司）' : '加微信'} value={adds} unit="人"
+            tag={isBoss ? '客服填' : '手填'} accent
             sub={prog.total > 0 && adds != null ? `平台来的留下 ${Math.round(adds / prog.total * 100)}%` : '昨天微信新增好友'}
             onClick={() => document.getElementById('wechat-adds')?.focus()} />
           <Arrow />
           {/* ⚠️ 这里取 opsPerf 不是 perf —— 三段必须同一天。
               分母是昨天的咨询，分子拿今天的单，算出来的转化率是假的。 */}
-          <Big label="下单" value={opsPerf.booked} unit="单" tag="自动"
-            sub={adds > 0 ? `加微信的成了 ${Math.round(opsPerf.booked / adds * 100)}%` : '昨天你建的单'} />
+          <Big label={isBoss ? '下单（全公司）' : '下单'} value={opsPerf.booked} unit="单" tag="自动"
+            sub={adds > 0 ? `加微信的成了 ${Math.round(opsPerf.booked / adds * 100)}%`
+                          : isBoss ? '昨天全公司建的单' : '昨天你建的单'} />
         </div>
 
         {/* 实际接待 —— 一个数，不分平台 */}
@@ -628,8 +636,8 @@ export default function WorkLog() {
             表上天天挂着金额，她自然会往贵的车型引，而客人只需要小车。
             这对复购是直接伤害。单数才是她真实的产出。 */}
         <div className="grid grid-cols-2 gap-3 mt-4 pt-3 border-t border-gray-100">
-          <Stat label="今天搬的（我接的）" value={`${perf.served} 单`} />
-          <Stat label="今天你建的单" value={`${perf.booked} 单`} />
+          <Stat label={isBoss ? '今天搬的（全公司）' : '今天搬的（我接的）'} value={`${perf.served} 单`} />
+          <Stat label={isBoss ? '今天建的单（全公司）' : '今天你建的单'} value={`${perf.booked} 单`} />
           {isManager && <Stat label="完成金额" value={money(perf.servedAmount)} />}
         </div>
         <p className="text-xs text-gray-400 mt-2 leading-relaxed">
