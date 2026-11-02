@@ -45,6 +45,8 @@ const ORDER_COLUMNS = new Set([
   // workStatus: idle|running|paused|stopped；workStartedAt/EndedAt 是真实开工/收工时间
   // workStartedBy: 第一个按开始的师傅 id（并发提示用，7/13 加列）
   'workStatus','workStartedAt','workEndedAt','workAccumulatedSec','workRunStartedAt','workStartedBy',
+  // 核对备注（11-02）—— 和师傅写的 workerNote 分开两栏
+  'reconcileNote',
   // 师傅补填实际收工时间的留痕（10/11 加列）—— 补的时间是回忆出来的不是打卡打出来的，
   // 对账时必须能分辨，否则下个月没人知道该不该信这个数
   'endFixReason','endFixNote','endFixBy','endFixAt','endFixHoursLate',

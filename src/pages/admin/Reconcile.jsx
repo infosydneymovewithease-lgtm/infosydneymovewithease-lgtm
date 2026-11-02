@@ -691,6 +691,32 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, o
             </div>
           )}
 
+          {/* ── 两栏备注（老板 11-02）────────────────────────
+              「每个订单里都应该可以看到师傅的备注，也要可以自己备注」
+              ⚠️ 分成两栏，不合并。师傅写的是他在现场看到的，
+                 核账的人写的是他核完的结论 —— 谁说的话算谁的，
+                 混成一栏之后就再也分不清「师傅说」还是「我判断」。 */}
+          <div className="mt-3 grid sm:grid-cols-2 gap-2">
+            <div className="bg-gray-50 rounded-lg px-3 py-2">
+              <p className="text-xs text-gray-400 mb-1">师傅在交单时写的</p>
+              {order.workerNote
+                ? <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{order.workerNote}</p>
+                : <p className="text-sm text-gray-300">没写</p>}
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">
+                核对备注
+                <span className="text-gray-300 ml-1">（会留痕，写了就能保存）</span>
+              </p>
+              <textarea rows={2}
+                value={draft.reconcileNote ?? order.reconcileNote ?? ''}
+                onChange={e => edit('reconcileNote', e.target.value)}
+                placeholder="例：师傅微信确认 6 小时属实；客人少给 20 下次补"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none
+                           outline-none focus:border-red-400" />
+            </div>
+          </div>
+
           <div className="flex items-center gap-2 mt-3">
             <input value={reason} onChange={e => setReason(e.target.value)}
               placeholder="补录原因（会留痕）"
