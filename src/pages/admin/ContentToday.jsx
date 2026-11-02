@@ -15,7 +15,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useApp } from '../../context/AppContext'
-import { sydneyToday } from '../../utils/date'
+import { sydneyToday, hhmmIn } from '../../utils/date'
 import { todayToPost, bodyFor, SOURCE_LABEL } from '../../utils/content'
 import { requiredAccounts, opsDateFor, opsCanEdit } from '../../utils/worklog'
 import { uploadImage } from '../../utils/upload'
@@ -34,9 +34,8 @@ const dl = (u, name) => {
   return u + (u.includes('?') ? '&' : '?') + 'download=' + encodeURIComponent(name || 'cover.jpg')
 }
 
-const hhmm = iso => iso
-  ? new Date(iso).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
-  : ''
+// ⚠️ 一律按【悉尼】显示，不跟看的人的设备时区走 —— 理由见 utils/date.js hhmmIn
+const hhmm = iso => hhmmIn(iso, undefined, '')
 
 export default function ContentToday() {
   const { user, staff, config, getContentRange, markSlotPosted, getWorkday, saveInquiry,

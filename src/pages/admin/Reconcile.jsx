@@ -10,7 +10,7 @@
 import { useState, useEffect, useMemo, Fragment } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
-import { sydneyToday, addDays } from '../../utils/date'
+import { sydneyToday, addDays, hhmmIn } from '../../utils/date'
 import {
   vehicleMedians, detectIssues, impactOf, daySummary, participants, RECONCILE_FIELDS,
   deriveDraft, DERIVED_FIELDS, unitPriceOf, feeToQty, breakdown, STANDARD_DEPOSIT,
@@ -20,9 +20,8 @@ import {
 } from 'lucide-react'
 
 const money = n => `$${(Number(n) || 0).toFixed(2)}`
-const hhmm = iso => iso
-  ? new Date(iso).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
-  : null
+// ⚠️ 一律按【悉尼】显示，不跟看的人的设备时区走 —— 理由见 utils/date.js hhmmIn
+const hhmm = iso => hhmmIn(iso, undefined, null)
 // 老板 10-11：时间一律只到分钟，秒没必要。
 // 注意 toLocaleString 不传字段时【默认带秒】，所以每处都要显式列出来。
 const stamp = iso => new Date(iso).toLocaleString('zh-CN', {

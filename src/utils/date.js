@@ -65,3 +65,34 @@ export function sydneyDateOf(iso) {
   const d = new Date(iso)
   return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString('en-CA', { timeZone: TZ })
 }
+
+/**
+ * 时间戳显示成「时:分」。
+ *
+ * ⚠️ 必须指定时区。2026-11-02 小洁报「今天 2 号早上打的卡，显示还是 1 号」——
+ *    她看到的是 22:56，而她是悉尼上午 09:56 打的。
+ *    原来各页面自己写的版本是：
+ *      new Date(iso).toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' })
+ *    没传 timeZone ＝ 跟【看的人的设备时区】走。她那台设备报 UTC，
+ *    悉尼 09:56 = UTC 前一天 22:56 —— 时间错 3 小时，日期还退了一天。
+ *
+ *    存的数据一直是对的（完整 ISO + 悉尼 work_date），错的只有显示。
+ *    但同一条打卡，老板在悉尼看是 09:56、她看是 22:56 —— 这种各看各的
+ *    比直接报错更难发现，因为两边都觉得自己看到的是对的。
+ *
+ * 默认悉尼：活是在悉尼干的，工资、对账、工时全按悉尼算，这是业务事实，
+ * 不该因为看的人在哪而改变。
+ */
+export function hhmmIn(iso, tz = TZ, empty = '—') {
+  if (!iso) return empty
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return empty
+  return d.toLocaleTimeString('zh-CN', {
+    hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz,
+  })
+}
+
+/** 北京时间的「时:分」。客服在国内，排班和休息时段都是按北京说的。 */
+export function hhmmBeijing(iso, empty = '—') {
+  return hhmmIn(iso, 'Asia/Shanghai', empty)
+}

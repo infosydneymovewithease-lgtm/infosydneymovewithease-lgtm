@@ -9,7 +9,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
-import { sydneyToday, addDays, sydneyDateOf, weekdayOf } from '../../utils/date'
+import { sydneyToday, addDays, sydneyDateOf, weekdayOf, hhmmIn } from '../../utils/date'
 import { currentSeason, tzGapHours } from '../../utils/shifts'
 import {
   requiredAccounts, myChannels, ownsAccount, inquiryProgress, myPerformance, weeklyVideo, weekRange,
@@ -21,9 +21,8 @@ import AddChannelAccount from '../../components/AddChannelAccount'
 import AttendanceCard from '../../components/AttendanceCard'
 import { uploadImage } from '../../utils/upload'
 
-const hhmm = iso => iso
-  ? new Date(iso).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
-  : '—'
+// ⚠️ 一律按【悉尼】显示，不跟看的人的设备时区走 —— 理由见 utils/date.js hhmmIn
+const hhmm = iso => hhmmIn(iso, undefined, '—')
 const money = n => `$${(Number(n) || 0).toFixed(2)}`
 
 const WD = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']

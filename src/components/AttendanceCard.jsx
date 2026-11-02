@@ -9,15 +9,14 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useApp } from '../context/AppContext'
-import { sydneyToday } from '../utils/date'
+import { sydneyToday, hhmmIn, hhmmBeijing } from '../utils/date'
 import { currentSeason, tzGapHours } from '../utils/shifts'
 import { slotsForDay, startOptions, othersOnBreak, myBreak, breakMinutes } from '../utils/worklog'
 import { humanError } from '../utils/netError'
 import { LogIn, LogOut, Coffee } from 'lucide-react'
 
-const hhmm = iso => iso
-  ? new Date(iso).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
-  : '—'
+// ⚠️ 一律按【悉尼】显示，不跟看的人的设备时区走 —— 理由见 utils/date.js hhmmIn
+const hhmm = iso => hhmmIn(iso, undefined, '—')
 
 export default function AttendanceCard({ compact = false }) {
   const { user, staff, config, getWorkday, upsertWorkLog, startBreak, endBreak, getRoster } = useApp()
@@ -74,7 +73,11 @@ export default function AttendanceCard({ compact = false }) {
       <div className="flex items-center gap-3 text-sm flex-wrap">
         <span className="text-gray-500">
           上班 <b className="font-mono text-gray-800">{hhmm(mine?.clock_in)}</b>
-          {mine?.clock_out && <> · 下班 <b className="font-mono text-gray-800">{hhmm(mine.clock_out)}</b></>}
+          {mine?.clock_in && <span className="text-xs text-gray-400">（北京 {hhmmBeijing(mine.clock_in)}）</span>}
+          {mine?.clock_out && <>
+            {' '}· 下班 <b className="font-mono text-gray-800">{hhmm(mine.clock_out)}</b>
+            <span className="text-xs text-gray-400">（北京 {hhmmBeijing(mine.clock_out)}）</span>
+          </>}
         </span>
         {slots.map(w => {
           const r = myBreak(day.breaks, user?.id, w.slot_index)
@@ -113,9 +116,16 @@ export default function AttendanceCard({ compact = false }) {
           </button>
         ) : (
           <>
+            {/* ⚠️ 两个时区都标出来。这张卡上休息时段写的是「北京」，
+                打卡却按悉尼 —— 一张卡两套时区，不标清楚就会被当成系统错了。
+                小洁 11-02：「今天 2 号早上打的卡，显示还是 1 号」。 */}
             <span className="text-sm text-gray-600">
               上班 <b className="font-mono">{hhmm(mine.clock_in)}</b>
-              {mine.clock_out && <> · 下班 <b className="font-mono">{hhmm(mine.clock_out)}</b></>}
+              <span className="text-xs text-gray-400">（北京 {hhmmBeijing(mine.clock_in)}）</span>
+              {mine.clock_out && <>
+                {' '}· 下班 <b className="font-mono">{hhmm(mine.clock_out)}</b>
+                <span className="text-xs text-gray-400">（北京 {hhmmBeijing(mine.clock_out)}）</span>
+              </>}
             </span>
             {/* 老板 10-15 测试时上班下班点在了同一分钟，露出两个问题：
                 ① 下班之后休息那排就不显示了（行为是对的，但他以为没做）

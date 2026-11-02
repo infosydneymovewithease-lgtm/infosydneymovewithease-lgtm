@@ -9,14 +9,13 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
-import { sydneyToday, addDays } from '../../utils/date'
+import { sydneyToday, addDays, hhmmIn } from '../../utils/date'
 import { slotsForDay, breakMinutes, requiredAccounts, weekRange, trustSignals, bookedOn, inquiryByStaff } from '../../utils/worklog'
 import { isWorkingOn } from '../../utils/shifts'
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react'
 
-const hhmm = iso => iso
-  ? new Date(iso).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
-  : '—'
+// ⚠️ 一律按【悉尼】显示，不跟看的人的设备时区走 —— 理由见 utils/date.js hhmmIn
+const hhmm = iso => hhmmIn(iso, undefined, '—')
 const WEEK = ['一', '二', '三', '四', '五', '六', '日']
 
 export default function TeamToday() {
