@@ -11,7 +11,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { sydneyToday, addDays, hhmmIn } from '../../utils/date'
 import { slotsForDay, breakMinutes, requiredAccounts, weekRange, trustSignals, bookedOn, inquiryByStaff } from '../../utils/worklog'
-import { isWorkingOn } from '../../utils/shifts'
+import { onDutyOn } from '../../utils/shifts'
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react'
 
 // ⚠️ 一律按【悉尼】显示，不跟看的人的设备时区走 —— 理由见 utils/date.js hhmmIn
@@ -76,14 +76,21 @@ export default function TeamToday() {
     setDay(d); setConfirm(cf); setReturns(rt); setOpen(op); setChecked(false)
   }
 
-  // 今天该上班的人
-  const onDuty = useMemo(() => {
-    const ids = [...new Set((config.staffSchedules || []).map(s => s.staff_id))]
-    // 2026-10-16：排班表是唯一真相，没排班才回退到星期规则
-    return ids.filter(id => isWorkingOn(config.staffSchedules, id, date, roster))
-  }, [config.staffSchedules, date, roster])
+  // 今天实际打了卡的人 —— 打卡是事实，排班是计划
+  const clockedIn = useMemo(
+    () => (day.logs || []).filter(l => l.clock_in).map(l => l.staff_id),
+    [day.logs])
 
-  const slots = slotsForDay(config.breakWindows, config.staffSchedules, date, new Date(), roster)
+  // 今天在岗的人。
+  // ⚠️ 2026-11-04：候选名单要取【星期规则 + 排班表 + 打卡】的并集。
+  //    原来只从 staff_schedule 取 —— 经理不在那张表里，排班表写着她 A 班也
+  //    轮不到被读，于是「今天 1 人在岗」，而且底下那张待办会【静默跳过她】，
+  //    她自己永远不会被催日报。
+  const onDuty = useMemo(
+    () => onDutyOn(config.staffSchedules, date, roster, clockedIn),
+    [config.staffSchedules, date, roster, clockedIn])
+
+  const slots = slotsForDay(config.breakWindows, config.staffSchedules, date, new Date(), roster, undefined, clockedIn)
   // 退回是管理动作，客服之间不能互退；也不能退自己的
   const canReturn = user?.role === 'admin' || user?.role === 'manager'
   const quota = Number(policy.comment_quota) || 3
@@ -321,7 +328,7 @@ export default function TeamToday() {
                 {/* ⚠️ 休息段要【按这个人当天的班次】取，不能用页面级的 slots ——
                     A 班和 B 班的 slot_index 都是 1、2，混在一起既会重复渲染，
                     也会把别人班次的段算到她头上。 */}
-                {slotsForDay(config.breakWindows, config.staffSchedules, date, new Date(), roster, id).map(w => {
+                {slotsForDay(config.breakWindows, config.staffSchedules, date, new Date(), roster, id, clockedIn).map(w => {
                   const r = day.breaks.find(b => b.staff_id === id && b.slot_index === w.slot_index)
                   const on = r?.started_at && !r?.ended_at
                   const mins = breakMinutes(r)

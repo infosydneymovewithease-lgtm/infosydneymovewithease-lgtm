@@ -60,7 +60,11 @@ export default function AttendanceCard({ compact = false }) {
 
   const mine = day.logs.find(l => l.staff_id === user?.id)
   // ⚠️ 传 user.id —— 不传的话会把 A/B 两个班的休息段混在一起显示
-  const slots = slotsForDay(config.breakWindows, config.staffSchedules, date, new Date(), roster, user?.id)
+  // ⚠️ 最后那个参数是【今天实际打了卡的人】。打卡是事实，排班是计划。
+  //    不传的话，不在 staff_schedule 里的人（经理）永远算不进在岗 ——
+  //    她的下午休息会被当成单人日整段藏掉（11-04 老板发现）。
+  const clockedIn = (day.logs || []).filter(l => l.clock_in).map(l => l.staff_id)
+  const slots = slotsForDay(config.breakWindows, config.staffSchedules, date, new Date(), roster, user?.id, clockedIn)
   const others = othersOnBreak(day.breaks, user?.id)
   const onBreakNow = slots.find(w => {
     const r = myBreak(day.breaks, user?.id, w.slot_index)

@@ -85,10 +85,42 @@ export function isWorkingOn(staffSchedules, staffId, dateStr, roster) {
   return row ? row.is_working : true   // 没配过的人默认上班，不要凭空把人排休
 }
 
-/** 某天在岗的人。用来判断「单人日」—— 单人日下午那段休息不开放 */
+/**
+ * 某天在岗的人。用来判断「单人日」—— 单人日下午那段休息不开放。
+ *
+ * ⚠️ 2026-11-04 修：候选名单必须取【三个来源的并集】。
+ *
+ * 老板 11-04：「昨天（周二）经理登录正常工作了，她也打卡了，
+ *              排班表里也是她上班，但是显示还是一个人在工作」
+ *
+ * 原来是这么写的：
+ *   const ids = staffSchedules.map(s => s.staff_id)   // 只从星期规则表取
+ *   return ids.filter(id => isWorkingOn(..., roster))
+ *
+ * 10-16 那次把「是否在岗」改成了排班表优先，却【忘了候选名单还是从旧表来的】。
+ * 经理不在 staff_schedule 里 → 她根本没进入筛选 → 排班表写着 A 班也轮不到被读。
+ *
+ * 后果不只是那句「只有你一个人在岗」：
+ *   · 她的下午休息被整段藏掉（单人日只给 2 段）
+ *   · 团队今日的待办会【静默跳过她】—— 她自己永远不会被催日报
+ *
+ * @param clockedIn 今天实际打了卡的人。打卡是事实，排班是计划，事实优先 ——
+ *   排班没生成、排错了、人不在名单里，三种情况一次全覆盖。
+ *   ⚠️ 反向不做：没打卡【不】判定为不在岗，忘打卡的人太多了。
+ */
+export function onDutyOn(staffSchedules, dateStr, roster, clockedIn = []) {
+  const ids = new Set([
+    ...(staffSchedules || []).map(s => s.staff_id),
+    ...(roster || []).filter(r => String(r.work_date) === dateStr).map(r => r.staff_id),
+    ...clockedIn,
+  ])
+  return [...ids].filter(id =>
+    clockedIn.includes(id) || isWorkingOn(staffSchedules, id, dateStr, roster))
+}
+
+/** @deprecated 用 onDutyOn —— 这个版本的候选名单只从 staff_schedule 取，会漏人 */
 export function workingStaffOn(staffSchedules, dateStr, roster) {
-  const ids = [...new Set((staffSchedules || []).map(s => s.staff_id))]
-  return ids.filter(id => isWorkingOn(staffSchedules, id, dateStr, roster))
+  return onDutyOn(staffSchedules, dateStr, roster)
 }
 
 /** 某天实际可用的休息窗口（单人日自动砍掉 single_day=false 的那段） */

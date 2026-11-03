@@ -12,7 +12,7 @@
 // 3「单人日不排下午休息」——
 //    只有一个人在岗，休 3 小时没人接电话。老板 10-11 定：单人日只休 2 小时。
 
-import { currentSeason, toMinutes, toHHMM, isWorkingOn } from './shifts'
+import { currentSeason, toMinutes, toHHMM, onDutyOn } from './shifts'
 import { sydneyDateOf, addDays } from './date'
 import { BACKLOG_FROM } from '../config/features'
 
@@ -28,10 +28,11 @@ import { BACKLOG_FROM } from '../config/features'
  *
  * @param staffId 看谁的班次；从排班表取当天的 A/B
  */
-export function slotsForDay(breakWindows, staffSchedules, dateStr, now = new Date(), roster, staffId) {
+export function slotsForDay(breakWindows, staffSchedules, dateStr, now = new Date(), roster, staffId, clockedIn = []) {
   const season = currentSeason(now)
-  const ids = [...new Set((staffSchedules || []).map(s => s.staff_id))]
-  const onDuty = ids.filter(id => isWorkingOn(staffSchedules, id, dateStr, roster))
+  // ⚠️ 在岗名单走 onDutyOn —— 候选名单要取「星期规则 + 排班表 + 打卡」的并集。
+  //    原来只从 staff_schedule 取，经理不在那张表里就永远算不进来（11-04 修）。
+  const onDuty = onDutyOn(staffSchedules, dateStr, roster, clockedIn)
   const alone = onDuty.length <= 1
   // 当天这个人上的是哪个班 —— 排班表是唯一真相
   const myShift = staffId
