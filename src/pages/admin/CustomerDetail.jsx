@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
+import { money } from '../../utils/money'
 import { useApp } from '../../context/AppContext'
 import { ArrowLeft, Phone, MessageCircle, Calendar, DollarSign, ChevronRight, Download } from 'lucide-react'
 import dayjs from 'dayjs'
@@ -130,8 +131,8 @@ export default function CustomerDetail() {
         {/* Stats row */}
         <div className="grid grid-cols-4 border-t border-gray-100 divide-x divide-gray-100">
           <StatCell label="下单次数" value={`${orderCount} 单`} />
-          <StatCell label="累计实收" value={totalSpent > 0 ? `$${totalSpent}` : '—'} green={totalSpent > 0} />
-          <StatCell label="报价总额" value={`$${totalQuoted}`} />
+          <StatCell label="累计实收" value={totalSpent > 0 ? money(totalSpent) : '—'} green={totalSpent > 0} />
+          <StatCell label="报价总额" value={money(totalQuoted)} />
           <StatCell label="客户来源" value={customer.source || '—'} />
         </div>
       </div>

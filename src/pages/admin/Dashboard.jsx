@@ -1,4 +1,5 @@
 import { useApp } from '../../context/AppContext'
+import { money } from '../../utils/money'
 import AttendanceCard from '../../components/AttendanceCard'
 import DailyProgress from '../../components/DailyProgress'
 import { FEATURES, BACKLOG_FROM } from '../../config/features'
@@ -182,7 +183,7 @@ export default function Dashboard() {
       {/* Stats cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard label="今日订单" value={todayOrders.length} icon={ClipboardList} color="blue" />
-        <StatCard label="今日收入" value={`$${todayRevenue}`} icon={DollarSign} color="green" />
+        <StatCard label="今日收入" value={money(todayRevenue)} icon={DollarSign} color="green" />
         <StatCard label="待派单" value={unassigned.length} icon={Truck} color={unassigned.length > 0 ? 'red' : 'gray'} />
         <StatCard label="未付款" value={unpaid.length} icon={CreditCard} color={unpaid.length > 0 ? 'red' : 'gray'} />
       </div>
