@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { BANK, PAYID } from '../../config/payment'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft, Phone, CheckCircle, ChevronRight, Upload, X } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
@@ -1098,20 +1099,26 @@ export default function MoveBooking() {
                 <div className="space-y-1 text-orange-700">
                   <div className="flex justify-between">
                     <span className="text-orange-500">银行</span>
-                    <span className="font-medium">Commonwealth Bank (CBA)</span>
+                    <span className="font-medium">{BANK.bank}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-orange-500">户名</span>
-                    <span className="font-medium">movewithease</span>
+                    <span className="font-medium">{BANK.accountName}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-orange-500">BSB</span>
-                    <span className="font-medium">062-161</span>
+                    <span className="font-medium">{BANK.bsb}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-orange-500">账号</span>
-                    <span className="font-medium">10950608</span>
+                    <span className="font-medium">{BANK.accountNumber}</span>
                   </div>
+                  {PAYID && (
+                    <div className="flex justify-between">
+                      <span className="text-orange-500">PayID</span>
+                      <span className="font-medium">{PAYID}</span>
+                    </div>
+                  )}
                 </div>
                 <p className="text-orange-500 mt-2">转账后请在下方上传付款成功截图，为您锁定档期</p>
               </div>

@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { BANK, PAYID } from '../../config/payment'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Phone, CheckCircle, Upload, X } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
@@ -535,11 +536,11 @@ export default function StorageBooking() {
             style={{ background: '#FFF7ED', border: '1px solid #FED7AA' }}>
             <p className="font-semibold text-orange-800 mb-2">转账收款账户</p>
             <div className="space-y-1 text-orange-700">
-              <div className="flex justify-between"><span className="text-orange-500">银行</span><span className="font-medium">Commonwealth Bank (CBA)</span></div>
-              <div className="flex justify-between"><span className="text-orange-500">户名</span><span className="font-medium">Move With Ease</span></div>
-              <div className="flex justify-between"><span className="text-orange-500">BSB</span><span className="font-medium">062-000</span></div>
-              <div className="flex justify-between"><span className="text-orange-500">账号</span><span className="font-medium">1234 5678</span></div>
-              <div className="flex justify-between"><span className="text-orange-500">PayID</span><span className="font-medium">0426 033 899</span></div>
+              <div className="flex justify-between"><span className="text-orange-500">银行</span><span className="font-medium">{BANK.bank}</span></div>
+              <div className="flex justify-between"><span className="text-orange-500">户名</span><span className="font-medium">{BANK.accountName}</span></div>
+              <div className="flex justify-between"><span className="text-orange-500">BSB</span><span className="font-medium">{BANK.bsb}</span></div>
+              <div className="flex justify-between"><span className="text-orange-500">账号</span><span className="font-medium">{BANK.accountNumber}</span></div>
+              {PAYID && <div className="flex justify-between"><span className="text-orange-500">PayID</span><span className="font-medium">{PAYID}</span></div>}
             </div>
             <p className="text-orange-500 mt-2">转账备注请填写您的姓名</p>
           </div>

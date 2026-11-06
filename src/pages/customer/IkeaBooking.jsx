@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { BANK, PAYID } from '../../config/payment'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Phone, CheckCircle, Upload, X } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
@@ -488,10 +489,10 @@ export default function IkeaBooking() {
             style={{ background: '#FFF7ED', border: '1px solid #FED7AA' }}>
             <p className="font-semibold text-orange-800 mb-1">转账收款账户</p>
             <div className="text-orange-700 space-y-0.5">
-              <p>银行：Commonwealth Bank (CBA)</p>
-              <p>户名：Move With Ease</p>
-              <p>BSB：062-000 &nbsp;|&nbsp; 账号：1234 5678</p>
-              <p>PayID：0426 033 899</p>
+              <p>银行：{BANK.bank}</p>
+              <p>户名：{BANK.accountName}</p>
+              <p>BSB：{BANK.bsb} &nbsp;|&nbsp; 账号：{BANK.accountNumber}</p>
+              {PAYID && <p>PayID：{PAYID}</p>}
             </div>
             <p className="text-orange-500 mt-1.5">转账备注请填写姓名及订单号</p>
           </div>
