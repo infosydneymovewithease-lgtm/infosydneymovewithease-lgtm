@@ -26,6 +26,12 @@ export default function WorkerStorageDetail() {
   const order = storageOrders.find(o => o.id === id)
 
   const [photos, setPhotos] = useState(() => order?.photos || [])
+  // ⚠️ 周数输入框要存一份「正在打字」的草稿。
+  //    老板 11-10：「最前这个 1 不能删除，会影响改成正确时间」。
+  //    原来是 onChange 直接 Math.max(1, …||1) —— 一删到空就立刻变回 1，
+  //    那个 1 永远删不掉，想输 9 只能变成 19。
+  //    打字时原样显示（允许空），离开输入框才校正。
+  const [weeksDraft, setWeeksDraft] = useState(null)   // null = 用库里的值
   const [photoBusy, setPhotoBusy] = useState(false)
   const [photoErr, setPhotoErr] = useState('')
   const [videoUrl, setVideoUrl] = useState(null)
@@ -558,11 +564,17 @@ export default function WorkerStorageDetail() {
                     </p>
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-600 shrink-0">客人付了几周</span>
-                      <input type="number" min="1" step="1" inputMode="numeric"
-                        value={weeks}
-                        onChange={e => {
-                          const n = Math.max(1, Math.round(Number(e.target.value) || 1))
-                          updateStorageOrder(id, { weeks: n })
+                      <input type="text" inputMode="numeric" pattern="[0-9]*"
+                        value={weeksDraft ?? String(weeks)}
+                        onFocus={() => setWeeksDraft(String(weeks))}
+                        onChange={e => setWeeksDraft(e.target.value.replace(/[^0-9]/g, ''))}
+                        onBlur={() => {
+                          const n = Math.round(Number(weeksDraft))
+                          // 空着或填 0 就当没改，退回原值 —— 不替人猜
+                          if (weeksDraft !== '' && Number.isFinite(n) && n >= 1 && n !== weeks) {
+                            updateStorageOrder(id, { weeks: n })
+                          }
+                          setWeeksDraft(null)
                         }}
                         className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-sm font-mono text-right
                                    outline-none focus:border-red-400" />
