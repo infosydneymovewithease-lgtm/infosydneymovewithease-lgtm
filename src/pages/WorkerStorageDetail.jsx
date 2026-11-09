@@ -8,6 +8,8 @@ import { VEHICLES } from '../data/vehicles'
 import { roundToHalfHour } from '../utils/pricing'
 import { isDepositPaid } from '../utils/orderHelpers'
 import { getStorageRates, FREE_SUPPLIES_LABEL } from '../data/storageRates'
+import { uploadImage } from '../utils/upload'
+import { humanError } from '../utils/netError'
 
 const STEPS = [
   { key: 'confirmed', label: '确认收单',     desc: '确认已收到本次寄存任务' },
@@ -19,11 +21,13 @@ const STEP_ORDER = STEPS.map(s => s.key)
 export default function WorkerStorageDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { storageOrders, updateStorageOrder, completeStorageOrder } = useApp()
+  const { storageOrders, updateStorageOrder, updateStorageOrderAwait, completeStorageOrder } = useApp()
 
   const order = storageOrders.find(o => o.id === id)
 
   const [photos, setPhotos] = useState(() => order?.photos || [])
+  const [photoBusy, setPhotoBusy] = useState(false)
+  const [photoErr, setPhotoErr] = useState('')
   const [videoUrl, setVideoUrl] = useState(null)
   const [videoLoading, setVideoLoading] = useState(false)
   const [lightbox, setLightbox] = useState(null)
@@ -90,7 +94,15 @@ export default function WorkerStorageDetail() {
   )
 
   const days = dayjs(order.moveOutDate).diff(dayjs(order.moveInDate), 'day')
-  const weeks = Math.max(1, Math.ceil(days / 7))
+  // 按日期自动算出来的周数 —— 只是【默认值】
+  const autoWeeks = Math.max(1, Math.ceil(days / 7))
+  // ⚠️ 2026-11-10 老板：「寄存的时间被钉死，实际上这次客人付款 9 周的钱，
+  //    不能改动就不正确」。QX2611012：入库 11-09 / 预计取件 2027-02-01
+  //    = 12 周 = $624，但客人只付了 9 周。
+  //    日期是「预计」，付了几周才是事实 —— 事实必须能覆盖预计。
+  //    存进 order.weeks（这一列白名单里本来就有，一直没人写）。
+  const weeks = Number(order.weeks) > 0 ? Number(order.weeks) : autoWeeks
+  const weeksOverridden = Number(order.weeks) > 0 && Number(order.weeks) !== autoWeeks
   const { boxRate, furRate, shortTerm, freeSupplies } = getStorageRates(weeks)
   const storageFee = (order.boxes * boxRate + order.furniture * furRate) * weeks
 
@@ -105,8 +117,12 @@ export default function WorkerStorageDetail() {
     updateStorageOrder(id, updates)
   }
 
-  async function compressImage(file) {
-    return new Promise(resolve => {
+  // ⚠️ 2026-11-10 改成产出【文件】而不是 base64 字符串。
+  //    原来压缩完直接 toDataURL，整串 base64 塞进 storage_orders 行里 ——
+  //    一张 200~400KB，三张就上兆，超过 Supabase realtime 的单条上限，
+  //    推回来的记录被砍成壳，界面上刚拍的照片 1~2 秒后自己消失。
+  async function compressToFile(file) {
+    const dataUrl = await new Promise(resolve => {
       const reader = new FileReader()
       reader.onload = e => {
         const img = new Image()
@@ -119,26 +135,50 @@ export default function WorkerStorageDetail() {
           canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
           resolve(canvas.toDataURL('image/jpeg', 0.75))
         }
+        img.onerror = () => resolve(null)
         img.src = e.target.result
       }
       reader.readAsDataURL(file)
     })
+    if (!dataUrl) return file          // 压不了就传原图，总比传不上去强
+    const bin = atob(dataUrl.split(',')[1])
+    const buf = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i)
+    return new File([buf], `storage_${Date.now()}.jpg`, { type: 'image/jpeg' })
   }
 
   async function handleAddPhoto(e) {
     const files = Array.from(e.target.files).slice(0, 3 - photos.length)
-    if (!files.length) return
-    const compressed = await Promise.all(files.map(compressImage))
-    const next = [...photos, ...compressed]
-    setPhotos(next)
-    updateStorageOrder(id, { photos: next })
     e.target.value = ''
+    if (!files.length) return
+    setPhotoBusy(true); setPhotoErr('')
+    try {
+      const urls = []
+      for (const f of files) {
+        const small = await compressToFile(f)
+        const r = await uploadImage(small, 'deposit-screenshots')
+        // uploadImage 传不上去会退回 base64（r.data）—— 那种情况宁可报错也别存进行里，
+        // 存进去就是 1~2 秒后自己消失，师傅以为拍了其实没有
+        if (!r?.url) throw new Error('图片没传上去，换个网络再试一次')
+        urls.push(r.url)
+      }
+      const next = [...photos, ...urls]
+      setPhotos(next)
+      // ⚠️ 等结果。凭证照片「存不进去就等于没拍」，不能用发了不管的写法
+      await updateStorageOrderAwait(id, { photos: next })
+    } catch (err) {
+      setPhotos(order?.photos || [])      // 失败就退回真实状态，不留假照片
+      setPhotoErr(humanError(err, '照片'))
+    } finally {
+      setPhotoBusy(false)
+    }
   }
 
-  function handleRemovePhoto(idx) {
+  async function handleRemovePhoto(idx) {
     const next = photos.filter((_, i) => i !== idx)
     setPhotos(next)
-    updateStorageOrder(id, { photos: next })
+    try { await updateStorageOrderAwait(id, { photos: next }) }
+    catch (err) { setPhotos(order?.photos || []); setPhotoErr(humanError(err, '照片')) }
   }
 
   async function handleAddVideo(e) {
@@ -406,12 +446,24 @@ export default function WorkerStorageDetail() {
                         {photos.length < 3 && (
                           <button onClick={() => photoInputRef.current?.click()}
                             className="text-xs text-red-600 font-semibold flex items-center gap-1">
-                            <Camera size={12} /> 拍照
+                            <Camera size={12} /> 拍照 / 选图
                           </button>
                         )}
                       </div>
-                      <input ref={photoInputRef} type="file" accept="image/*" multiple capture="environment"
+                      {/* ⚠️ 没有 capture —— 带 capture 的话 iOS 只给相机，
+                          选不了相册。老板 11-10：「也应该可以从手机照片里
+                          上传视频和图片」。去掉之后相机和相册都能选。 */}
+                      <input ref={photoInputRef} type="file" accept="image/*" multiple
                         className="hidden" onChange={handleAddPhoto} />
+                      {photoBusy && (
+                        <p className="text-xs text-gray-500 py-2">照片上传中…别关页面</p>
+                      )}
+                      {photoErr && (
+                        <div className="mb-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs leading-relaxed">
+                          ⚠️ {photoErr}
+                          <br />这张<b>没有</b>存上，请重拍或重选 —— 别以为拍了就完事了
+                        </div>
+                      )}
                       {photos.length > 0 ? (
                         <div className="flex gap-2 flex-wrap">
                           {photos.map((src, i) => (
@@ -450,7 +502,7 @@ export default function WorkerStorageDetail() {
                           <button onClick={handleRemoveVideo} className="text-xs text-red-500">删除</button>
                         )}
                       </div>
-                      <input ref={videoInputRef} type="file" accept="video/*" capture="environment"
+                      <input ref={videoInputRef} type="file" accept="video/*"
                         className="hidden" onChange={handleAddVideo} />
                       {videoLoading ? (
                         <div className="py-6 text-center text-gray-400 text-sm">加载中...</div>
@@ -460,7 +512,7 @@ export default function WorkerStorageDetail() {
                         <button onClick={() => videoInputRef.current?.click()}
                           className="w-full py-5 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center gap-2 text-gray-400">
                           <Video size={18} />
-                          <span className="text-sm">录制入库视频</span>
+                          <span className="text-sm">录制 / 选择入库视频</span>
                         </button>
                       )}
                     </div>
@@ -497,15 +549,33 @@ export default function WorkerStorageDetail() {
                     </div>
                   </div>
 
-                  {/* 寄存部分 */}
-                  <div className="space-y-1 pb-3 border-b border-gray-100">
-                    <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">寄存部分（只读）</p>
+                  {/* 寄存部分 —— 周数可改（老板 11-10：客人付几周就算几周）*/}
+                  <div className="space-y-1.5 pb-3 border-b border-gray-100">
+                    <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">寄存部分</p>
                     <p className="text-xs text-gray-400">
                       {order.boxes} 箱 × ${boxRate}/周
                       {order.furniture > 0 && ` + ${order.furniture} 家具 × $${furRate}/周`}
-                      {' '}× {weeks} 周
                     </p>
-                    <div className="flex justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600 shrink-0">客人付了几周</span>
+                      <input type="number" min="1" step="1" inputMode="numeric"
+                        value={weeks}
+                        onChange={e => {
+                          const n = Math.max(1, Math.round(Number(e.target.value) || 1))
+                          updateStorageOrder(id, { weeks: n })
+                        }}
+                        className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-sm font-mono text-right
+                                   outline-none focus:border-red-400" />
+                      <span className="text-xs text-gray-400">周</span>
+                      {weeksOverridden && (
+                        <span className="text-xs text-amber-600">按日期是 {autoWeeks} 周</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 leading-relaxed">
+                      默认按「入库 → 预计取件」算（{autoWeeks} 周）。
+                      <b>客人实际付了几周就填几周</b> —— 预计取件日期只是预计，付款才是事实
+                    </p>
+                    <div className="flex justify-between text-sm pt-1">
                       <span className="text-gray-600">寄存费</span>
                       <span className="text-gray-900 font-semibold">${storageFee}</span>
                     </div>

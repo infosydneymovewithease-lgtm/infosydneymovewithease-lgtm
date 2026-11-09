@@ -238,8 +238,23 @@ export function AppProvider({ children }) {
     }
     init()
 
+    // ⚠️ realtime 推回来的记录【可能是残缺的】。
+    //    Supabase 对单条 realtime 消息有大小上限（默认 1MB），
+    //    超了就把记录内容砍掉，只给一个壳。
+    //    2026-11-10 寄存拍照就栽在这儿：照片以 base64 存进行里，
+    //    三张就上兆 → 推回来的 n 没有 photos → 整行一换，
+    //    界面上刚拍的照片 1~2 秒后自己消失。
+    //    「后来又照了一张留下了」也对得上 —— 那次的行刚好没超限。
+    //
+    //    两道防护：
+    //      ① 壳包直接丢掉（没有 id 就不是一条能用的记录）
+    //      ② 用【合并】不用整行替换 —— 残缺的字段至少不会把本地的好数据抹掉
+    const merge = (x, n) => ({ ...x, ...n })
+    const usable = n => !!(n && n.id)
+
     const channel = supabase.channel('app-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, ({ eventType, new: n, old: o }) => {
+        if (!usable(n) && eventType !== 'DELETE') return   // 壳包，丢掉
         if (eventType === 'INSERT') setOrders(prev => prev.some(x => x.id === n.id) ? prev : [n, ...prev])
         else if (eventType === 'UPDATE') setOrders(prev => prev.map(x => {
           if (x.id !== n.id) return x
@@ -247,18 +262,20 @@ export function AppProvider({ children }) {
           // 保证同组师傅看到的最终状态一致（满足需求④）
           const TERMINAL = ['已完成', '已取消']
           if (TERMINAL.includes(x.status) && !TERMINAL.includes(n.status)) return x
-          return n
+          return merge(x, n)
         }))
         else if (eventType === 'DELETE') setOrders(prev => prev.filter(x => x.id !== o.id))
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'storage_orders' }, ({ eventType, new: n, old: o }) => {
+        if (!usable(n) && eventType !== 'DELETE') return   // 壳包，丢掉
         if (eventType === 'INSERT') setStorageOrders(prev => prev.some(x => x.id === n.id) ? prev : [n, ...prev])
-        else if (eventType === 'UPDATE') setStorageOrders(prev => prev.map(x => x.id === n.id ? n : x))
+        else if (eventType === 'UPDATE') setStorageOrders(prev => prev.map(x => x.id === n.id ? merge(x, n) : x))
         else if (eventType === 'DELETE') setStorageOrders(prev => prev.filter(x => x.id !== o.id))
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'b2b_customers' }, ({ eventType, new: n, old: o }) => {
+        if (!usable(n) && eventType !== 'DELETE') return   // 壳包，丢掉
         if (eventType === 'INSERT') setB2bCustomers(prev => prev.some(x => x.id === n.id) ? prev : [n, ...prev])
-        else if (eventType === 'UPDATE') setB2bCustomers(prev => prev.map(x => x.id === n.id ? n : x))
+        else if (eventType === 'UPDATE') setB2bCustomers(prev => prev.map(x => x.id === n.id ? merge(x, n) : x))
         else if (eventType === 'DELETE') setB2bCustomers(prev => prev.filter(x => x.id !== o.id))
       })
       .subscribe()
@@ -1117,6 +1134,14 @@ export function AppProvider({ children }) {
     bg(supabase.from('storage_orders').update(pickStorage(updates)).eq('id', id), '更新寄存订单')
   }
 
+  /** 等结果的版本。凭证照片这种「存不进去就等于没拍」的东西必须用这个。 */
+  async function updateStorageOrderAwait(id, updates) {
+    setStorageOrders(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s))
+    const { error } = await supabase.from('storage_orders')
+      .update(pickStorage(updates)).eq('id', id)
+    if (error) throw new Error(error.message || '保存失败，请重试')
+  }
+
   function deleteOrder(id) {
     if ((id || '').startsWith('STG-')) {
       setStorageOrders(prev => prev.filter(o => o.id !== id))
@@ -1318,6 +1343,7 @@ export function AppProvider({ children }) {
       unmarkSlotPosted, markSlotPosted2,
       cleanupPostedVideos,
       updateSlot, markSlotPosted, skipSlot, listContentPrompts,
+      updateStorageOrderAwait,
       getRoster, generateRoster, setRoster, listHolidays,
       orders, confirmOrder, completeOrder, startWork, getMyOrders, finishWorkWithCorrection,
       createOrder, createOrderWithSlotCheck,
