@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useApp } from '../../context/AppContext'
-import { sydneyToday } from '../../utils/date'
+import { sydneyToday, addDays } from '../../utils/date'
 import {
   overview, staffStats, insights, gaps, recentMonths, periodRange,
 } from '../../utils/summary'
@@ -24,6 +24,10 @@ export default function Summary() {
   const today = sydneyToday()
   const [kind, setKind] = useState('month')
   const [anchor, setAnchor] = useState(() => today.slice(0, 7))
+  // ⚠️ 2026-11-10 老板：「实际上我也想看上周和之前的」。
+  //    月份本来就能选，周却写死用 today —— periodRange('week', 任意日期)
+  //    本来就支持任意一周，只是界面上没给入口。
+  const [weekAnchor, setWeekAnchor] = useState(today)
   const [data, setData] = useState({ logs: [], breaks: [], inquiries: [], posts: [], closes: [] })
   const [returns, setReturns] = useState([])
   const [content, setContent] = useState({ items: [], slots: [] })
@@ -36,8 +40,8 @@ export default function Summary() {
   // 客服看不到月汇总 —— 老板 10-11：「周可以看，月以上就不能查看」
   const effKind = isBoss ? kind : 'week'
   const range = useMemo(
-    () => periodRange(effKind, effKind === 'month' ? anchor : today),
-    [effKind, anchor, today])
+    () => periodRange(effKind, effKind === 'month' ? anchor : weekAnchor),
+    [effKind, anchor, weekAnchor])
   const period = effKind === 'month' ? anchor : `${range.from}~${range.to}`
 
   useEffect(() => {
@@ -92,7 +96,7 @@ export default function Summary() {
         </div>
         {isBoss ? (
           <div className="flex items-center gap-1 bg-white rounded-xl shadow-sm p-1">
-            {[['week', '本周'], ['month', '本月']].map(([k, l]) => (
+            {[['week', '周'], ['month', '月']].map(([k, l]) => (
               <button key={k} onClick={() => setKind(k)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
                   kind === k ? 'text-white' : 'text-gray-500 hover:bg-gray-50'}`}
@@ -101,6 +105,26 @@ export default function Summary() {
             {kind === 'month' && (
               <input type="month" value={anchor} onChange={e => setAnchor(e.target.value)}
                 className="px-2 py-1 text-sm font-semibold outline-none" />
+            )}
+            {/* 周导航 —— 左右翻周，不许翻到还没过完的未来 */}
+            {kind === 'week' && (
+              <div className="flex items-center gap-0.5 pl-1">
+                <button onClick={() => setWeekAnchor(w => addDays(w, -7))}
+                  title="上一周"
+                  className="px-2 py-1 text-gray-400 hover:text-gray-700 text-lg leading-none">‹</button>
+                <span className="px-1 text-sm font-semibold font-mono whitespace-nowrap">
+                  {range.from.slice(5).replace('-', '/')}–{range.to.slice(5).replace('-', '/')}
+                </span>
+                <button onClick={() => setWeekAnchor(w => addDays(w, 7))}
+                  disabled={range.to >= today} title="下一周"
+                  className="px-2 py-1 text-gray-400 hover:text-gray-700 text-lg leading-none disabled:opacity-20">›</button>
+                {range.to < today && (
+                  <button onClick={() => setWeekAnchor(today)}
+                    className="ml-1 px-2 py-1 text-xs text-red-700 hover:underline whitespace-nowrap">
+                    回到本周
+                  </button>
+                )}
+              </div>
             )}
           </div>
         ) : (
