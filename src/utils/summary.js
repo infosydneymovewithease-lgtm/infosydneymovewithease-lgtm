@@ -10,6 +10,7 @@
 import { hourlyRateFor } from './wageRates'
 import { participants } from './reconcile'
 import { sydneyDateOf, addDays } from './date'
+import { OPS_BACKLOG_FROM } from '../config/features'
 
 const num = v => Number(v) || 0
 const inRange = (d, from, to) => d && String(d) >= from && String(d) <= to
@@ -193,9 +194,15 @@ export function gaps(opts) {
   }
   const today = new Date().toISOString().slice(0, 10)
   const past = days.filter(d => d < today)
+  // ⚠️ 2026-11-10 老板：「这个页更新掉，从今天开始」。
+  //    流程类遗漏（漏登记 / 没交日报 / 没日结）补不回来了，
+  //    一直挂着只会让这块变成没人看的噪音 —— 真出事的那条也跟着被忽略。
+  //    ⚠️ 只勾销【流程遗漏】。未收款不在此列 ——
+  //       那是还没收回来的钱，不是记录缺失，不能用一条起算线抹掉。
+  const live = past.filter(d => d >= OPS_BACKLOG_FROM)
 
   // 没日结的天（那天有已完成订单才算）
-  const noClose = past.filter(d => {
+  const noClose = live.filter(d => {
     const has = (orders || []).some(o => String(o.date) === d && o.status === '已完成')
     return has && !(closes || []).some(c => String(c.work_date) === d && c.status === 'confirmed')
   })
@@ -203,7 +210,7 @@ export function gaps(opts) {
 
   // 没交日报
   for (const id of staffIds || []) {
-    const miss = past.filter(d =>
+    const miss = live.filter(d =>
       (logs || []).some(l => l.staff_id === id && String(l.work_date) === d && l.clock_in && !l.submitted_at))
     if (miss.length) out.push({ sev: 'mid', text: `${id} 有 ${miss.length} 天打了卡但没交日报` })
   }
@@ -211,7 +218,7 @@ export function gaps(opts) {
   // 平台漏登记
   // ⚠️ 2026-10-30 T+1：咨询数是【第二天】填的，所以昨天那天还不算漏 ——
   //    她今天才填。往前错一天判断，否则每天早上都会凭空多出一条假告警。
-  const inqPast = past.filter(d => d < addDays(today, -1))
+  const inqPast = live.filter(d => d < addDays(today, -1))
   const need = (accounts || []).filter(a => a.status === 'active')
   for (const a of need) {
     const miss = inqPast.filter(d =>
