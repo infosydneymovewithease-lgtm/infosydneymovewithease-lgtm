@@ -14,7 +14,7 @@
 
 import { currentSeason, toMinutes, toHHMM, onDutyOn } from './shifts'
 import { sydneyDateOf, addDays } from './date'
-import { BACKLOG_FROM } from '../config/features'
+import { OPS_BACKLOG_FROM } from '../config/features'
 
 /**
  * 某天该开放哪几段休息。
@@ -148,10 +148,10 @@ export function opsCanEdit(logDate, today, role) {
  *    而它要管的是【从今往后】别再漏。
  *
  * @param inquiries 这段日期范围内的全部登记（任何人填的都算）
- * @param since     不早于这天（默认 BACKLOG_FROM）
+ * @param since     不早于这天（默认 OPS_BACKLOG_FROM）
  * @returns [{ date, missing: [account], }]，按日期倒序
  */
-export function opsOverdue(channelAccounts, inquiries, today, days = 14, since = BACKLOG_FROM) {
+export function opsOverdue(channelAccounts, inquiries, today, days = 14, since = OPS_BACKLOG_FROM) {
   const need = (channelAccounts || []).filter(a => a.status === 'active')
   if (!need.length) return []
   const out = []
