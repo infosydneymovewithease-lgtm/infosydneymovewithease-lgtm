@@ -143,6 +143,20 @@ export default function WorkLog() {
   // 所以三档：客服只看小红书、经理只看企业开发、老板两个都看（都不卡他）。
   const isBoss    = user?.role === 'admin'
 
+  // ── 昨天打了卡但没交日报（跨天卡住的那种）──────────────
+  // 悉尼午夜 = 北京 21:00（夏令时），客服加班过了那个点，
+  // 日报页已经翻到新的一天，昨天那份就交不上去了。
+  // 小洁 11-06 只能打一个 00:11 的假卡才交得上 11-05 的日报。
+  //
+  // ⚠️ 这是个【很窄】的口子，不是放开自由补填：
+  //    必须「昨天真打了卡」+「本人」+「还没交」+「今天中午之前」。
+  //    老板 10-24 定的「不给自由日期选择器」那条规矩没动 ——
+  //    这不是补一个没上班的日子，是把真上过的那个班收尾。
+  const nowHH = Number(hhmm(new Date().toISOString()).slice(0, 2))
+  const canFinishPrev = !editingPast
+    && !!opsMine?.clock_in && !opsMine?.submitted_at
+    && nowHH < 12
+
   // 经理的产出是「做出来的内容」，不是「发出去的条数」—— 取本周排期来算
   useEffect(() => {
     // ⚠️ 2026-10-18 对调后：内容数据【人人都要】——
@@ -220,6 +234,26 @@ export default function WorkLog() {
           老板 10-13：经理核对发现问题要退回重填，客服得知道哪里不对。
           退回时 submitted_at 被清空，所以「有退回记录 + 当前未提交」= 要改。 */}
       {/* 别的日子被退回了还没改 —— 一进来就看见，点进去改 */}
+      {/* 昨天那份没交的日报 —— 跨天卡住的，给一个窄口子收尾 */}
+      {canFinishPrev && (
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4">
+          <p className="text-sm font-bold text-amber-900">
+            你 {opsDate} 的日报还没提交
+          </p>
+          <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+            那天你打了上班卡（{hhmm(opsMine.clock_in)}），但日报没交上去 ——
+            多半是下班时悉尼这边已经翻到第二天了。
+            <br />
+            <b>今天中午 12 点前可以回去交完</b>，过了就只能走退回重填。
+          </p>
+          <button onClick={() => setDate(opsDate)}
+            className="mt-2 w-full py-2.5 rounded-xl text-white text-sm font-bold"
+            style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
+            去交 {opsDate} 的日报
+          </button>
+        </div>
+      )}
+
       {pending.filter(r => r.work_date !== date).length > 0 && (
         <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-4">
           <p className="font-bold text-red-900 text-sm mb-2">

@@ -96,3 +96,37 @@ export function hhmmIn(iso, tz = TZ, empty = '—') {
 export function hhmmBeijing(iso, empty = '—') {
   return hhmmIn(iso, 'Asia/Shanghai', empty)
 }
+
+/** 某一刻悉尼比 UTC 快多少分钟（夏令时会变，所以要按那一刻算） */
+function sydneyOffsetMinutes(ms) {
+  const f = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TZ, hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  })
+  const p = Object.fromEntries(f.formatToParts(new Date(ms)).map(x => [x.type, x.value]))
+  const asUTC = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second)
+  return (asUTC - ms) / 60000
+}
+
+/**
+ * 把「悉尼的某天某点几分」变成真正的时间戳。
+ *
+ * ⚠️ 不能直接 new Date('2026-11-05T22:30')——那样是按【浏览器所在时区】解析的。
+ *    客服在国内，她填 22:30 会被当成北京 22:30，存进去就差 3 小时。
+ *    补填下班时间要的是「悉尼墙上的那个时刻」。
+ *
+ * @param dateStr 'YYYY-MM-DD'（悉尼日期）
+ * @param hhmm    'HH:MM'（悉尼时间）
+ */
+export function sydneyToISO(dateStr, hhmm) {
+  const [y, m, d] = String(dateStr).split('-').map(Number)
+  const [hh, mi] = String(hhmm).split(':').map(Number)
+  if (![y, m, d, hh, mi].every(Number.isFinite)) return null
+  const naive = Date.UTC(y, m - 1, d, hh, mi)
+  // 算两遍：第一遍用「假装是 UTC」的时刻求偏移，第二遍用修正后的时刻再求一次，
+  // 这样跨夏令时切换那一天也不会差一小时
+  let ms = naive - sydneyOffsetMinutes(naive) * 60000
+  ms = naive - sydneyOffsetMinutes(ms) * 60000
+  return new Date(ms).toISOString()
+}

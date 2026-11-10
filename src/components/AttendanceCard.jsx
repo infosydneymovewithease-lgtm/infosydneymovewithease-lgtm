@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useApp } from '../context/AppContext'
-import { sydneyToday, hhmmIn, hhmmBeijing } from '../utils/date'
+import { sydneyToday, addDays, hhmmIn, hhmmBeijing, sydneyToISO } from '../utils/date'
 import { currentSeason, tzGapHours } from '../utils/shifts'
 import { slotsForDay, startOptions, othersOnBreak, myBreak, breakMinutes } from '../utils/worklog'
 import { humanError } from '../utils/netError'
@@ -22,18 +22,31 @@ export default function AttendanceCard({ compact = false }) {
   const { user, staff, config, getWorkday, upsertWorkLog, startBreak, endBreak, getRoster } = useApp()
   const date = sydneyToday()
   const [day, setDay] = useState({ logs: [], breaks: [] })
+  // ⚠️ 2026-11-10 老板定的方案①：下班关的是【你开着的那个班】，不是「今天的班」。
+  //    悉尼比北京快 2~3 小时，悉尼午夜 = 北京 21:00（夏令时）/ 22:00（冬令时）。
+  //    客服加班过了那个点，系统的「今天」就翻篇了，她昨天那条记录够不着 ——
+  //    下班卡打不了、休息结束不了、日报交不了。
+  //    小洁 11-06 只能打一个 00:11 的假卡才交得上 11-05 的日报，出勤数据被污染。
+  //    ⚠️ 那个悬崖一年移动两次（夏令时切换），靠开会交代挡不住，只能在代码里解决。
+  const prevDate = addDays(date, -1)
+  const [prevDay, setPrevDay] = useState({ logs: [], breaks: [] })
+  const [lateOut, setLateOut] = useState('')   // 超过 16 小时时手填的实际下班时间
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [confirmOut, setConfirmOut] = useState(false)
   const [roster, setRoster] = useState([])
   const [, setTick] = useState(0)
 
-  const refresh = useCallback(async () => setDay(await getWorkday(date)), [getWorkday, date])
+  const refresh = useCallback(async () => {
+    const [d, pd] = await Promise.all([getWorkday(date), getWorkday(prevDate)])
+    setDay(d); setPrevDay(pd)
+  }, [getWorkday, date, prevDate])
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const [d, rs] = await Promise.all([getWorkday(date), getRoster(date, date)])
-      if (alive) { setDay(d); setRoster(rs.roster || []) }
+      const [d, rs, pd] = await Promise.all([
+        getWorkday(date), getRoster(date, date), getWorkday(prevDate)])
+      if (alive) { setDay(d); setRoster(rs.roster || []); setPrevDay(pd) }
     })()
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -59,6 +72,19 @@ export default function AttendanceCard({ compact = false }) {
   }
 
   const mine = day.logs.find(l => l.staff_id === user?.id)
+
+  // ── 还开着没关的那个班 ──────────────────────────────
+  // 今天已经打了上班卡就不用找了（正常情况）。
+  // 只有「今天还没上班卡，而昨天那条有上班没下班」才是跨天卡住的场景。
+  const prevMine = prevDay.logs.find(l => l.staff_id === user?.id)
+  const openPrev = (prevMine?.clock_in && !prevMine?.clock_out) ? prevMine : null
+  const openHours = openPrev
+    ? (Date.now() - new Date(openPrev.clock_in).getTime()) / 3600000
+    : 0
+  // ⚠️ 超过 16 小时不给一键关。不然「昨天 08:30 上班、今天 09:00 下班」
+  //    会变成一个 24 小时的班 —— QX2608021 变成 $21,364 就是这么来的。
+  //    超了就让她填实际几点下的班，不替她写「现在」。
+  const canQuickClose = !!openPrev && openHours <= 16
   // ⚠️ 传 user.id —— 不传的话会把 A/B 两个班的休息段混在一起显示
   // ⚠️ 最后那个参数是【今天实际打了卡的人】。打卡是事实，排班是计划。
   //    不传的话，不在 staff_schedule 里的人（经理）永远算不进在岗 ——
@@ -104,6 +130,61 @@ export default function AttendanceCard({ compact = false }) {
   return (
     <div className="bg-white rounded-2xl p-4 shadow-sm">
       {err && <p className="text-red-600 text-sm mb-2">{err}</p>}
+
+      {/* ── 昨天那个班还开着（跨天了）────────────────────
+          顶在最上面。她不会自己想到去翻昨天 —— 在她眼里就是
+          「按钮没了」。所以必须主动把这件事摆出来。 */}
+      {openPrev && (
+        <div className="mb-3 rounded-xl border-2 border-amber-300 bg-amber-50 px-3 py-2.5">
+          <p className="text-sm font-bold text-amber-900">
+            你 {prevDate} 的班还没打下班卡
+          </p>
+          <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+            上班 {hhmmIn(openPrev.clock_in)}（北京 {hhmmBeijing(openPrev.clock_in)}）·
+            已经过去 {Math.floor(openHours)} 小时。
+            <br />
+            悉尼比北京快 {tzGapHours()} 小时，你下班时这边已经是第二天了 ——
+            所以那个班要单独关掉。
+          </p>
+
+          {canQuickClose ? (
+            <button disabled={busy}
+              onClick={() => run(() => upsertWorkLog(prevDate,
+                { clock_out: new Date().toISOString() }))}
+              className="mt-2 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl
+                         text-white text-sm font-bold disabled:opacity-40"
+              style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
+              <LogOut size={15} /> 下班打卡（{prevDate} 的班）
+            </button>
+          ) : (
+            /* ⚠️ 超过 16 小时不给一键关 —— 按「现在」写会变成一个 24 小时的班。
+                  QX2608021 变成 $21,364 就是这么来的。让她填实际时间。 */
+            <div className="mt-2">
+              <p className="text-xs text-amber-800 mb-1.5">
+                隔太久了，<b>不能按「现在」算</b> —— 那会变成一个 {Math.floor(openHours)} 小时的班。
+                填你当时实际几点下的班（<b>悉尼时间</b>）：
+              </p>
+              <div className="flex items-center gap-2">
+                <input type="time" step="60" value={lateOut}
+                  onChange={e => setLateOut(e.target.value)}
+                  className="border border-amber-300 rounded-lg px-2 py-1.5 text-sm font-mono
+                             bg-white outline-none focus:border-red-400" />
+                <span className="text-xs text-amber-700 shrink-0">
+                  {lateOut ? `北京 ${hhmmBeijing(sydneyToISO(prevDate, lateOut))}` : '悉尼时间'}
+                </span>
+                <button disabled={busy || !lateOut}
+                  onClick={() => run(() => upsertWorkLog(prevDate,
+                    { clock_out: sydneyToISO(prevDate, lateOut) }))}
+                  className="ml-auto px-4 py-1.5 rounded-lg text-white text-sm font-bold disabled:opacity-30"
+                  style={{ background: 'linear-gradient(135deg,#6b1414,#c0392b)' }}>
+                  保存
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex items-center gap-3 flex-wrap">
         <h2 className="font-bold text-gray-900 text-sm shrink-0">出勤</h2>
         <span className="text-xs text-gray-400 shrink-0">
