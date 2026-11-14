@@ -225,7 +225,7 @@ export default function Reconcile() {
           <span className="w-24 shrink-0">师傅</span>
           <span className="w-28 shrink-0">开始–结束</span>
           <span className="w-14 shrink-0 text-right">工时</span>
-          <span className="w-12 shrink-0 text-center">收款</span>
+          <span className="w-20 shrink-0 text-center">收款</span>
           <span className="flex-1 text-right">金额</span>
           <span className="w-20 shrink-0 text-right">状态</span>
         </div>
@@ -479,9 +479,21 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, o
           hoursOdd ? 'text-red-500 font-semibold' : 'text-gray-500'}`}>
           {order.billedHours != null ? `${order.billedHours}h` : '—'}
         </span>
-        <span className="text-xs text-gray-400 w-12 shrink-0 text-center">
-          {order.paymentMethod === 'cash' ? '现金' : order.paymentMethod === 'transfer' ? '转账'
-            : <span className="text-red-500 font-semibold">未标</span>}
+        {/* ⚠️ 收款方式 + 收没收到，两件事都要在列表上看得见。
+            老板 11-05：「已核对」会把未收款盖住 —— 勾了核对就看不到那笔钱还欠着。
+            核对 = 我和师傅对过账目；收款 = 钱到账了。两回事。 */}
+        <span className="text-xs w-20 shrink-0 text-center leading-tight">
+          <span className="block text-gray-400">
+            {order.paymentMethod === 'cash' ? '现金' : order.paymentMethod === 'transfer' ? '转账'
+              : <span className="text-red-500 font-semibold">未标</span>}
+          </span>
+          {order.status === '已完成' && (
+            order.paymentStatus === 'paid'
+              ? <span className="block text-green-600">已收</span>
+              : <span className="block text-red-600 font-semibold">
+                  {order.paymentStatus === 'partial' ? '收一半' : '未收'}
+                </span>
+          )}
         </span>
 
         <span className="font-mono text-sm text-gray-700 flex-1 text-right">{money(order.finalAmount)}</span>
@@ -640,6 +652,39 @@ function OrderRow({ order, issues, staffRates, staff, medians, checkedBy, b2b, o
               })}
             </div>
             {!order.paymentMethod && <span className="text-xs text-red-500">原来没标</span>}
+          </div>
+
+          {/* ── 收到钱了吗（2026-11-15 加）──────────────────
+              在这之前，整个后台【没有任何地方】能把「未收款」改成「已收款」。
+              师傅交单时选一次，之后就定死了 —— 客人过几天付了钱，
+              那单永远挂着未收，周月汇总天天报，谁也改不动。
+              ⚠️ paymentStatus 本来就在 reconcile_order 的白名单里，
+                 一直缺的只是这个按钮。 */}
+          <div className="flex items-center gap-3 mt-2 text-sm">
+            <span className="text-gray-600 whitespace-nowrap">收到钱了吗</span>
+            <div className="flex gap-1.5">
+              {[['paid', '✓ 收到了'], ['partial', '收了一部分'], ['unpaid', '还没收']].map(([val, label]) => {
+                const cur = draft.paymentStatus ?? order.paymentStatus ?? 'unpaid'
+                const on = cur === val
+                return (
+                  <button key={val} onClick={() => edit('paymentStatus', val)}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                      on ? (val === 'paid' ? 'border-green-500 bg-green-50 text-green-700'
+                                           : 'border-red-400 bg-red-50 text-red-700')
+                         : 'border-gray-200 text-gray-500'}`}>
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+            {/* ⚠️ 隔了很久才收到的，多半不是当初那个方式。
+                 转账要加 10% GST，方式不改金额就是错的。 */}
+            {(draft.paymentStatus ?? order.paymentStatus) === 'paid'
+              && order.paymentStatus !== 'paid' && (
+              <span className="text-xs text-amber-700 bg-amber-50 rounded px-2 py-1 leading-tight">
+                隔了这么久才收到？顺手确认上面的收款方式 —— 转账要加 10% GST
+              </span>
+            )}
           </div>
 
           {/* 账单怎么算出来的 —— Annie 手里拿着现金或流水，得看懂这个数的来路 */}

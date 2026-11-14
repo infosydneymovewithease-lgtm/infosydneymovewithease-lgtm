@@ -90,6 +90,8 @@ export default function AdminOrderDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { orders, workers, dispatchOrder, updateOrderStatus, updateOrder, user } = useApp()
+  // 收款状态是钱的状态，不是随手标记 —— 只给 admin / 客服经理
+  const isManager = user?.role === 'admin' || user?.role === 'manager'
 
   const order = orders.find(o => o.id === id)
   const [showDispatch, setShowDispatch] = useState(false)
@@ -758,7 +760,39 @@ export default function AdminOrderDetail() {
             )}
           </div>
         )}
-        {order.paymentStatus === 'unpaid' && (
+        {/* ── 收到钱了吗（2026-11-15 加）──────────────────
+            原来这里只有一句「⚠️ 客户未付款，请跟进」，但【没有任何地方能改】。
+            客人过几天付了钱，这单永远挂着未收，周月汇总天天报。
+            ⚠️ 只有 admin/manager 能改 —— 这是钱的状态，不是随手标记。 */}
+        {order.status === '已完成' && isManager && (
+          <div className="mt-2 flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-gray-500 shrink-0">收到钱了吗</span>
+            {[['paid', '✓ 收到了'], ['partial', '收了一部分'], ['unpaid', '还没收']].map(([val, label]) => {
+              const on = (order.paymentStatus || 'unpaid') === val
+              return (
+                <button key={val}
+                  onClick={() => updateOrder(id, {
+                    paymentStatus: val,
+                    editedAt: new Date().toISOString(),
+                    editedBy: user?.name || user?.role || '客服',
+                    editReason: `收款状态改成「${label}」`,
+                  })}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                    on ? (val === 'paid' ? 'border-green-500 bg-green-50 text-green-700'
+                                         : 'border-red-400 bg-red-50 text-red-700')
+                       : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                  {label}
+                </button>
+              )
+            })}
+            {order.paymentStatus !== 'paid' && order.paymentMethod === 'cash' && (
+              <span className="text-xs text-amber-700">
+                隔久了才收到的话，顺手去对账改一下收款方式 —— 转账要加 10% GST
+              </span>
+            )}
+          </div>
+        )}
+        {order.paymentStatus === 'unpaid' && !isManager && (
           <p className="text-red-500 text-xs mt-1">⚠️ 客户未付款，请跟进</p>
         )}
         {order.workerNote && (
