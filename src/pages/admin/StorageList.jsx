@@ -4,24 +4,12 @@ import { PlusCircle, Phone, ChevronRight, AlertTriangle, Clock, CheckCircle } fr
 import dayjs from 'dayjs'
 import { useState } from 'react'
 import { getStorageRates } from '../../data/storageRates'
+import { storageStatus, STORAGE_TABS } from '../../utils/storage'
 
-function getStorageStatus(order) {
-  if (order.actualMoveOutDate) return { label: '已取件', color: 'bg-gray-100 text-gray-500', icon: CheckCircle }
-  const today = dayjs()
-  const moveOut = dayjs(order.moveOutDate)
-  const daysLeft = moveOut.diff(today, 'day')
-  if (daysLeft < 0)  return { label: '已逾期', color: 'bg-red-100 text-red-600', icon: AlertTriangle, daysLeft }
-  if (daysLeft <= 7) return { label: `${daysLeft}天后到期`, color: 'bg-amber-100 text-amber-700', icon: Clock, daysLeft }
-  return { label: '寄存中', color: 'bg-blue-100 text-blue-700', icon: Clock, daysLeft }
-}
-
-const STATUS_TABS = [
-  { label: '全部',    value: 'all' },
-  { label: '寄存中',  value: 'active' },
-  { label: '即将到期', value: 'expiring' },
-  { label: '已逾期',  value: 'overdue' },
-  { label: '已取件',  value: 'done' },
-]
+// ⚠️ 2026-11-16：本地那份 getStorageStatus 和 STATUS_TABS 搬到 utils/storage.js 了。
+//    原来它只看出库日，入库日还没到的 5 单全被标成「寄存中」——
+//    小洁在群里圈红的就是这几条：「这些还没开始寄存呢…我在这里看不出来」。
+//    详情页还有一份一样的，一起合并了。
 
 export default function StorageList() {
   const { storageOrders, updateStorageOrder } = useApp()
@@ -31,32 +19,29 @@ export default function StorageList() {
 
   const today = dayjs()
 
-  const enriched = storageOrders.map(o => ({ ...o, _status: getStorageStatus(o) }))
+  const enriched = storageOrders.map(o => ({ ...o, _status: storageStatus(o, today) }))
 
   const filtered = enriched.filter(o => {
-    const matchTab =
-      tab === 'all'      ? true :
-      tab === 'done'     ? !!o.actualMoveOutDate :
-      tab === 'overdue'  ? (!o.actualMoveOutDate && dayjs(o.moveOutDate).diff(today, 'day') < 0) :
-      tab === 'expiring' ? (!o.actualMoveOutDate && dayjs(o.moveOutDate).diff(today, 'day') >= 0 && dayjs(o.moveOutDate).diff(today, 'day') <= 7) :
-      (!o.actualMoveOutDate && dayjs(o.moveOutDate).diff(today, 'day') > 7)
-
+    const matchTab = tab === 'all' ? o._status.key !== 'cancelled' : o._status.key === tab
     const q = search.toLowerCase()
     const matchSearch = !q || o.customerName?.toLowerCase().includes(q) || o.customerPhone?.includes(q) || o.id?.toLowerCase().includes(q)
     return matchTab && matchSearch
   }).sort((a, b) => {
+    // 待入库的按入库日排（最近要来的在前），其余按出库日排
+    const ap = a._status.key === 'pending', bp = b._status.key === 'pending'
+    if (ap !== bp) return ap ? -1 : 1
+    if (ap) return (a.moveInDate || '').localeCompare(b.moveInDate || '')
     if (a.actualMoveOutDate && !b.actualMoveOutDate) return 1
     if (!a.actualMoveOutDate && b.actualMoveOutDate) return -1
     return (a.moveOutDate || '').localeCompare(b.moveOutDate || '')
   })
 
-  const counts = {
-    all: enriched.length,
-    active:   enriched.filter(o => !o.actualMoveOutDate && dayjs(o.moveOutDate).diff(today, 'day') > 7).length,
-    expiring: enriched.filter(o => !o.actualMoveOutDate && dayjs(o.moveOutDate).diff(today, 'day') >= 0 && dayjs(o.moveOutDate).diff(today, 'day') <= 7).length,
-    overdue:  enriched.filter(o => !o.actualMoveOutDate && dayjs(o.moveOutDate).diff(today, 'day') < 0).length,
-    done:     enriched.filter(o => !!o.actualMoveOutDate).length,
-  }
+  const counts = STORAGE_TABS.reduce((acc, t) => ({
+    ...acc,
+    [t.value]: t.value === 'all'
+      ? enriched.filter(o => o._status.key !== 'cancelled').length
+      : enriched.filter(o => o._status.key === t.value).length,
+  }), {})
 
   const weeklyRevenue = enriched
     .filter(o => !o.actualMoveOutDate)
@@ -107,7 +92,7 @@ export default function StorageList() {
 
       {/* Tabs + Search */}
       <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1">
-        {STATUS_TABS.map(t => (
+        {STORAGE_TABS.map(t => (
           <button
             key={t.value}
             onClick={() => setTab(t.value)}
@@ -190,13 +175,18 @@ function StorageCard({ order: o, onClick, onCancel }) {
             <span>📦 {o.boxes}箱</span>
             {o.furniture > 0 && <><span>·</span><span>🪑 {o.furniture}件家具</span></>}
             <span>·</span>
-            <span>{o.moveInDate} 入库</span>
+            {o._status.key === 'pending'
+              ? <span className="text-indigo-600 font-medium">{o.moveInDate} 入库</span>
+              : <span>{o.moveInDate} 入库</span>}
           </div>
         </div>
         <div className="text-right flex-shrink-0">
           <p className="text-green-600 font-bold text-sm">${totalFee}/期</p>
           <p className="text-gray-400 text-xs">${weeklyFee}/周</p>
-          <p className="text-gray-400 text-xs mt-0.5">到期 {o.moveOutDate}</p>
+          {/* 小洁 11-16：「客户入库时，支付的寄存费用，是到几号出库」——
+              moveOutDate 本来就是付费覆盖到的那天，只是原来写「到期」看不出是钱付到这儿 */}
+          <p className="text-gray-500 text-xs mt-0.5">已付到 {o.moveOutDate}</p>
+          <p className="text-gray-400 text-xs">共 {weeks} 周</p>
           {canCancel && onCancel && (
             <button
               onClick={e => { e.stopPropagation(); onCancel() }}
