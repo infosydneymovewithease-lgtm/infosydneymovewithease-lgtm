@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
 import { isDepositPaid } from '../../utils/orderHelpers'
+import { storageStatus } from '../../utils/storage'
 dayjs.locale('zh-cn')
 import {
   AlertTriangle, CheckCircle, Clock, DollarSign,
@@ -71,15 +72,11 @@ export default function Dashboard() {
   const noDeposit = orders.filter(o => !o.isB2BOrder && o.deposit > 0 && !isDepositPaid(o) && isActive(o) && inScope(o))
 
   // 寄存到期 / 逾期
-  const storageExpiring = (storageOrders || []).filter(o => {
-    if (o.actualMoveOutDate || o.status === '已取消' || !o.moveOutDate) return false
-    const daysLeft = dayjs(o.moveOutDate).diff(dayjs(), 'day')
-    return daysLeft >= 0 && daysLeft <= 7
-  })
-  const storageOverdue = (storageOrders || []).filter(o => {
-    if (o.actualMoveOutDate || o.status === '已取消' || !o.moveOutDate) return false
-    return dayjs(o.moveOutDate).diff(dayjs(), 'day') < 0
-  })
+  // ⚠️ 2026-11-16：这里原来自己又算了一遍日期（全项目第三份），
+  //    而且不看 workerStatus —— 还没入库的单也会被算进「即将到期」。
+  //    现在统一走 utils/storage.js 的 storageStatus()，一个口径。
+  const storageExpiring = (storageOrders || []).filter(o => storageStatus(o).key === 'expiring')
+  const storageOverdue  = (storageOrders || []).filter(o => storageStatus(o).key === 'overdue')
 
   const todayRevenue = orders
     .filter(o => o.date === today && o.finalAmount)
@@ -104,8 +101,9 @@ export default function Dashboard() {
     storageOverdue.length > 0 && {
       type: 'storageOverdue', urgent: false,
       level: 'red', icon: CalendarClock,
-      text: `${storageOverdue.length} 单寄存已逾期`,
-      action: () => navigate('/admin/orders?date=all'),
+      text: `${storageOverdue.length} 单寄存待出库（已逾期）`,
+      // ⚠️ 原来跳 /admin/orders —— 那是搬家订单列表，点进去一单寄存都找不到
+      action: () => navigate('/admin/storage?tab=overdue'),
     },
     unassigned.length > 0 && {
       type: 'unassigned', urgent: false,
@@ -129,7 +127,7 @@ export default function Dashboard() {
       type: 'storageExpiring', urgent: false,
       level: 'yellow', icon: Package,
       text: `${storageExpiring.length} 单寄存 7 天内到期`,
-      action: () => navigate('/admin/orders?date=all'),
+      action: () => navigate('/admin/storage?tab=expiring'),
     },
     noDeposit.length > 0 && {
       type: 'noDeposit', urgent: false,

@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { PlusCircle, Phone, ChevronRight, AlertTriangle, Clock, CheckCircle } from 'lucide-react'
 import dayjs from 'dayjs'
@@ -14,7 +14,13 @@ import { storageStatus, STORAGE_TABS } from '../../utils/storage'
 export default function StorageList() {
   const { storageOrders, updateStorageOrder } = useApp()
   const navigate = useNavigate()
-  const [tab, setTab] = useState('all')
+  // ⚠️ 2026-11-16：认 URL 上的 ?tab= ——
+  //    工作台那条「X 单寄存 7 天内到期」要能一键跳到对应页签，
+  //    否则客服点完还得自己再找一次。
+  const [params] = useSearchParams()
+  const [tab, setTab] = useState(
+    STORAGE_TABS.some(t => t.value === params.get('tab')) ? params.get('tab') : 'all'
+  )
   const [search, setSearch] = useState('')
 
   const today = dayjs()
