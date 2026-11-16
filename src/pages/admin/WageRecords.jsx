@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import { ChevronDown, ChevronRight, AlertCircle } from 'lucide-react'
 import dayjs from 'dayjs'
-import { hourlyRateFor, resolveRate, participantsIn } from '../../utils/wageRates'
+import { resolveRate, participantsIn } from '../../utils/wageRates'
+import { workerWage } from '../../utils/reconcile'
 
 // ── Worker config ──────────────────────────────────────────────
 // 2026-10-11：费率从这里搬到了数据库 staff_rate（带生效日期）。
@@ -13,33 +14,10 @@ import { hourlyRateFor, resolveRate, participantsIn } from '../../utils/wageRate
 //   ① 原名单漏了老周，而本页是遍历那个常量生成行的 —— 他从没在这页出现过
 //   ② 小宇 8/1 涨薪，只存当前值会把 7 月的历史工资一起改写
 
-function calcWorkerWage(order, workerId, staffRates) {
-  if (!order.billedHours) return null
-  const r = hourlyRateFor(staffRates, workerId, order)
-  const isDriver = r.isDriverRole
-  const workers = order.assignedWorkers?.length || 1
-  const rate = r.rate
-  const basePay = Math.round(rate * order.billedHours * 100) / 100
-
-  // 楼梯费＋加班费：工人平分，公司不拿
-  const stairOvertime = (order.stairFee || 0) + (order.overtimeFee || 0)
-  const stairShare = stairOvertime > 0 ? Math.round(stairOvertime / workers * 100) / 100 : 0
-
-  // 重物费＋易碎费：工人＋公司平分（公司算1份）
-  const heavyFragile = (order.heavyFee || 0) + (order.fragileEstimatedFee || 0)
-  const heavyShare = heavyFragile > 0 ? Math.round(heavyFragile / (workers + 1) * 100) / 100 : 0
-
-  return {
-    rate, isDriver, workers,
-    rateSource: r.source,          // 'db' | 'legacy' | 'default' —— 非 db 时页面标黄
-    basePay,
-    stairShare,
-    heavyShare,
-    stairOvertime,
-    heavyFragile,
-    total: Math.round((basePay + stairShare + heavyShare) * 100) / 100,
-  }
-}
+// ⚠️ 2026-11-16：本地那份 calcWorkerWage 删了，改用 reconcile.js 的 workerWage()。
+//    原来这里和对账页 daySummary 各算各的，同一单给两个数（这边含重物费，那边没有），
+//    而且【两边都漏了回程费】—— 老板对老王手写工资单时发现的，5/09 以来 374 单都漏。
+//    一个口径，改一处两处都对。
 
 // ── Period helpers ─────────────────────────────────────────────
 function weekBounds(weeksAgo = 0) {
@@ -58,7 +36,7 @@ const TABS = [
 
 // ── Component ──────────────────────────────────────────────────
 export default function WageRecords() {
-  const { orders, staffRates } = useApp()
+  const { orders, staffRates, b2bCustomers } = useApp()
   const [tab, setTab] = useState('thisWeek')
   const [expanded, setExpanded] = useState({})
 
@@ -89,7 +67,7 @@ export default function WageRecords() {
       o.assignedTo === id || o.assignedWorkers?.includes(id)
     )
     const details = myOrders
-      .map(o => ({ order: o, wage: calcWorkerWage(o, id, staffRates) }))
+      .map(o => ({ order: o, wage: workerWage(o, id, staffRates, b2bCustomers) }))
       .filter(x => x.wage !== null)
     const missingData = myOrders.filter(o => !o.billedHours)
     const total = details.reduce((s, x) => s + x.wage.total, 0)
@@ -211,6 +189,20 @@ export default function WageRecords() {
                           <span>{o.billedHours}h × ${wage.rate}/h</span>
                           <span className="text-gray-600">${wage.basePay.toFixed(2)}</span>
                         </div>
+                        {wage.returnPay > 0 && (
+                          <div className="flex justify-between">
+                            <span>回程 {wage.longHaul ? '1' : wage.returnHours}h × ${wage.rate}/h</span>
+                            <span className="text-blue-500">+${wage.returnPay.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {wage.longHaul && (
+                          <div className="flex justify-between bg-amber-50 -mx-0.5 px-1 py-0.5 rounded">
+                            <span className="text-amber-700">
+                              ⚠️ 长途回程共 {wage.returnHours}h，还有 {wage.pendingHours}h 待你定
+                            </span>
+                            <span className="text-amber-700">未算</span>
+                          </div>
+                        )}
                         {wage.stairShare > 0 && (
                           <div className="flex justify-between">
                             <span>楼梯/加班 ${wage.stairOvertime} ÷ {wage.workers}人</span>

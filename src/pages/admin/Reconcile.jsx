@@ -111,7 +111,7 @@ export default function Reconcile() {
     () => orders.filter(o => o.date === date).sort((a, b) => (a.orderNo || '').localeCompare(b.orderNo || '')),
     [orders, date])
   const done = dayOrders.filter(o => o.status === '已完成')
-  const sum = useMemo(() => daySummary(dayOrders, staffRates), [dayOrders, staffRates])
+  const sum = useMemo(() => daySummary(dayOrders, staffRates, b2bCustomers), [dayOrders, staffRates, b2bCustomers])
 
   const issuesBy = useMemo(() => Object.fromEntries(
     done.map(o => [o.id, detectIssues(o, { medians, staffRates })])), [done, medians, staffRates])

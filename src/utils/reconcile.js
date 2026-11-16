@@ -11,6 +11,7 @@
 import { hourlyRateFor } from './wageRates'
 import { billedHours as calcBilled, overtimeDetail } from './pricing'
 import { VEHICLES, STAIRS_FEE, VAN_PROMO_DISCOUNT } from '../data/vehicles'
+import { RETURN_PAY_FROM } from '../config/features'
 
 /** 这些字段为空不算异常 —— 低频，不是漏记 */
 export const LOW_FREQUENCY_FEES = ['parkingFee', 'highwayFee', 'fuelFee', 'suppliesFee']
@@ -129,7 +130,7 @@ export function impactOf(order, changes, staffRates) {
 
 /** 当日汇总。随补录实时变。
  *  工资按人拆开 —— Annie要拿这个和每个师傅核工资，只给总数等于没给。 */
-export function daySummary(orders, staffRates) {
+export function daySummary(orders, staffRates, b2bCustomers) {
   let due = 0, paid = 0, cash = 0, transfer = 0
   const byStaff = new Map()
   for (const o of orders) {
@@ -141,13 +142,15 @@ export function daySummary(orders, staffRates) {
       if (o.paymentMethod === 'cash') cash += amt
       else if (o.paymentMethod === 'transfer') transfer += amt
     }
-    const share = (Number(o.stairFee) || 0) + (Number(o.overtimeFee) || 0)
+    // ⚠️ 2026-11-16：这里原来自己算一套（工时＋楼梯＋加班），
+    //    和工资页的公式不一样 —— 少了重物费，两套都少了回程费。
+    //    现在统一走 workerWage()，一个口径。
     const ids = participants(o)
     for (const id of ids) {
       const r = hourlyRateFor(staffRates, id, o)
-      const w = r.rate * (Number(o.billedHours) || 0) + share / (ids.length || 1)
+      const w = workerWage(o, id, staffRates, b2bCustomers)
       const cur = byStaff.get(id) || { id, name: r.name, amount: 0, orders: 0 }
-      byStaff.set(id, { ...cur, amount: cur.amount + w, orders: cur.orders + 1 })
+      byStaff.set(id, { ...cur, amount: cur.amount + (w?.total || 0), orders: cur.orders + 1 })
     }
   }
   const wageList = [...byStaff.values()].sort((a, b) => b.amount - a.amount)
@@ -209,6 +212,75 @@ export function unitPriceOf(order, key, b2bCustomers) {
   }
   if (key === 'stairFee') return STAIRS_FEE[v.people] || 10
   return 0
+}
+
+/**
+ * 一个师傅在一单上该拿多少。【唯一口径】
+ *
+ * 2026-11-16 新建。原来有两套公式，同一单给两个数：
+ *   工资页 WageRecords.calcWorkerWage  工时＋楼梯＋加班＋重物
+ *   对账页 daySummary                  工时＋楼梯＋加班        ← 漏了重物
+ * 而且【两套都漏了回程费】。
+ *
+ * ⚠️ 回程这个洞是老板 11-16 对老王的手写工资单时发现的：
+ *    他那一周每单都比系统多 1 小时，太均匀了不像算错 —— 就是回程。
+ *    客户每单都付了回程费（小卡 $110 / 大卡 $120），公司全额留下，
+ *    师傅拿 $0。5/09 以来 374 单都是这样。
+ *
+ * 回程怎么折算：
+ *   returnFee 存的是【金额】，但它在对账页本来就是按「小时数 × 单价」填进去的
+ *   （RECONCILE_FIELDS 里 type:'qty', unit:'小时'）。所以反着除回去就是小时数。
+ *   $110 ÷ $110 = 1 小时。企业协议价（面包车 时薪$60 / 回程$50）走 unitPriceOf。
+ *
+ * ⚠️ 长途不自动给（老板 11-16 定）：
+ *    超过 1 小时的回程（$550、$990 那种，约 20 单）只自动算 1 小时，
+ *    剩下的标出来【由他逐单定】—— 开 5 小时回来和跑一趟近程不是一回事，
+ *    规则我替他定不了。
+ */
+export function workerWage(order, workerId, staffRates, b2bCustomers) {
+  const hours = Number(order?.billedHours) || 0
+  if (!hours) return null
+
+  const r = hourlyRateFor(staffRates, workerId, order)
+  const rate = r.rate
+  const workers = order.assignedWorkers?.length || 1
+  const r2 = n => Math.round(n * 100) / 100
+
+  const basePay = r2(rate * hours)
+
+  // 回程：金额 ÷ 单价 = 小时数
+  // ⚠️ 只从 RETURN_PAY_FROM 起算。之前的单维持原样 ——
+  //    否则历史工资被追溯改写，和当时实际发的钱对不上。
+  const inScope = String(order.date || '') >= RETURN_PAY_FROM
+  const unit = inScope ? unitPriceOf(order, 'returnFee', b2bCustomers) : 0
+  const returnAmt = inScope ? (Number(order.returnFee) || 0) : 0
+  const returnHours = unit > 0 ? returnAmt / unit : 0
+  const longHaul = returnHours > 1.001          // 留一点浮点余量
+  const paidHours = longHaul ? 1 : returnHours
+  const returnPay = r2(rate * paidHours)
+
+  // 楼梯费＋加班费：工人平分，公司不拿
+  const stairOvertime = (Number(order.stairFee) || 0) + (Number(order.overtimeFee) || 0)
+  const stairShare = stairOvertime > 0 ? r2(stairOvertime / workers) : 0
+
+  // 重物费＋易碎费：工人＋公司平分（公司算 1 份）
+  const heavyFragile = (Number(order.heavyFee) || 0) + (Number(order.fragileEstimatedFee) || 0)
+  const heavyShare = heavyFragile > 0 ? r2(heavyFragile / (workers + 1)) : 0
+
+  return {
+    rate, isDriver: r.isDriverRole, workers,
+    rateSource: r.source,          // 'db' | 'legacy' | 'default' —— 非 db 时页面标黄
+    basePay,
+    returnPay,
+    returnHours: r2(returnHours),
+    longHaul,
+    pendingHours: longHaul ? r2(returnHours - 1) : 0,   // 待他定的那部分
+    stairShare,
+    heavyShare,
+    stairOvertime,
+    heavyFragile,
+    total: r2(basePay + returnPay + stairShare + heavyShare),
+  }
 }
 
 /** 这一单该用的时薪。协议价快照优先 —— 和 pricing.js calcTotal 同源。 */
