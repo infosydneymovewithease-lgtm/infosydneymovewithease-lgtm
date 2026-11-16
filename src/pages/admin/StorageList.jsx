@@ -4,7 +4,7 @@ import { PlusCircle, Phone, ChevronRight, AlertTriangle, Clock, CheckCircle } fr
 import dayjs from 'dayjs'
 import { useState } from 'react'
 import { getStorageRates } from '../../data/storageRates'
-import { storageStatus, STORAGE_TABS } from '../../utils/storage'
+import { storageStatus, STORAGE_TABS, FIRST_NOTICE_DAYS, SECOND_NOTICE_DAYS } from '../../utils/storage'
 
 // ⚠️ 2026-11-16：本地那份 getStorageStatus 和 STATUS_TABS 搬到 utils/storage.js 了。
 //    原来它只看出库日，入库日还没到的 5 单全被标成「寄存中」——
@@ -42,6 +42,9 @@ export default function StorageList() {
     return (a.moveOutDate || '').localeCompare(b.moveOutDate || '')
   })
 
+  // 7 天内到期的 —— 第二封通知的对象
+  const urgentCount = enriched.filter(o => o._status.urgent).length
+
   const counts = STORAGE_TABS.reduce((acc, t) => ({
     ...acc,
     [t.value]: t.value === 'all'
@@ -74,25 +77,41 @@ export default function StorageList() {
         </button>
       </div>
 
-      {/* Stats */}
+      {/* Stats
+          ⚠️ 2026-11-16 改：
+          · 补上「待入库」—— 原来横幅四格里没有它，5 单待入库在横幅上完全看不见
+          · 「已逾期」改叫「待出库」，和页签同名。同一件事两个名字，交接时要出事
+          · 拿掉「已取件」—— 那是办完的事，不需要天天盯；要看点页签就有
+          · 四格都能点，点了直接切到对应页签 */}
       <div className="grid grid-cols-4 gap-3 mb-5">
-        <StatCard label="寄存中" value={counts.active + counts.expiring} color="blue" />
-        <StatCard label="即将到期" value={counts.expiring} color={counts.expiring > 0 ? 'amber' : 'gray'} />
-        <StatCard label="已逾期" value={counts.overdue} color={counts.overdue > 0 ? 'red' : 'gray'} />
-        <StatCard label="已取件" value={counts.done} color="gray" />
+        <StatCard label="待入库"   value={counts.pending}  color={counts.pending > 0 ? 'indigo' : 'gray'} onClick={() => setTab('pending')} />
+        <StatCard label="寄存中"   value={counts.active}   color="blue"  onClick={() => setTab('active')} />
+        <StatCard label="即将到期" value={counts.expiring} color={counts.expiring > 0 ? 'amber' : 'gray'} onClick={() => setTab('expiring')} />
+        <StatCard label="待出库"   value={counts.overdue}  color={counts.overdue > 0 ? 'red' : 'gray'}    onClick={() => setTab('overdue')} />
       </div>
 
       {/* Overdue / expiring alerts */}
       {counts.overdue > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-3 mb-4">
           <AlertTriangle size={16} className="text-red-500 flex-shrink-0" />
-          <span className="text-red-700 text-sm">有 <strong>{counts.overdue}</strong> 个寄存已逾期，请联系客户安排取件</span>
+          <span className="text-red-700 text-sm">有 <strong>{counts.overdue}</strong> 个寄存待出库（已逾期），请联系客户安排取件或续费</span>
         </div>
       )}
-      {counts.expiring > 0 && (
+      {urgentCount > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 flex items-center gap-3 mb-4">
+          <Clock size={16} className="text-orange-500 flex-shrink-0" />
+          <span className="text-orange-700 text-sm">
+            有 <strong>{urgentCount}</strong> 个寄存 <strong>{SECOND_NOTICE_DAYS}</strong> 天内到期 ——
+            第二封通知该发了，记得把逾期规则讲清楚
+          </span>
+        </div>
+      )}
+      {counts.expiring - urgentCount > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-3 mb-4">
           <Clock size={16} className="text-amber-500 flex-shrink-0" />
-          <span className="text-amber-700 text-sm">有 <strong>{counts.expiring}</strong> 个寄存将在7天内到期</span>
+          <span className="text-amber-700 text-sm">
+            有 <strong>{counts.expiring - urgentCount}</strong> 个寄存 <strong>{FIRST_NOTICE_DAYS}</strong> 天内到期 —— 联系客户问续费还是取货
+          </span>
         </div>
       )}
 
@@ -208,10 +227,14 @@ function StorageCard({ order: o, onClick, onCancel }) {
   )
 }
 
-function StatCard({ label, value, color }) {
-  const colors = { blue: 'text-blue-600', amber: 'text-amber-600', red: 'text-red-500', gray: 'text-gray-400' }
+function StatCard({ label, value, color, onClick }) {
+  const colors = {
+    blue: 'text-blue-600', amber: 'text-amber-600', red: 'text-red-500',
+    indigo: 'text-indigo-600', gray: 'text-gray-400',
+  }
   return (
-    <div className="bg-white rounded-xl p-3 shadow-sm text-center">
+    <div onClick={onClick}
+      className={`bg-white rounded-xl p-3 shadow-sm text-center${onClick ? ' cursor-pointer hover:shadow-md transition-shadow' : ''}`}>
       <p className={`text-2xl font-bold ${colors[color] || 'text-gray-800'}`}>{value}</p>
       <p className="text-gray-400 text-xs mt-0.5">{label}</p>
     </div>

@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
 import { isDepositPaid } from '../../utils/orderHelpers'
-import { storageStatus } from '../../utils/storage'
+import { storageStatus, FIRST_NOTICE_DAYS } from '../../utils/storage'
 dayjs.locale('zh-cn')
 import {
   AlertTriangle, CheckCircle, Clock, DollarSign,
@@ -126,7 +126,7 @@ export default function Dashboard() {
     storageExpiring.length > 0 && {
       type: 'storageExpiring', urgent: false,
       level: 'yellow', icon: Package,
-      text: `${storageExpiring.length} 单寄存 7 天内到期`,
+      text: `${storageExpiring.length} 单寄存 ${FIRST_NOTICE_DAYS} 天内到期`,
       action: () => navigate('/admin/storage?tab=expiring'),
     },
     noDeposit.length > 0 && {

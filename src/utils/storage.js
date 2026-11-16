@@ -16,6 +16,15 @@
 
 import dayjs from 'dayjs'
 
+// ── 催费节奏（老板 2026-11-16 定）─────────────────────────
+//   出库日 −15 天  第一封：问续费还是取货
+//   出库日 − 7 天  第二封：再催 + 把逾期规则讲全
+//   逾期 0~1 个月  按原价继续计费（纸箱 $4/周 · 家具 $8/周）
+//   逾期 1~2 个月  涨到短期价（纸箱 $5/周 · 家具 $10/周）
+//   逾期 2 个月以上 处理 / 变卖抵扣仓储费
+export const FIRST_NOTICE_DAYS  = 15
+export const SECOND_NOTICE_DAYS = 7
+
 /**
  * @returns {{key, label, color, daysLeft}} key 用来做筛选，label 用来显示
  */
@@ -32,9 +41,22 @@ export function storageStatus(order, now = dayjs()) {
 
   const daysLeft = dayjs(order.moveOutDate).diff(now, 'day')
   if (daysLeft < 0)
-    return { key: 'overdue', label: '待出库', color: 'bg-red-100 text-red-600', daysLeft }
-  if (daysLeft <= 7)
-    return { key: 'expiring', label: `${daysLeft}天后到期`, color: 'bg-amber-100 text-amber-700', daysLeft }
+    return { key: 'overdue', label: `已逾期 ${-daysLeft} 天`, color: 'bg-red-100 text-red-600', daysLeft }
+
+  // ⚠️ 老板 11-16 定的催费节奏：提前 15 天催一次，提前 7 天再催一次并把规则讲全。
+  //    所以「即将到期」的窗口是 15 天，不是原来的 7 天 ——
+  //    7 天才提醒，客户来不及约车、排时间，容易直接拖成逾期。
+  if (daysLeft <= FIRST_NOTICE_DAYS)
+    return {
+      key: 'expiring',
+      label: `${daysLeft}天后到期`,
+      // 进了第二封（7 天）的窗口就转橙，客服一眼看得出哪几单该加紧
+      color: daysLeft <= SECOND_NOTICE_DAYS
+        ? 'bg-orange-100 text-orange-700'
+        : 'bg-amber-100 text-amber-700',
+      daysLeft,
+      urgent: daysLeft <= SECOND_NOTICE_DAYS,
+    }
   return { key: 'active', label: '寄存中', color: 'bg-green-100 text-green-700', daysLeft }
 }
 
