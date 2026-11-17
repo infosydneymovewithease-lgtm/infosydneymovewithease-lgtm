@@ -427,8 +427,24 @@ export function AppProvider({ children }) {
   }
 
   // 寄存订单师傅交单：状态进入「寄存中」（不是「已完成」—— 寄存中是物品仍在库的状态）
+  //
+  // ⚠️ 2026-11-17 加 paymentStatus: '已付'。老板定的规矩：
+  //    钱是【先收】的，师傅到现场确认客人的寄存时长和金额，当场收齐 ——
+  //    运输费 + 寄存费 − 已收定金，没有例外。
+  //    所以「东西进仓」这一刻，钱就已经收了。
+  //
+  //    在这之前付款状态要另外有人手动去点，结果就是没人点：
+  //    Ying Gao（M27815）、Chen（M27834）两单东西早在库里，
+  //    状态还挂着「仅付定金」。一件已经发生的事，却靠人记得去标记一下。
+  //
+  //    老板选了【自动标】而不是【让师傅填实收金额】——
+  //    代价是万一师傅真没收到，这个信号就丢了。他知道并接受。
   async function completeStorageOrder(orderId, result, expectedVersion) {
-    const updates = { status: '寄存中', workerStatus: 'done', completedAt: new Date().toISOString(), ...result }
+    const updates = {
+      status: '寄存中', workerStatus: 'done', completedAt: new Date().toISOString(),
+      paymentStatus: '已付',
+      ...result,
+    }
     setStorageOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o))
     let query = supabase.from('storage_orders').update(pickStorage(updates)).eq('id', orderId)
     if (typeof expectedVersion === 'number') {
