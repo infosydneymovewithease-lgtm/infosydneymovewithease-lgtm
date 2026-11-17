@@ -1095,7 +1095,16 @@ function EditStorageBillModal({ order, storageFee, onClose, onSave }) {
 // ⚠️ 只算、只显示，【不写回数据库】——
 //    实际收多少还是老板跟客户谈，系统给的是「按规矩该是多少」。
 function SettlementCard({ order }) {
-  const [settleDate, setSettleDate] = useState(order.actualMoveOutDate || sydneyToday())
+  // ⚠️ 默认结算日不能用「今天」—— 本地测试时踩到了：
+  //    一单 11/09 入库、付到 2027-01-11，现在才第 8 天，东西好好在仓库里，
+  //    面板一打开却写「要退给客户 $393.71」（因为它以为客户今天来取件了）。
+  //    小洁看到正常单要退几百块会直接懵。
+  //    所以默认落在「预期的那一天」：
+  //      已取件 → 实际取件日；已逾期 → 今天；还没到期 → 原到期日（显示不退不补）
+  const today = sydneyToday()
+  const 默认结算日 = order.actualMoveOutDate
+    || (today > order.moveOutDate ? today : order.moveOutDate)
+  const [settleDate, setSettleDate] = useState(默认结算日)
   const [renewWeeks, setRenewWeeks] = useState('')
 
   // 还没真入库的单没什么好结算的
@@ -1160,7 +1169,17 @@ function SettlementCard({ order }) {
           </div>
         )}
 
-        <Row label="已付"><span className="text-orange-600">-${r.已付.toFixed(2)}</span></Row>
+        {/* ⚠️ 规矩是【先收钱】：师傅现场确认客人的寄存时长和金额，当场收，没有例外。
+            所以「师傅已交单（东西在库）」+「付款状态不是已付」= 数据不对，
+            要么收了没改状态，要么真没收到。两种都得有人去问一句。 */}
+        <Row label="已付（师傅现场收）"><span className="text-orange-600">-${r.已付.toFixed(2)}</span></Row>
+        {order.workerStatus === 'done' && order.paymentStatus !== '已付' && (
+          <p className="text-xs text-red-700 bg-red-50 rounded-lg px-2 py-1.5">
+            ⚠️ 东西已经在库，付款状态却还是「{order.paymentStatus === '定金' ? '仅付定金' : '未付款'}」。
+            按规矩师傅现场就该收齐了 —— <strong>确认一下钱到底收了没有</strong>，
+            收了就去上面「付款状态」改成已付清。
+          </p>
+        )}
       </div>
 
       <div className="border-t border-gray-100 pt-2.5 mt-1">
@@ -1182,6 +1201,12 @@ function SettlementCard({ order }) {
         {r.逾期天数 > 0 && (
           <p className="text-xs text-red-600 mt-2">
             ⚠️ 按 {settleDate} 算，晚一天多 ${r.每天多收}
+          </p>
+        )}
+        {/* 把日期改到到期日之前 = 在问「如果客户提前来取会怎样」，说清楚免得当成既成事实 */}
+        {!order.actualMoveOutDate && settleDate < order.moveOutDate && (
+          <p className="text-xs text-blue-600 bg-blue-50 rounded-lg px-2 py-1.5 mt-2">
+            ℹ️ 这是假设客户 {settleDate} 来取件的结果。东西还在仓库里，没真取之前不用退。
           </p>
         )}
       </div>
