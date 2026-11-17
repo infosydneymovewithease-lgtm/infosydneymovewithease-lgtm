@@ -1157,18 +1157,6 @@ function SettlementCard({ order }) {
           </div>
         ))}
 
-        {r.物料补收 > 0 && (
-          <div>
-            <div className="flex justify-between items-baseline">
-              <span className="text-sm font-medium text-amber-700">物料补收 ⚠️</span>
-              <span className="text-gray-800 text-sm font-semibold">${r.物料补收.toFixed(2)}</span>
-            </div>
-            <p className="text-xs text-gray-400">
-              掉回短期档，已用物料要补：{r.物料明细.map(m => `${m.label} ${m.数量}×$${m.单价}`).join('　')}
-            </p>
-          </div>
-        )}
-
         {/* ⚠️ 规矩是【先收钱】：师傅现场确认客人的寄存时长和金额，当场收，没有例外。
             所以「师傅已交单（东西在库）」+「付款状态不是已付」= 数据不对，
             要么收了没改状态，要么真没收到。两种都得有人去问一句。 */}

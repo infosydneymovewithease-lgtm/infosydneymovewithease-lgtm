@@ -9,7 +9,7 @@
 // ⚠️ 核心约定：【周】只是报价时对客户的说法，系统里一律按天记。
 //    日价 = 周价 ÷ 7。这样提前取、超时取、逾期，一条公式走完，没有例外。
 
-import { STORAGE_RATES, getStorageRates, MATERIAL_PRICES, MATERIAL_LABELS } from '../data/storageRates'
+import { STORAGE_RATES, getStorageRates } from '../data/storageRates'
 
 const DAY = 86400000
 const d2 = n => Math.round(n * 100) / 100
@@ -26,10 +26,6 @@ const addDays = (s, n) => {
 
 /** 宽限期：逾期头 30 天按原档价，不涨 */
 export const GRACE_DAYS = 30
-
-// 物料单价搬到 data/storageRates.js 了 —— 页面文案和结算补收必须用同一份，
-// 不然调价时改一处漏一处（和今天早上工资那两套公式是同一个病）。
-export { MATERIAL_PRICES, MATERIAL_LABELS }
 
 /** 某个档位下，这一单每天多少钱 */
 function dailyRate(order, shortTerm) {
@@ -84,23 +80,15 @@ export function settleStorage(order, settleDate, renewWeeks = 0) {
   const renewDays = newDueDate ? days(settleDate, newDueDate) : 0
   const 续费 = d2(renewDays * rate)
 
-  // ── 物料补收：只在【掉回短期档】时发生 ─────────────
-  const 原档 = getStorageRates(Math.max(1, Math.ceil(days(inDate, dueDate) / 7)))
-  const 掉档 = !原档.shortTerm && shortTerm
-  const 物料明细 = []
-  let 物料补收 = 0
-  if (掉档) {
-    const m = order.materialsIssued || order.requestedMaterials || {}
-    for (const k of Object.keys(MATERIAL_PRICES)) {
-      const n = Number(m[k]) || 0
-      if (n > 0) {
-        const 金额 = d2(n * MATERIAL_PRICES[k])
-        物料明细.push({ key: k, label: MATERIAL_LABELS[k], 数量: n, 单价: MATERIAL_PRICES[k], 金额 })
-        物料补收 += 金额
-      }
-    }
-    物料补收 = d2(物料补收)
-  }
+  // ⚠️ 2026-11-17 晚，老板定：【跨档不补物资差价】。
+  //    「物资费用就不要补了，怎样算成本够的」
+  //    客户订 6 周拿了免费纸箱、第 4 周就取走 —— 钱按短期重算，
+  //    但物资不往回追。几十块的事，换客户少一次争执。
+  //
+  //    这一条省掉的不只是一段代码：本来要补的三个窟窿
+  //    （后台建单加物资栏、加床垫套字段、师傅交单确认实际发放数量）
+  //    现在都不再是阻塞项。胶带 $3 / 床垫套 $10 照常按使用收，
+  //    那是单独卖的东西，和档位无关。
 
   // ── 已付：原报价（预订周数 × 当时档位周价）─────────
   const 预订天数 = Math.max(1, days(inDate, dueDate))
@@ -109,7 +97,11 @@ export function settleStorage(order, settleDate, renewWeeks = 0) {
   const 已付 = d2(预订周数 * ((Number(order.boxes) || 0) * r0.boxRate
                            + (Number(order.furniture) || 0) * r0.furRate))
 
-  const 应收 = d2(正常与宽限 + 逾期加价 + 续费 + 物料补收)
+  // 掉档：订的是长期、实际只住到短期 —— 整单按短期价重算（页面要提示）
+  const 原档 = getStorageRates(Math.max(1, Math.ceil(days(inDate, dueDate) / 7)))
+  const 掉档 = !原档.shortTerm && shortTerm
+
+  const 应收 = d2(正常与宽限 + 逾期加价 + 续费)
   const 差额 = d2(应收 - 已付)   // 正数 = 客户补，负数 = 退给客户
 
   return {
@@ -122,7 +114,6 @@ export function settleStorage(order, settleDate, renewWeeks = 0) {
       segB > 0 && { 标签: '逾期加价', 从: graceEnd, 到: endDate, 天: segB, 日价: d2(shortRate), 金额: 逾期加价 },
       renewDays > 0 && { 标签: `续 ${renewWeeks} 周`, 从: settleDate, 到: newDueDate, 天: renewDays, 日价: d2(rate), 金额: 续费 },
     ].filter(Boolean),
-    物料明细, 物料补收,
     已付, 应收, 差额,
     要补: 差额 > 0 ? 差额 : 0,
     要退: 差额 < 0 ? d2(-差额) : 0,
