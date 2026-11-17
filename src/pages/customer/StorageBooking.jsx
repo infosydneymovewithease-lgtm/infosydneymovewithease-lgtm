@@ -234,7 +234,7 @@ export default function StorageBooking() {
             </div>
           </div>
           <div className="mt-2 rounded-xl px-3 py-2 text-xs" style={{ background: 'rgba(255,255,255,0.18)' }}>
-            🎁 <strong>长期优惠</strong>：寄存 &gt;5 周降至 纸箱 $4 / 家具 $8，且<strong>免费送 {FREE_SUPPLIES_LABEL}</strong>
+            🎁 <strong>长期优惠</strong>：寄存 &gt;5 周降至 纸箱 $4 / 家具 $8，需要{FREE_SUPPLIES_LABEL}可<strong>免费提供</strong>（按实际使用）
           </div>
         </div>
 
@@ -311,7 +311,7 @@ export default function StorageBooking() {
               </div>
               {fee.freeSupplies && (
                 <p className="text-xs text-green-600 font-semibold pt-0.5">
-                  🎁 含免费物资（{FREE_SUPPLIES_LABEL}）
+                  🎁 需要{FREE_SUPPLIES_LABEL}免费提供（用多少算多少）
                 </p>
               )}
               <p className="text-xs text-gray-400">存储费另计运输费，取回搬运享 <span className="text-green-600 font-semibold">$10 优惠</span></p>

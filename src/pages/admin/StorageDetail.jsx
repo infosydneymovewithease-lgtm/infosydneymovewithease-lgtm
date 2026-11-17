@@ -5,7 +5,7 @@ import dayjs from 'dayjs'
 import { useState, useRef, useEffect } from 'react'
 import { saveVideo, getVideo, deleteVideo } from '../../utils/mediaDB'
 import { isDepositPaid } from '../../utils/orderHelpers'
-import { getStorageRates, FREE_SUPPLIES_LABEL } from '../../data/storageRates'
+import { getStorageRates, FREE_SUPPLIES_LABEL, PAID_SUPPLIES_NOTE } from '../../data/storageRates'
 import { storageStatus } from '../../utils/storage'
 import { settleStorage } from '../../utils/storageBilling'
 import { sydneyToday } from '../../utils/date'
@@ -284,7 +284,7 @@ export default function StorageDetail() {
         </div>
         {freeSupplies && (
           <div className="mt-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-            ✅ 含免费物资（{FREE_SUPPLIES_LABEL}）— 长期客户权益
+            ✅ 长期客户 {FREE_SUPPLIES_LABEL} 免费（按实际使用）· {PAID_SUPPLIES_NOTE}
           </div>
         )}
       </Card>

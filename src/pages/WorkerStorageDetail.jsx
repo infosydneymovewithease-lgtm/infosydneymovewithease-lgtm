@@ -326,7 +326,7 @@ export default function WorkerStorageDetail() {
 
             {freeSupplies && (
               <div className="mt-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-700">
-                🎁 客户享免费物资（{FREE_SUPPLIES_LABEL}）— 寄存 &gt;5 周长期客户权益
+                🎁 长期客户 {FREE_SUPPLIES_LABEL} 免费 —— 按实际给出去的数量算，没给就不算
               </div>
             )}
           </div>

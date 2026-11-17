@@ -9,7 +9,7 @@
 // ⚠️ 核心约定：【周】只是报价时对客户的说法，系统里一律按天记。
 //    日价 = 周价 ÷ 7。这样提前取、超时取、逾期，一条公式走完，没有例外。
 
-import { STORAGE_RATES, getStorageRates } from '../data/storageRates'
+import { STORAGE_RATES, getStorageRates, MATERIAL_PRICES, MATERIAL_LABELS } from '../data/storageRates'
 
 const DAY = 86400000
 const d2 = n => Math.round(n * 100) / 100
@@ -27,9 +27,9 @@ const addDays = (s, n) => {
 /** 宽限期：逾期头 30 天按原档价，不涨 */
 export const GRACE_DAYS = 30
 
-/** 物料单价（老板 11-17 定）。跨档掉回短期时按实际发放数量补收。 */
-export const MATERIAL_PRICES = { boxes: 5, tape: 3, mattressCover: 10 }
-export const MATERIAL_LABELS = { boxes: '纸箱', tape: '胶带', mattressCover: '床垫套' }
+// 物料单价搬到 data/storageRates.js 了 —— 页面文案和结算补收必须用同一份，
+// 不然调价时改一处漏一处（和今天早上工资那两套公式是同一个病）。
+export { MATERIAL_PRICES, MATERIAL_LABELS }
 
 /** 某个档位下，这一单每天多少钱 */
 function dailyRate(order, shortTerm) {
