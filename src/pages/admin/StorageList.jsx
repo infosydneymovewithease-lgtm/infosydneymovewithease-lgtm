@@ -5,6 +5,8 @@ import dayjs from 'dayjs'
 import { useState } from 'react'
 import { getStorageRates } from '../../data/storageRates'
 import { storageStatus, STORAGE_TABS, FIRST_NOTICE_DAYS, SECOND_NOTICE_DAYS } from '../../utils/storage'
+import { settleStorage } from '../../utils/storageBilling'
+import { sydneyToday } from '../../utils/date'
 
 // ⚠️ 2026-11-16：本地那份 getStorageStatus 和 STATUS_TABS 搬到 utils/storage.js 了。
 //    原来它只看出库日，入库日还没到的 5 单全被标成「寄存中」——
@@ -212,6 +214,17 @@ function StorageCard({ order: o, onClick, onCancel }) {
               moveOutDate 本来就是付费覆盖到的那天，只是原来写「到期」看不出是钱付到这儿 */}
           <p className="text-gray-500 text-xs mt-0.5">已付到 {o.moveOutDate}</p>
           <p className="text-gray-400 text-xs">共 {weeks} 周</p>
+          {/* 逾期的单直接把欠款摆出来 —— 不用点进去就知道严重程度。
+              规则见 utils/storageBilling.js（老板 11-17 定） */}
+          {o._status.key === 'overdue' && (() => {
+            const r = settleStorage(o, sydneyToday())
+            return r && r.要补 > 0 ? (
+              <>
+                <p className="text-red-600 text-xs font-semibold mt-1">已欠 ${r.要补.toFixed(2)}</p>
+                <p className="text-red-400 text-xs">每天 +${r.每天多收}</p>
+              </>
+            ) : null
+          })()}
           {canCancel && onCancel && (
             <button
               onClick={e => { e.stopPropagation(); onCancel() }}

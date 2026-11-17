@@ -7,6 +7,8 @@ import { saveVideo, getVideo, deleteVideo } from '../../utils/mediaDB'
 import { isDepositPaid } from '../../utils/orderHelpers'
 import { getStorageRates, FREE_SUPPLIES_LABEL } from '../../data/storageRates'
 import { storageStatus } from '../../utils/storage'
+import { settleStorage } from '../../utils/storageBilling'
+import { sydneyToday } from '../../utils/date'
 
 // ⚠️ 2026-11-16：日期部分搬到 utils/storage.js 了（和列表页共用一份）。
 //    这里只保留【订单流程】那几个状态 —— 待确认／已确认／已派单，
@@ -394,6 +396,9 @@ export default function StorageDetail() {
           <div className="mt-1 bg-gray-50 rounded-lg px-3 py-2 text-xs text-gray-500">{order.notes}</div>
         )}
       </Card>
+
+      {/* 结算 —— 老板 11-17 定的规则，见 utils/storageBilling.js */}
+      <SettlementCard order={order} />
 
       {/* 定金凭证 */}
       {(order.depositStatus || order.depositScreenshot) && (
@@ -1080,5 +1085,106 @@ function EditStorageBillModal({ order, storageFee, onClose, onSave }) {
         </div>
       </div>
     </div>
+  )
+}
+
+// ── 结算面板 ──────────────────────────────────────────
+// 2026-11-17。老板问「客人逾期了系统会不会自动核算欠多少钱」—— 以前不会。
+// 规则全在 utils/storageBilling.js，这里只负责显示。
+//
+// ⚠️ 只算、只显示，【不写回数据库】——
+//    实际收多少还是老板跟客户谈，系统给的是「按规矩该是多少」。
+function SettlementCard({ order }) {
+  const [settleDate, setSettleDate] = useState(order.actualMoveOutDate || sydneyToday())
+  const [renewWeeks, setRenewWeeks] = useState('')
+
+  // 还没真入库的单没什么好结算的
+  if (order.workerStatus !== 'done' && !order.actualMoveOutDate) return null
+  if (order.status === '已取消') return null
+
+  const r = settleStorage(order, settleDate, Number(renewWeeks) || 0)
+  if (!r) return null
+
+  const 要补 = r.要补 > 0, 要退 = r.要退 > 0
+
+  return (
+    <Card title="结算">
+      <Row label="入库日">{order.moveInDate}</Row>
+      <Row label="原到期日">
+        <span className="text-gray-800">{order.moveOutDate}</span>
+        <span className="text-gray-400 text-xs ml-1">钱付到这天</span>
+      </Row>
+      {r.逾期天数 > 0 && (
+        <Row label="已逾期"><span className="text-red-600 font-semibold">{r.逾期天数} 天</span></Row>
+      )}
+
+      {/* ⚠️ 结算日可以改 —— 客户说周末付，就填周末那天，金额和新到期日跟着变 */}
+      <div className="border-t border-gray-100 pt-2.5 mt-1 flex items-end gap-3">
+        <label className="flex-1">
+          <span className="text-gray-500 text-xs block mb-1">结算日</span>
+          <input type="date" value={settleDate} onChange={e => setSettleDate(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm" />
+        </label>
+        <label className="w-28">
+          <span className="text-gray-500 text-xs block mb-1">续费（周）</span>
+          <input type="number" min="0" step="1" value={renewWeeks} placeholder="0"
+            onChange={e => setRenewWeeks(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm" />
+        </label>
+      </div>
+
+      {/* 分段明细 —— 每段写明「从哪天到哪天 × 每天多少钱」，
+          小洁可以直接对着念给客户听 */}
+      <div className="border-t border-gray-100 pt-2.5 mt-1 space-y-2">
+        {r.段.map((g, i) => (
+          <div key={i}>
+            <div className="flex justify-between items-baseline">
+              <span className={`text-sm font-medium ${g.标签 === '逾期加价' ? 'text-red-600' : 'text-gray-700'}`}>
+                {g.标签}{g.标签 === '逾期加价' && ' ⚠️'}
+              </span>
+              <span className="text-gray-800 text-sm font-semibold">${g.金额.toFixed(2)}</span>
+            </div>
+            <p className="text-xs text-gray-400">{g.从} → {g.到}　{g.天} 天 × ${g.日价}/天</p>
+          </div>
+        ))}
+
+        {r.物料补收 > 0 && (
+          <div>
+            <div className="flex justify-between items-baseline">
+              <span className="text-sm font-medium text-amber-700">物料补收 ⚠️</span>
+              <span className="text-gray-800 text-sm font-semibold">${r.物料补收.toFixed(2)}</span>
+            </div>
+            <p className="text-xs text-gray-400">
+              掉回短期档，已用物料要补：{r.物料明细.map(m => `${m.label} ${m.数量}×$${m.单价}`).join('　')}
+            </p>
+          </div>
+        )}
+
+        <Row label="已付"><span className="text-orange-600">-${r.已付.toFixed(2)}</span></Row>
+      </div>
+
+      <div className="border-t border-gray-100 pt-2.5 mt-1">
+        <div className="flex justify-between items-center">
+          <span className="text-gray-700 font-semibold">
+            {要补 ? '要补' : 要退 ? '要退给客户' : '不退不补'}
+          </span>
+          <span className={`font-bold text-xl ${要补 ? 'text-red-600' : 要退 ? 'text-green-600' : 'text-gray-400'}`}>
+            ${(要补 ? r.要补 : 要退 ? r.要退 : 0).toFixed(2)}
+          </span>
+        </div>
+        {r.新到期日 && <Row label="新到期日"><span className="text-blue-600 font-semibold">{r.新到期日}</span></Row>}
+        {r.掉档 && (
+          <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5 mt-2">
+            ⚠️ 实际只存了 {Math.ceil((new Date(settleDate) - new Date(order.moveInDate)) / 86400000 / 7)} 周，
+            掉回短期档（纸箱 $5 / 家具 $10 每周），整单按短期价重算
+          </p>
+        )}
+        {r.逾期天数 > 0 && (
+          <p className="text-xs text-red-600 mt-2">
+            ⚠️ 按 {settleDate} 算，晚一天多 ${r.每天多收}
+          </p>
+        )}
+      </div>
+    </Card>
   )
 }
