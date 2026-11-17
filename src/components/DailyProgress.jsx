@@ -46,6 +46,12 @@ export default function DailyProgress() {
   }, [date, isManager])
 
   const log = day.logs.find(l => l.staff_id === user?.id)
+  // ⚠️ 2026-11-17 修。加微信人数填的是【昨天】的（T+1，和平台咨询一样），
+  //    但待办检查的一直是【今天】那条 log —— 10-30 改 T+1 时平台咨询改了，
+  //    加微信漏了。后果：Annie 填完 11-16 的 3 人，工作台查 11-17（空的），
+  //    一直提示「去填加微信人数」。她的原话：「无法保存。每次填完之后，
+  //    工作台还是有提示让我再去填」—— 其实存进去了，是查错了天。
+  const opsLog = opsDay.logs.find(l => l.staff_id === user?.id)
   const accounts = requiredAccounts(config.channelAccounts, user?.id, user?.role === 'admin')
   // ⚠️ 2026-11-02：admin 看的是【全公司】有没有登记，不是他自己填了没有。
   //    他不在排班里、本来就不接待咨询，按「他自己填的」算永远是 0，
@@ -73,8 +79,8 @@ export default function DailyProgress() {
   const edits = myEditsToday(content.items, content.slots, user?.id, date, sydneyDateOf).length
 
   const tasks = todayTasks({
-    role: user?.role, log, inquiryOk: prog.ok || !opsEditable, inquiryMissing: prog.missing,
-    inquiryDate: opsDate,
+    role: user?.role, log, opsLog, inquiryOk: prog.ok || !opsEditable, inquiryMissing: prog.missing,
+    inquiryDate: opsDate, opsEditable,
     slotsToday, quota: Number(policy.comment_quota) || 3,
     openDays: open, editedToday: edits,
     // 今天已完成的单 —— 这些现在就能核，不用等明天日结

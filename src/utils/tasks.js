@@ -25,7 +25,7 @@ export const S = { done: 'done', todo: 'todo', wait: 'wait', skip: 'skip' }
  */
 export function todayTasks(ctx) {
   const {
-    role, log, inquiryOk, inquiryMissing, inquiryDate, slotsToday, quota,
+    role, log, opsLog, inquiryOk, inquiryMissing, inquiryDate, opsEditable, slotsToday, quota,
     openDays, editedToday, nameOfAccount, todayDone,
   } = ctx
   const isManager = role === 'admin' || role === 'manager'
@@ -96,9 +96,13 @@ export function todayTasks(ctx) {
     minutes: 3, to: '/admin/worklog',
   })
 
+  // ⚠️ 查的必须是【昨天】那条 log —— 加微信和平台咨询一样是 T+1 填的。
+  //    这里原来查 log（今天），填多少次都不会变「已完成」。
   t.push({
-    key: 'adds', label: '加微信人数',
-    state: log?.wechat_adds != null ? S.done : S.todo,
+    key: 'adds',
+    label: inquiryDate ? `填【昨天】的加微信人数（${inquiryDate}）` : '加微信人数',
+    state: (opsLog?.wechat_adds != null || opsEditable === false) ? S.done : S.todo,
+    hint: opsLog?.wechat_adds != null ? null : '昨天加了几个 · 0 个也要填 0',
     minutes: 1, to: '/admin/worklog',
   })
 
