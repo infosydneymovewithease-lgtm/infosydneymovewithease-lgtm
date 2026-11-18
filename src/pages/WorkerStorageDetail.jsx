@@ -129,8 +129,11 @@ export default function WorkerStorageDetail() {
   //    老板那天就是卡在这儿：没贴纸 → 拍不了 → 整单交不上去。
   async function 打标签(silent) {
     setPrintMsg('sending')
-    const r = await printStorageLabels(id, user)
-    setPrintMsg(r.ok ? `✅ ${r.msg}，去打印机拿` : `⚠️ ${r.msg}`)
+    // ⚠️ 同客服端：没有 try/catch 的话，抛异常就永远卡在「发送中」
+    let r
+    try { r = await printStorageLabels(id, user) }
+    catch (e) { r = { ok: false, msg: `出错了：${e?.name || ''} ${e?.message || String(e)}`.trim() } }
+    setPrintMsg(r?.ok ? `✅ ${r.msg}，去打印机拿` : `⚠️ ${r?.msg || '没有返回结果'}`)
     // ⚠️ 自动触发时失败【也要显示】。默默失败师傅不知道，走到拍照那步才发现没纸，
     //    那时候他可能已经离开打印机了。
     setTimeout(() => setPrintMsg(null), 8000)

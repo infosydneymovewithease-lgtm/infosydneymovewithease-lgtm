@@ -611,12 +611,29 @@ export default function StorageDetail() {
       {order.status !== '已取消' && !order.actualMoveOutDate && (
         <div className="mb-3 space-y-2">
           <button onClick={async () => {
+              // ⚠️ 2026-11-18。小洁那边秒数一直跳到 17s、20s 都不停，按钮永远卡在「发送中」。
+              //    根因就在这里：原来没有 try/catch —— printStorageLabels 只要【抛异常】
+              //    （不是返回失败，是抛出），clearInterval 和 setPrintMsg 都不会执行，
+              //    秒数永远跳下去，而异常内容被完全吞掉，远程什么都看不到。
+              //    现在三道保险：
+              //      ① try/catch/finally —— 不管怎样都收尾
+              //      ② 20 秒看门狗 —— 就算 fetch 和 abort 一起失灵，界面也会自己解开
+              //      ③ 异常原文显示出来 —— 下次不用再猜
               setPrintMsg('sending'); setPrintSec(0)
               const tick = setInterval(() => setPrintSec(n => n + 1), 1000)
-              const r = await printStorageLabels(id, user)
-              clearInterval(tick)
-              setPrintMsg(r.ok ? `✅ ${r.msg}` : `⚠️ ${r.msg}`)
-              setTimeout(() => setPrintMsg(null), 12000)
+              const watchdog = setTimeout(() => {
+                clearInterval(tick)
+                setPrintMsg('⚠️ 20 秒完全没反应 —— 你的网络连不上服务器。让悉尼那边代点一下')
+              }, 20000)
+              try {
+                const r = await printStorageLabels(id, user)
+                setPrintMsg(r?.ok ? `✅ ${r.msg}` : `⚠️ ${r?.msg || '没有返回结果'}`)
+              } catch (e) {
+                setPrintMsg(`⚠️ 出错了：${e?.name || ''} ${e?.message || String(e)}`.trim())
+              } finally {
+                clearTimeout(watchdog); clearInterval(tick)
+                setTimeout(() => setPrintMsg(null), 15000)
+              }
             }}
             disabled={printMsg === 'sending'}
             className="w-full py-3.5 rounded-xl text-white font-semibold text-sm disabled:opacity-50"
