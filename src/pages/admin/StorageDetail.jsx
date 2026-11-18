@@ -26,6 +26,7 @@ export default function StorageDetail() {
 
   const order = storageOrders.find(o => o.id === id)
   const [editPayment, setEditPayment] = useState(false)
+  const [printMsg, setPrintMsg] = useState(null)
   const [editExtend, setEditExtend] = useState(false)
   const [newMoveOut, setNewMoveOut] = useState('')
   const [showDispatch, setShowDispatch] = useState(false)
@@ -593,6 +594,39 @@ export default function StorageDetail() {
             }}
             className="text-xs text-purple-700 bg-white border border-purple-200 px-2.5 py-1.5 rounded-lg hover:bg-purple-50 flex-shrink-0 font-medium">
             🔄 改派
+          </button>
+        </div>
+      )}
+
+      {/* ⚠️ 两个打印入口，不是重复：
+          · 远程打印 —— 小洁在国内点一下，悉尼那台打印机出纸（走 print_jobs 队列）
+            老板 11-18：「我要在订单上面也有一个手动点击的扭，让客服我们也可以点击这个打印，
+            防止师傅操作遇到问题」
+          · 预览打印 —— 人就在打印机旁边时，浏览器 ⌘P 直接打，不排队
+          标签在【待入库】时就要能打：师傅出发前得带着贴，不是进了仓才补。 */}
+      {order.status !== '已取消' && !order.actualMoveOutDate && (
+        <div className="mb-3 space-y-2">
+          <button onClick={async () => {
+              setPrintMsg('sending')
+              const r = await printStorageLabels(id, user)
+              setPrintMsg(r.ok ? `✅ ${r.msg}` : `⚠️ ${r.msg}`)
+              setTimeout(() => setPrintMsg(null), 8000)
+            }}
+            disabled={printMsg === 'sending'}
+            className="w-full py-3.5 rounded-xl text-white font-semibold text-sm disabled:opacity-50"
+            style={{ background: 'linear-gradient(135deg, #6b1414, #c0392b)' }}>
+            {printMsg === 'sending'
+              ? '发送中…'
+              : `🖨️ 远程打印标签（${(order.boxes || 0) + (order.furniture || 0)} 张 · 悉尼出纸）`}
+          </button>
+          {printMsg && printMsg !== 'sending' && (
+            <p className={`text-xs text-center ${printMsg.startsWith('✅') ? 'text-green-600' : 'text-amber-700'}`}>
+              {printMsg}
+            </p>
+          )}
+          <button onClick={() => navigate(`/admin/storage/${id}/labels`)}
+            className="w-full py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 font-medium text-xs hover:bg-gray-50">
+            👁️ 预览 / 本机打印（人在打印机旁边时用）
           </button>
         </div>
       )}

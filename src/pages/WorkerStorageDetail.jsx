@@ -8,6 +8,7 @@ import { VEHICLES } from '../data/vehicles'
 import { roundToHalfHour } from '../utils/pricing'
 import { isDepositPaid } from '../utils/orderHelpers'
 import { getStorageRates, FREE_SUPPLIES_LABEL } from '../data/storageRates'
+import { printStorageLabels } from '../utils/printJobs'
 import { uploadImage } from '../utils/upload'
 import { humanError } from '../utils/netError'
 
@@ -21,7 +22,7 @@ const STEP_ORDER = STEPS.map(s => s.key)
 export default function WorkerStorageDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { storageOrders, updateStorageOrder, updateStorageOrderAwait, completeStorageOrder } = useApp()
+  const { storageOrders, updateStorageOrder, updateStorageOrderAwait, completeStorageOrder, user } = useApp()
 
   const order = storageOrders.find(o => o.id === id)
 
@@ -117,10 +118,29 @@ export default function WorkerStorageDetail() {
   const isDone = order.status === '寄存中'
   const canSubmit = photos.length >= 3 && (videoUrl || order.hasVideo)
 
+  // 打印状态：null / 'sending' / 提示文字
+  const [printMsg, setPrintMsg] = useState(null)
+
+  // ⚠️ 老板 11-18 定的触发时机：师傅点【到达仓库入库】那一刻自动打标签。
+  //    为什么是这一刻 ——
+  //      · 件数已经定了（客户现场加件时师傅已经改过数字）
+  //      · 人就在仓库，打印机在旁边
+  //      · 下一步正好要拍「订单号」那张照片，需要贴纸
+  //    老板那天就是卡在这儿：没贴纸 → 拍不了 → 整单交不上去。
+  async function 打标签(silent) {
+    setPrintMsg('sending')
+    const r = await printStorageLabels(id, user)
+    setPrintMsg(r.ok ? `✅ ${r.msg}，去打印机拿` : `⚠️ ${r.msg}`)
+    // ⚠️ 自动触发时失败【也要显示】。默默失败师傅不知道，走到拍照那步才发现没纸，
+    //    那时候他可能已经离开打印机了。
+    setTimeout(() => setPrintMsg(null), 8000)
+  }
+
   function advanceStep(stepKey) {
     const updates = { workerStatus: stepKey }
     if (stepKey === 'arrived') updates.arrivedAt = new Date().toISOString()
     updateStorageOrder(id, updates)
+    if (stepKey === 'stored') 打标签(true)
   }
 
   // ⚠️ 2026-11-10 改成产出【文件】而不是 base64 字符串。
@@ -441,6 +461,29 @@ export default function WorkerStorageDetail() {
               <>
                 <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                   <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100">
+        {/* ⚠️ 打印条：自动打完也留一个补打按钮 ——
+             客户现场加件、纸卡了、师傅没看见，都得能再来一次 */}
+        <div className="bg-white rounded-xl p-4 mb-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-semibold text-gray-800 text-sm">🏷️ 寄存标签</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {(order.boxes || 0) + (order.furniture || 0)} 张 · 贴箱子上才能拍「订单号」那张照片
+              </p>
+            </div>
+            <button onClick={() => 打标签(false)} disabled={printMsg === 'sending'}
+              className="flex-shrink-0 px-4 py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-50"
+              style={{ background: 'linear-gradient(135deg, #6b1414, #c0392b)' }}>
+              {printMsg === 'sending' ? '发送中…' : '补打一次'}
+            </button>
+          </div>
+          {printMsg && printMsg !== 'sending' && (
+            <p className={`text-xs mt-2 ${printMsg.startsWith('✅') ? 'text-green-600' : 'text-amber-700'}`}>
+              {printMsg}
+            </p>
+          )}
+        </div>
+
                     <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">入库凭证</h3>
                     <p className="text-xs text-gray-400 mt-0.5">需要3张照片（位置、订单号、物品数量）+ 1个视频</p>
                   </div>
