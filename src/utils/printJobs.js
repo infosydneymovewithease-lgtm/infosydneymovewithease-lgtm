@@ -20,11 +20,21 @@ import { supabase } from '../lib/supabase'
  */
 export async function printStorageLabels(orderId, user) {
   try {
-    const { data, error } = await supabase.rpc('enqueue_storage_label', {
-      p_target_id: orderId,
-      p_by: user?.id || null,
-      p_by_name: user?.name || null,
-    })
+    // ⚠️ 必须有超时。2026-11-18 小洁在国内点了之后，按钮停在「发送中…」整整一分钟 ——
+    //    supabase-js 的 rpc() 没有默认超时，网络卡住就永远不返回，
+    //    她既不知道在发、也不知道已经死了，只能干等。
+    //    宁可告诉她「超时了，再试一次」，也不能让她盯着一个不会变的按钮。
+    const { data, error } = await Promise.race([
+      supabase.rpc('enqueue_storage_label', {
+        p_target_id: orderId,
+        p_by: user?.id || null,
+        p_by_name: user?.name || null,
+      }),
+      new Promise(r => setTimeout(() => r({ data: null, error: { message: '__timeout__' } }), 20000)),
+    ])
+    if (error?.message === '__timeout__') {
+      return { ok: false, msg: '网络太慢，20 秒没回应。刷新页面看看是不是其实排上了，没有就再点一次' }
+    }
     if (error) {
       // 迁移没跑时函数不存在 —— 说人话，别让师傅看到一串英文
       if (/does not exist|schema cache/i.test(error.message || '')) {
