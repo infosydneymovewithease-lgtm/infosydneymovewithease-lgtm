@@ -27,6 +27,10 @@ export default function StorageDetail() {
   const order = storageOrders.find(o => o.id === id)
   const [editPayment, setEditPayment] = useState(false)
   const [printMsg, setPrintMsg] = useState(null)
+  // ⚠️ 秒数是【诊断用】的：小洁那边停在「发送中…」两分钟，
+  //    我没法判断她拿到的是新包还是旧包。
+  //    有秒数在跳 = 新版在跑；一直不动 = 还是旧页面，刷新没生效。
+  const [printSec, setPrintSec] = useState(0)
   const [editExtend, setEditExtend] = useState(false)
   const [newMoveOut, setNewMoveOut] = useState('')
   const [showDispatch, setShowDispatch] = useState(false)
@@ -607,16 +611,18 @@ export default function StorageDetail() {
       {order.status !== '已取消' && !order.actualMoveOutDate && (
         <div className="mb-3 space-y-2">
           <button onClick={async () => {
-              setPrintMsg('sending')
+              setPrintMsg('sending'); setPrintSec(0)
+              const tick = setInterval(() => setPrintSec(n => n + 1), 1000)
               const r = await printStorageLabels(id, user)
+              clearInterval(tick)
               setPrintMsg(r.ok ? `✅ ${r.msg}` : `⚠️ ${r.msg}`)
-              setTimeout(() => setPrintMsg(null), 8000)
+              setTimeout(() => setPrintMsg(null), 12000)
             }}
             disabled={printMsg === 'sending'}
             className="w-full py-3.5 rounded-xl text-white font-semibold text-sm disabled:opacity-50"
             style={{ background: 'linear-gradient(135deg, #6b1414, #c0392b)' }}>
             {printMsg === 'sending'
-              ? '发送中…'
+              ? `发送中… ${printSec}s`
               : `🖨️ 远程打印标签（${(order.boxes || 0) + (order.furniture || 0)} 张 · 悉尼出纸）`}
           </button>
           {printMsg && printMsg !== 'sending' && (

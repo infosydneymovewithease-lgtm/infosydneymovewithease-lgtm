@@ -19,31 +19,39 @@ import { supabase } from '../lib/supabase'
  * @returns {{ok:boolean, msg:string, count?:number}}
  */
 export async function printStorageLabels(orderId, user) {
+  // ⚠️ 2026-11-18 第二版。第一版用 supabase.rpc() + Promise.race 做超时，
+  //    小洁那边点下去停在「发送中…」两分钟，20 秒的超时压根没触发 ——
+  //    说明她拿到的还是旧包（Safari 的强制刷新不是 ⌘⇧R）。
+  //    但不该靠「她刷对了」才正常。这版改成直接 fetch + AbortController：
+  //      · 超时由浏览器层面掐断，不依赖任何库的行为
+  //      · 不管网络怎么卡，15 秒一定有结果
+  const url = import.meta.env.VITE_SUPABASE_URL
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY
+  const ac = new AbortController()
+  const timer = setTimeout(() => ac.abort(), 15000)
   try {
-    // ⚠️ 必须有超时。2026-11-18 小洁在国内点了之后，按钮停在「发送中…」整整一分钟 ——
-    //    supabase-js 的 rpc() 没有默认超时，网络卡住就永远不返回，
-    //    她既不知道在发、也不知道已经死了，只能干等。
-    //    宁可告诉她「超时了，再试一次」，也不能让她盯着一个不会变的按钮。
-    const { data, error } = await Promise.race([
-      supabase.rpc('enqueue_storage_label', {
+    const r = await fetch(`${url}/rest/v1/rpc/enqueue_storage_label`, {
+      method: 'POST',
+      headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         p_target_id: orderId,
         p_by: user?.id || null,
         p_by_name: user?.name || null,
       }),
-      new Promise(r => setTimeout(() => r({ data: null, error: { message: '__timeout__' } }), 20000)),
-    ])
-    if (error?.message === '__timeout__') {
-      return { ok: false, msg: '网络太慢，20 秒没回应。刷新页面看看是不是其实排上了，没有就再点一次' }
+      signal: ac.signal,
+    })
+    if (!r.ok) {
+      const t = await r.text().catch(() => '')
+      if (r.status === 404) return { ok: false, msg: '打印功能还没装好（SQL 50 没跑）' }
+      return { ok: false, msg: `服务器拒绝了（${r.status}）${t.slice(0, 80)}` }
     }
-    if (error) {
-      // 迁移没跑时函数不存在 —— 说人话，别让师傅看到一串英文
-      if (/does not exist|schema cache/i.test(error.message || '')) {
-        return { ok: false, msg: '打印功能还没装好（SQL 50 没跑）' }
-      }
-      return { ok: false, msg: error.message || '排队失败' }
-    }
-    return data || { ok: false, msg: '没有返回结果' }
+    return await r.json()
   } catch (e) {
-    return { ok: false, msg: e.message || '网络不通' }
+    if (e.name === 'AbortError') {
+      return { ok: false, msg: '15 秒没回应 —— 你的网络到服务器这段不通。换个网络再试，或者让悉尼这边代点' }
+    }
+    return { ok: false, msg: `发不出去：${e.message || '网络不通'}` }
+  } finally {
+    clearTimeout(timer)
   }
 }
