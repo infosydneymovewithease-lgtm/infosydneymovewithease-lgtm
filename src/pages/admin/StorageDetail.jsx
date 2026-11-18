@@ -7,6 +7,7 @@ import { saveVideo, getVideo, deleteVideo } from '../../utils/mediaDB'
 import { isDepositPaid } from '../../utils/orderHelpers'
 import { getStorageRates, FREE_SUPPLIES_LABEL } from '../../data/storageRates'
 import { storageStatus } from '../../utils/storage'
+import { printStorageLabels } from '../../utils/printJobs'
 
 // ⚠️ 2026-11-16：日期部分搬到 utils/storage.js 了（和列表页共用一份）。
 //    这里只保留【订单流程】那几个状态 —— 待确认／已确认／已派单，
