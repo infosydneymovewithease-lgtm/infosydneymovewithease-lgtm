@@ -36,6 +36,7 @@ import { FEATURES } from './config/features'
 import StorageList from './pages/admin/StorageList'
 import NewStorage from './pages/admin/NewStorage'
 import StorageDetail from './pages/admin/StorageDetail'
+import StorageLabels from './pages/admin/StorageLabels'
 import SecondhandList from './pages/admin/SecondhandList'
 import SecondhandDetail from './pages/admin/SecondhandDetail'
 import CancelledOrders from './pages/admin/CancelledOrders'
@@ -181,6 +182,7 @@ function AppRoutes() {
         <Route path="storage" element={<StorageList />} />
         <Route path="storage/new" element={<NewStorage />} />
         <Route path="storage/:id" element={<StorageDetail />} />
+        <Route path="storage/:id/labels" element={<StorageLabels />} />
         <Route path="secondhand" element={<SecondhandList />} />
         <Route path="secondhand/listing/new" element={<SecondhandListingForm />} />
         <Route path="secondhand/listing/:lid" element={<SecondhandListingForm />} />
