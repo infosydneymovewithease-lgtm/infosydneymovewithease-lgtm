@@ -9,7 +9,7 @@
 // ⚠️ 核心约定：【周】只是报价时对客户的说法，系统里一律按天记。
 //    日价 = 周价 ÷ 7。这样提前取、超时取、逾期，一条公式走完，没有例外。
 
-import { STORAGE_RATES, getStorageRates } from '../data/storageRates'
+import { STORAGE_RATES, getStorageRates } from '../data/storageRates.js'
 
 const DAY = 86400000
 const d2 = n => Math.round(n * 100) / 100
@@ -57,11 +57,24 @@ export function settleStorage(order, settleDate, renewWeeks = 0) {
   // 续费后的最终到期日 —— 结算日既是欠款段的终点，也是续费段的起点
   const newDueDate = renewWeeks > 0 ? addDays(settleDate, renewWeeks * 7) : null
 
-  // ⚠️ 档位按【最终】总时长定，两头都重算：
-  //    订 4 周续到 7 周 → 整单长期价；订 6 周第 4 周取走 → 整单掉回短期价
-  const finalEnd  = newDueDate || endDate
-  const totalDays = Math.max(1, days(inDate, finalEnd))
-  const { shortTerm } = getStorageRates(Math.max(1, Math.ceil(totalDays / 7)))
+  // ⚠️ 2026-11-19 修：【逾期天数不参与档位判断】。
+  //    老板：「预期 30 天内是宽限期没有什么费用变动，超过 1 个月就是按短期寄存费用算的」
+  //
+  //    原来这里写的是 days(inDate, newDueDate || endDate) —— 把逾期那段也算进了总时长，
+  //    后果是客户一逾期就自动升进长期档、单价从 $5 降到 $4，
+  //    连前面正常那段都跟着降价。实测 4 箱订 4 周逾期 45 天：
+  //    应该补 $128.57，算出来只有 $95.43 —— 逾期的人反而少付 $33。
+  //
+  //    「两头都重算」说的是【主动续费】和【提前取件】，不是逾期：
+  //      订 4 周续到 7 周   → 升长期价（客户多付了钱，该享受长期价）
+  //      订 6 周第 4 周取走 → 掉回短期价（实际没住够，不该享受长期价）
+  //      订 4 周拖了 76 天  → 还是短期客，拖再久也不升档
+  const 预订天数 = Math.max(1, days(inDate, dueDate))
+  const 实际天数 = Math.max(1, days(inDate, endDate))
+  const 计档天数 = renewWeeks > 0
+    ? 预订天数 + renewWeeks * 7              // 续费：预订 + 续的，中间逾期那段不算
+    : Math.min(实际天数, 预订天数)            // 不续费：提前取按实际、逾期按预订（封顶）
+  const { shortTerm } = getStorageRates(Math.max(1, Math.ceil(计档天数 / 7)))
   const rate      = dailyRate(order, shortTerm)
   const shortRate = dailyRate(order, true)   // 逾期第 2 个月起用这个
 
@@ -91,7 +104,7 @@ export function settleStorage(order, settleDate, renewWeeks = 0) {
   //    那是单独卖的东西，和档位无关。
 
   // ── 已付：原报价（预订周数 × 当时档位周价）─────────
-  const 预订天数 = Math.max(1, days(inDate, dueDate))
+  // 预订天数在上面算档位时已经声明过，这里直接用
   const 预订周数 = Math.max(1, Math.ceil(预订天数 / 7))
   const r0 = getStorageRates(预订周数)
   const 已付 = d2(预订周数 * ((Number(order.boxes) || 0) * r0.boxRate

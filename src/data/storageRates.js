@@ -11,22 +11,22 @@ export const STORAGE_RATES = {
   long:  { boxRate: 4, furRate: 8  },  // >5 周
 }
 
-// ── 物资（老板 2026-11-17 定）────────────────────────────────
-// ⚠️ 物资【不是自动送的】，是按需提供、用多少算多少。
-//    「有的客人需要有的客人不需要，没有用我们就不能收这个费用」
-//    —— 老板原话。在这之前所有页面都写「含免费物资」，
-//    出现在每一张长期单上，但实际上很多单一个箱子都没给。
+// ── 物资（老板 2026-11-19 定稿）──────────────────────────────
+// 11-17 一度改成「只送纸箱，胶带 $3 / 床垫套 $10」。
+// 11-19 老板推翻：「不用管，因为可以送，这个价格。
+//                   但是前提是提前和我们说，我们师傅会带过去」
 //
-// 长期客户（>5 周）：纸箱免费，按实际发放数量算，没给就不算
-// 其余一律按单价收：
+// 所以三样照送，真正的前提不是钱，是【提前告知】——
+// 师傅出车前才知道要带几个箱子；到了现场临时要，车上没有。
+// 页面文案要说的是这一句，不是价目表。
 export const MATERIAL_PRICES = { boxes: 5, tape: 3, mattressCover: 10 }
 export const MATERIAL_LABELS = { boxes: '纸箱', tape: '胶带', mattressCover: '床垫套' }
 
-/** 长期客户免费的那一项 */
-export const FREE_SUPPLIES_LABEL = '纸箱'
+/** 长期客户（>5 周）免费提供的物资 */
+export const FREE_SUPPLIES_LABEL = '纸箱 · 胶带 · 家具保护膜'
 
-/** 收费物资的说明，跟在免费项后面 */
-export const PAID_SUPPLIES_NOTE = '胶带 $3/个 · 床垫套 $10/个'
+/** 跟在免费项后面的前提条件 —— 这才是客户要记住的那句 */
+export const SUPPLIES_NOTICE = '请提前告知数量，师傅当天带过去'
 
 export function getStorageRates(weeks) {
   const shortTerm = weeks <= 5

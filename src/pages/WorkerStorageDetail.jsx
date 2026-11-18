@@ -7,7 +7,7 @@ import { saveVideo, getVideo, deleteVideo } from '../utils/mediaDB'
 import { VEHICLES } from '../data/vehicles'
 import { roundToHalfHour } from '../utils/pricing'
 import { isDepositPaid } from '../utils/orderHelpers'
-import { getStorageRates, FREE_SUPPLIES_LABEL } from '../data/storageRates'
+import { getStorageRates, FREE_SUPPLIES_LABEL, SUPPLIES_NOTICE } from '../data/storageRates'
 import { printStorageLabels } from '../utils/printJobs'
 import { uploadImage } from '../utils/upload'
 import { humanError } from '../utils/netError'
@@ -349,7 +349,7 @@ export default function WorkerStorageDetail() {
 
             {freeSupplies && (
               <div className="mt-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-700">
-                🎁 长期客户 {FREE_SUPPLIES_LABEL} 免费 —— 按实际给出去的数量算，没给就不算
+                🎁 长期客户 {FREE_SUPPLIES_LABEL} 免费 —— {SUPPLIES_NOTICE}
               </div>
             )}
           </div>

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { ArrowLeft } from 'lucide-react'
 import dayjs from 'dayjs'
-import { getStorageRates, FREE_SUPPLIES_LABEL, PAID_SUPPLIES_NOTE } from '../../data/storageRates'
+import { getStorageRates, FREE_SUPPLIES_LABEL, SUPPLIES_NOTICE } from '../../data/storageRates'
 
 function calcStorageFee(boxes, furniture, moveInDate, moveOutDate) {
   const days = dayjs(moveOutDate).diff(dayjs(moveInDate), 'day')
@@ -166,7 +166,7 @@ export default function NewStorage() {
           </div>
           {freeSupplies && (form.boxes > 0 || form.furniture > 0) && (
             <div className="bg-green-50 border border-green-200 rounded-xl px-3 py-2 text-sm text-green-700">
-              ✅ 此订单 &gt;5 周，{FREE_SUPPLIES_LABEL}免费（按实际使用）· {PAID_SUPPLIES_NOTE}
+              ✅ 此订单 &gt;5 周，{FREE_SUPPLIES_LABEL} 免费 · {SUPPLIES_NOTICE}
             </div>
           )}
 
