@@ -9,6 +9,7 @@ import { getStorageRates, FREE_SUPPLIES_LABEL, PAID_SUPPLIES_NOTE } from '../../
 import { storageStatus } from '../../utils/storage'
 import { settleStorage } from '../../utils/storageBilling'
 import { sydneyToday } from '../../utils/date'
+import { printStorageLabels } from '../../utils/printJobs'
 
 // ⚠️ 2026-11-16：日期部分搬到 utils/storage.js 了（和列表页共用一份）。
 //    这里只保留【订单流程】那几个状态 —— 待确认／已确认／已派单，
@@ -28,6 +29,11 @@ export default function StorageDetail() {
 
   const order = storageOrders.find(o => o.id === id)
   const [editPayment, setEditPayment] = useState(false)
+  const [printMsg, setPrintMsg] = useState(null)
+  // ⚠️ 秒数是【诊断用】的：小洁那边停在「发送中…」两分钟，
+  //    我没法判断她拿到的是新包还是旧包。
+  //    有秒数在跳 = 新版在跑；一直不动 = 还是旧页面，刷新没生效。
+  const [printSec, setPrintSec] = useState(0)
   const [editExtend, setEditExtend] = useState(false)
   const [newMoveOut, setNewMoveOut] = useState('')
   const [showDispatch, setShowDispatch] = useState(false)
@@ -598,6 +604,58 @@ export default function StorageDetail() {
             }}
             className="text-xs text-purple-700 bg-white border border-purple-200 px-2.5 py-1.5 rounded-lg hover:bg-purple-50 flex-shrink-0 font-medium">
             🔄 改派
+          </button>
+        </div>
+      )}
+
+      {/* ⚠️ 两个打印入口，不是重复：
+          · 远程打印 —— 小洁在国内点一下，悉尼那台打印机出纸（走 print_jobs 队列）
+            老板 11-18：「我要在订单上面也有一个手动点击的扭，让客服我们也可以点击这个打印，
+            防止师傅操作遇到问题」
+          · 预览打印 —— 人就在打印机旁边时，浏览器 ⌘P 直接打，不排队
+          标签在【待入库】时就要能打：师傅出发前得带着贴，不是进了仓才补。 */}
+      {order.status !== '已取消' && !order.actualMoveOutDate && (
+        <div className="mb-3 space-y-2">
+          <button onClick={async () => {
+              // ⚠️ 2026-11-18。小洁那边秒数一直跳到 17s、20s 都不停，按钮永远卡在「发送中」。
+              //    根因就在这里：原来没有 try/catch —— printStorageLabels 只要【抛异常】
+              //    （不是返回失败，是抛出），clearInterval 和 setPrintMsg 都不会执行，
+              //    秒数永远跳下去，而异常内容被完全吞掉，远程什么都看不到。
+              //    现在三道保险：
+              //      ① try/catch/finally —— 不管怎样都收尾
+              //      ② 20 秒看门狗 —— 就算 fetch 和 abort 一起失灵，界面也会自己解开
+              //      ③ 异常原文显示出来 —— 下次不用再猜
+              setPrintMsg('sending'); setPrintSec(0)
+              const tick = setInterval(() => setPrintSec(n => n + 1), 1000)
+              const watchdog = setTimeout(() => {
+                clearInterval(tick)
+                setPrintMsg('⚠️ 20 秒完全没反应 —— 你的网络连不上服务器。让悉尼那边代点一下')
+              }, 20000)
+              try {
+                const r = await printStorageLabels(id, user)
+                setPrintMsg(r?.ok ? `✅ ${r.msg}` : `⚠️ ${r?.msg || '没有返回结果'}`)
+              } catch (e) {
+                setPrintMsg(`⚠️ 出错了：${e?.name || ''} ${e?.message || String(e)}`.trim())
+              } finally {
+                clearTimeout(watchdog); clearInterval(tick)
+                setTimeout(() => setPrintMsg(null), 15000)
+              }
+            }}
+            disabled={printMsg === 'sending'}
+            className="w-full py-3.5 rounded-xl text-white font-semibold text-sm disabled:opacity-50"
+            style={{ background: 'linear-gradient(135deg, #6b1414, #c0392b)' }}>
+            {printMsg === 'sending'
+              ? `发送中… ${printSec}s`
+              : `🖨️ 远程打印标签（${(order.boxes || 0) + (order.furniture || 0)} 张 · 悉尼出纸）`}
+          </button>
+          {printMsg && printMsg !== 'sending' && (
+            <p className={`text-xs text-center ${printMsg.startsWith('✅') ? 'text-green-600' : 'text-amber-700'}`}>
+              {printMsg}
+            </p>
+          )}
+          <button onClick={() => navigate(`/admin/storage/${id}/labels`)}
+            className="w-full py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 font-medium text-xs hover:bg-gray-50">
+            👁️ 预览 / 本机打印（人在打印机旁边时用）
           </button>
         </div>
       )}
