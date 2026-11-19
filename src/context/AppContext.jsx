@@ -109,6 +109,18 @@ function pickB2B(obj) {
 
 export function AppProvider({ children }) {
   const [loading, setLoading] = useState(true)
+  // ⚠️ 2026-11-20。经理在国内打开后台，一边是永远转圈的「加载中...」，
+  //    一边是每日对账显示「这一天没有订单」—— 而库里那天明明有 4 单已完成。
+  //    两个症状是同一个根：
+  //      ① Promise.all 六个请求【一个超时都没有】，supabase-js 本身也不带默认超时。
+  //         有一个卡住不回，setLoading(false) 永远执行不到 → 一直转圈。
+  //      ② supabase-js 失败时【不抛异常】，返回 {data:null, error}。
+  //         data 是 null 就跳过 setOrders，catch 也不触发 ——
+  //         结果是空白后台，和「今天真的没单」长得一模一样，没有任何提示。
+  //    对客服来说最危险的就是②：她会以为单子丢了，可能去重建。
+  //    所以：订单/寄存/员工这三样是命根子，取不到就【明说取不到】，不许装没有。
+  const [loadError, setLoadError] = useState(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('user')
@@ -192,19 +204,43 @@ export function AppProvider({ children }) {
   // Fetch all Supabase data on mount + subscribe to realtime changes
   useEffect(() => {
     async function init() {
+      setLoading(true)
+      setLoadError(null)
+      // 超时兜底：到点就当这一项失败，让 Promise.all 能继续往下走。
+      // 20 秒是给国内网络留的余量 —— 小洁那边正常也要三五秒。
+      const 超时秒 = 20
+      const 限时 = (p, 名) => Promise.race([
+        p,
+        new Promise(r => setTimeout(
+          () => r({ data: null, error: { message: `${名}：${超时秒} 秒没回应` } }), 超时秒 * 1000)),
+      ])
       try {
         const [ordersRes, storageRes, staffRes, ratesRes, b2bRes, configRes] = await Promise.all([
-          supabase.from('orders').select('*').order('created_at', { ascending: false }),
-          supabase.from('storage_orders').select('*').order('created_at', { ascending: false }),
+          限时(supabase.from('orders').select('*').order('created_at', { ascending: false }), '订单'),
+          限时(supabase.from('storage_orders').select('*').order('created_at', { ascending: false }), '寄存订单'),
           // S1-D: staff 表已锁，必须通过 list_staff RPC 读取（不含密码）
-          supabase.rpc('list_staff'),
-          supabase.rpc('list_staff_rates'),   // 2026-10-11 费率入库；迁移未跑时会报错，下面容错
-          supabase.from('b2b_customers').select('*').order('created_at', { ascending: false }),
-          supabase.rpc('list_config'),        // 2026-10-11 第 3 步四张配置表；同样容错
+          限时(supabase.rpc('list_staff'), '员工'),
+          限时(supabase.rpc('list_staff_rates'), '工资费率'),   // 2026-10-11 费率入库；迁移未跑时会报错，下面容错
+          限时(supabase.from('b2b_customers').select('*').order('created_at', { ascending: false }), '企业客户'),
+          限时(supabase.rpc('list_config'), '运营配置'),        // 2026-10-11 第 3 步四张配置表；同样容错
         ])
-        if (ordersRes.data) setOrders(ordersRes.data)
-        if (storageRes.data) setStorageOrders(storageRes.data)
-        if (staffRes.data) setStaff(staffRes.data)
+
+        // ⚠️ 这三样取不到就是【打不开后台】，不是「今天没单」。
+        //    必须拦在这里报出来 —— 让人看见「连不上」，而不是看见一个空后台。
+        const 没取到 = [
+          !ordersRes?.data  && (ordersRes?.error?.message  || '订单读取失败'),
+          !storageRes?.data && (storageRes?.error?.message || '寄存订单读取失败'),
+          !staffRes?.data   && (staffRes?.error?.message   || '员工读取失败'),
+        ].filter(Boolean)
+        if (没取到.length > 0) {
+          console.error('[Supabase] 初始加载失败：', 没取到)
+          setLoadError(没取到)
+          return                      // finally 里照样 setLoading(false)，走错误页
+        }
+
+        setOrders(ordersRes.data)
+        setStorageOrders(storageRes.data)
+        setStaff(staffRes.data)
         // 费率：迁移还没跑时 RPC 不存在，这里静默失败 —— 工资计算会回退到代码里的旧名单
         if (ratesRes?.data) setStaffRates(ratesRes.data)
         else if (ratesRes?.error) console.warn('[staff_rate] 读取失败，工资回退旧逻辑：', ratesRes.error.message)
@@ -231,7 +267,11 @@ export function AppProvider({ children }) {
           }
         }
       } catch (err) {
+        // ⚠️ 2026-11-20 本地实测补的：网络直接不通时 supabase-js 是【抛异常】，
+        //    不是返回 {data:null}。只在上面那条路上设 loadError 的话，
+        //    断网这种最常见的情况反而漏到这里 —— 照样是个空后台。
         console.error('[Supabase] Failed to load initial data', err)
+        setLoadError([err?.message || String(err)])
       } finally {
         setLoading(false)
       }
@@ -281,7 +321,8 @@ export function AppProvider({ children }) {
       .subscribe()
 
     return () => supabase.removeChannel(channel)
-  }, [])
+    // reloadKey：错误页上点「重新加载」时重跑一遍（不刷新整页，省得她重新登录）
+  }, [reloadKey])
 
   // Persist user session and localStorage-backed state
   useEffect(() => {
@@ -1332,6 +1373,32 @@ export function AppProvider({ children }) {
     a.download = `订单记录_${new Date().toISOString().slice(0,10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  // ⚠️ 连不上就明说连不上。以前这里什么都没有 ——
+  //    取不到订单 = 一个空后台，客服会以为单子没了。
+  if (loadError) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                    justifyContent: 'center', background: '#FFF8F7', padding: 24, textAlign: 'center' }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>📡</div>
+        <p style={{ color: '#96394E', fontSize: 17, fontWeight: 700, marginBottom: 8 }}>连不上服务器</p>
+        <p style={{ color: '#6b7280', fontSize: 13, lineHeight: 1.7, maxWidth: 360, marginBottom: 4 }}>
+          后台数据没能读出来。<b>这不是「今天没有订单」—— 你的订单都还在。</b>
+        </p>
+        <p style={{ color: '#9ca3af', fontSize: 12, lineHeight: 1.7, maxWidth: 360, marginBottom: 18 }}>
+          多半是网络不稳（国内要挂着梯子）。点下面重试一次，还不行就换个网络或者过几分钟再试。
+        </p>
+        <button onClick={() => setReloadKey(k => k + 1)}
+          style={{ background: '#96394E', color: '#fff', border: 'none', borderRadius: 10,
+                   padding: '11px 28px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+          重新加载
+        </button>
+        <div style={{ marginTop: 20, fontSize: 11, color: '#c4c7cc', maxWidth: 400 }}>
+          {loadError.map((m, i) => <div key={i}>{m}</div>)}
+        </div>
+      </div>
+    )
   }
 
   if (loading) {
