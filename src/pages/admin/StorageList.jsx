@@ -4,7 +4,7 @@ import { PlusCircle, Phone, ChevronRight, AlertTriangle, Clock, CheckCircle } fr
 import dayjs from 'dayjs'
 import { useState, useMemo } from 'react'
 import { getStorageRates } from '../../data/storageRates'
-import { storageStatus, STORAGE_TABS, FIRST_NOTICE_DAYS, SECOND_NOTICE_DAYS, storageFeeOf } from '../../utils/storage'
+import { storageStatus, STORAGE_TABS, FIRST_NOTICE_DAYS, SECOND_NOTICE_DAYS, storageFeeOf, weeklyFeeOf } from '../../utils/storage'
 import { settleStorage } from '../../utils/storageBilling'
 import { sydneyToday } from '../../utils/date'
 
@@ -14,7 +14,9 @@ import { sydneyToday } from '../../utils/date'
 //    详情页还有一份一样的，一起合并了。
 
 export default function StorageList() {
-  const { storageOrders, updateStorageOrder } = useApp()
+  const { storageOrders, updateStorageOrder, user } = useApp()
+  // 周收入是老板要看的数，不给客服和经理（老板 11-21）
+  const isAdmin = user?.role === 'admin'
   const navigate = useNavigate()
   // ⚠️ 2026-11-16：认 URL 上的 ?tab= ——
   //    工作台那条「X 单寄存 7 天内到期」要能一键跳到对应页签，
@@ -63,8 +65,6 @@ export default function StorageList() {
   const money$ = useMemo(() => {
     const 在库 = enriched.filter(o => ['active', 'expiring', 'overdue'].includes(o._status.key))
     const 入库过 = enriched.filter(o => o.workerStatus === 'done' && o._status.key !== 'cancelled')
-    const 本月前缀 = sydneyToday().slice(0, 7)
-    const 本月 = 入库过.filter(o => (o.date || '').startsWith(本月前缀))
     const 逾期 = enriched.filter(o => o._status.key === 'overdue')
     // 逾期欠款走已上线的结算规则（宽限 30 天、超一月按短期档），不另写一套
     const 欠款 = 逾期.reduce((a, o) => {
@@ -75,27 +75,38 @@ export default function StorageList() {
     return {
       在库额: 在库.reduce((a, o) => a + storageFeeOf(o), 0),
       在库数: 在库.length,
-      本月额: 本月.reduce((a, o) => a + storageFeeOf(o), 0),
-      本月数: 本月.length,
       平均周: 入库过.length ? 周数合计 / 入库过.length : 0,
       欠款, 逾期数: 逾期.length,
     }
   }, [enriched])
 
-  const weeklyRevenue = enriched
-    .filter(o => !o.actualMoveOutDate)
-    .reduce((s, o) => {
-      const w = Math.max(1, Math.ceil(dayjs(o.moveOutDate).diff(dayjs(o.moveInDate), 'day') / 7))
-      const { boxRate, furRate } = getStorageRates(w)
-      return s + (o.boxes * boxRate + o.furniture * furRate)
-    }, 0)
+  // ⚠️ 2026-11-21 修了两个毛病：
+  //   ① 原来【没排除已取消】—— 只 filter 了 actualMoveOutDate。
+  //      库里 12 单已取消，把这个数吹到 $1448/周，真实只有 $599/周。
+  //      老板一直在看一个虚数。
+  //   ② 原来按 moveOut−moveIn 推周数定档位，和别处按 order.weeks 不一致。
+  //      老板 11-10 定过：客人付了几周才是事实，日期只是「预计」。
+  //      现在和 storageFeeOf 同源，两处永远一致。
+  const weeklyRevenue = useMemo(() => {
+    const 有效 = enriched.filter(o => o._status.key !== 'cancelled' && !o.actualMoveOutDate)
+    const 在库 = 有效.filter(o => o.workerStatus === 'done')
+    const 待入库 = 有效.filter(o => o.workerStatus !== 'done')
+    return {
+      在库: 在库.reduce((s, o) => s + weeklyFeeOf(o), 0),
+      待入库: 待入库.reduce((s, o) => s + weeklyFeeOf(o), 0),
+    }
+  }, [enriched])
 
   return (
     <div className="p-5 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-xl font-bold text-gray-900">寄存管理</h1>
-          <p className="text-gray-400 text-sm mt-0.5">每周收入约 ${weeklyRevenue}/周</p>
+          {isAdmin && (
+            <p className="text-gray-400 text-sm mt-0.5">
+              每周收入 {fmt(weeklyRevenue.在库 + weeklyRevenue.待入库)}/周
+            </p>
+          )}
         </div>
         <button
           onClick={() => navigate('/admin/storage/new')}
@@ -124,8 +135,15 @@ export default function StorageList() {
       <div className="grid grid-cols-4 gap-3 mb-5">
         <MoneyCard label="在库总额"   value={fmt(money$.在库额)} sub={`${money$.在库数} 单在仓库`}
           color="violet" onClick={() => setTab('active')} />
-        <MoneyCard label="本月寄存收入" value={fmt(money$.本月额)} sub={`${money$.本月数} 单入库`}
-          color="violet" />
+        {/* ⚠️ 老板 11-21：「有一些数据不想客服看、经理看的，主要是我想看
+             一周我们可以收入多少钱」。这张卡只有 admin 看得见。
+             原来这个位置是「本月寄存收入」—— 和左边「在库总额」是同一个数
+             （$3213 = $3213，这个月入库的正好就是在库的全部），纯重复，删掉。 */}
+        {isAdmin ? (
+          <MoneyCard label="每周收入" value={`${fmt(weeklyRevenue.在库 + weeklyRevenue.待入库)}/周`}
+            sub={`在库 ${fmt(weeklyRevenue.在库)} + 待入库 ${fmt(weeklyRevenue.待入库)}`}
+            color="violet" />
+        ) : <div />}
         <MoneyCard label="平均寄存周数" value={`${money$.平均周.toFixed(1)} 周`} sub="已入库单平均"
           color="gray" />
         <MoneyCard label="逾期欠款"   value={fmt(money$.欠款)} sub={`${money$.逾期数} 单逾期`}

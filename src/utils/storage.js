@@ -100,6 +100,17 @@ export function storageStepUpdates(order, stepKey) {
  * ⚠️ 不读 totalFee / weeklyFee：规则文档第十节说明那两列是脏字段，
  *    和按价目表算出来的对不上。唯一真相是「件数 × 周数 × 价目表」。
  */
+/**
+ * 单张寄存单【每周】多少钱 —— 和 storageFeeOf 同源，只差没乘周数。
+ * ⚠️ 档位按 order.weeks 判断，不按 moveOut−moveIn 推算。
+ *    老板 11-10：「客人付款 9 周的钱，不能改动就不正确」—— 付了几周才是事实。
+ */
+export function weeklyFeeOf(order) {
+  const weeks = Math.max(1, Number(order?.weeks) || 1)
+  const { boxRate, furRate } = getStorageRates(weeks)
+  return (Number(order?.boxes) || 0) * boxRate + (Number(order?.furniture) || 0) * furRate
+}
+
 export function storageFeeOf(order) {
   const weeks = Math.max(1, Number(order?.weeks) || 1)
   const { boxRate, furRate } = getStorageRates(weeks)
