@@ -69,3 +69,27 @@ export const STORAGE_TABS = [
   { label: '待出库',   value: 'overdue' },
   { label: '已取件',   value: 'done' },
 ]
+
+/**
+ * 师傅端推进寄存单某一步时要写的字段 —— 【全系统唯一一份】。
+ *
+ * ⚠️ 2026-11-21 抽出来的。老板：「为什么不像搬家订单一样点击一下就进入下一个流程」。
+ *    搬家单在首页卡片上就有「确认收单」按钮，一键推进；
+ *    寄存单只有详情页的步骤条里有，必须点进去翻下来才能确认。
+ *    要在卡片上也加按钮，规则就会出现在两个地方 ——
+ *    而「同一条规则写两遍然后不一致」正是寄存板块这一串毛病的来源
+ *    （寄存费一度有三个版本、返程费两边不一样）。所以先抽成一份。
+ *
+ * 状态推进用【反着判断】：只要不是终态就推到「已确认」，不去猜起始值是什么。
+ * 线上寄存单的起始状态至少三种（待确认 / 已收定金 / 已派单），白名单一定会漏。
+ */
+export function storageStepUpdates(order, stepKey) {
+  const updates = { workerStatus: stepKey }
+  if (stepKey === 'arrived') updates.arrivedAt = new Date().toISOString()
+  if (['confirmed', 'arrived'].includes(stepKey)
+      && !['寄存中', '已取消', '已确认'].includes(order?.status)) {
+    updates.status = '已确认'
+    updates.confirmedAt = order?.confirmedAt || new Date().toISOString()
+  }
+  return updates
+}

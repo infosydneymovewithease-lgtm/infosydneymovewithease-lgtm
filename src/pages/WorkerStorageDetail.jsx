@@ -8,6 +8,7 @@ import { VEHICLES, VAN_PROMO_DISCOUNT } from '../data/vehicles'
 import { roundToHalfHour } from '../utils/pricing'
 import { isDepositPaid } from '../utils/orderHelpers'
 import { getStorageRates, FREE_SUPPLIES_LABEL, SUPPLIES_NOTICE } from '../data/storageRates'
+import { storageStepUpdates } from '../utils/storage'
 import { printStorageLabels } from '../utils/printJobs'
 import { uploadImage } from '../utils/upload'
 import { humanError } from '../utils/netError'
@@ -173,25 +174,9 @@ export default function WorkerStorageDetail() {
   //    ⚠️ 只在「待确认 / 已派单」时才推进。别的状态一律不碰 ——
   //    已经「寄存中」的单如果被退回这一步，不能把它打回「已确认」。
   function advanceStep(stepKey) {
-    const updates = { workerStatus: stepKey }
-    if (stepKey === 'arrived') updates.arrivedAt = new Date().toISOString()
-    // ⚠️ 2026-11-21 第二版。第一版写的是白名单 ['待确认','已派单']，
-    //    老板实测 QX2611105 还是没进「进行中」，而 confirmedAt 是 null ——
-    //    说明那一刻 order.status 不在白名单里。具体是哪个值已经查不回来了
-    //    （单子早变成「寄存中」）。线上寄存单起始状态至少有三种：
-    //    待确认 / 已收定金 / 已派单 —— 白名单天生就会漏。
-    //
-    //    改成反过来：【只要不是终态就推进】，不去猜起始值是什么。
-    //    而且「到达取货地址」也补一次 —— 万一确认那下没生效，
-    //    下一步会自己纠正回来，不用人去管。
-    const 终态 = ['寄存中', '已取消']
-    if (['confirmed', 'arrived'].includes(stepKey)
-        && !终态.includes(order?.status)
-        && order?.status !== '已确认') {
-      updates.status = '已确认'
-      updates.confirmedAt = order?.confirmedAt || new Date().toISOString()
-    }
-    updateStorageOrder(id, updates)
+    // 规则在 utils/storage.js 的 storageStepUpdates —— 首页卡片的一键确认用同一份，
+    // 免得「同一条规则写两遍然后不一致」（寄存板块这一串毛病都是这么来的）
+    updateStorageOrder(id, storageStepUpdates(order, stepKey))
     if (stepKey === 'stored') 打标签(true)
   }
 

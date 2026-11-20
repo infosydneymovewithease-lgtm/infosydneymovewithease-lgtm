@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { getTodayHoliday } from '../data/holidays'
 import { scheduledTimeLabel } from '../utils/orderTime'
+import { storageStepUpdates } from '../utils/storage'
 import { MOCK_ANNOUNCEMENTS } from '../data/mockData'
 import { AlertTriangle, Bell, ChevronRight, Clock, CheckCircle, Loader, LogOut, History } from 'lucide-react'
 import dayjs from 'dayjs'
@@ -28,7 +29,10 @@ const TYPE_BADGE = {
 }
 
 export default function Home() {
-  const { worker, logout, getMyOrders, getMyStorageOrders, confirmOrder } = useApp()
+  const { worker, logout, getMyOrders, getMyStorageOrders, confirmOrder, updateStorageOrder } = useApp()
+
+  // 一键确认寄存单 —— 和详情页步骤条共用 utils/storage.js 里那一份规则
+  const confirmStorage = order => updateStorageOrder(order.id, storageStepUpdates(order, 'confirmed'))
   const navigate = useNavigate()
   const holiday = getTodayHoliday()
   const myOrders = getMyOrders()
@@ -181,7 +185,9 @@ export default function Home() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {current.storage.map(order => (
-              <StorageCard key={order.id} order={order} onClick={() => navigate(`/storage/${order.id}`)} />
+              <StorageCard key={order.id} order={order}
+                onClick={() => navigate(`/storage/${order.id}`)}
+                onConfirm={activeTab === 'unconfirmed' ? confirmStorage : undefined} />
             ))}
             {current.orders.map(order => (
               <OrderCard key={order.id} order={order}
@@ -223,28 +229,47 @@ const STORAGE_STATUS_COLOR = {
   '寄存中': 'bg-gray-100 text-gray-500',
 }
 
-function StorageCard({ order, onClick }) {
+function StorageCard({ order, onClick, onConfirm }) {
   const color = STORAGE_STATUS_COLOR[order.status] || 'bg-gray-100 text-gray-500'
+  // ⚠️ 2026-11-21 老板：「为什么不像搬家订单一样点击一下就进入下一个流程」。
+  //    原来寄存卡片上【没有任何按钮】，师傅必须点进去、翻到步骤条才能确认收单，
+  //    而旁边的搬家单卡片上就有一个红色「确认收单」。同一个人同一屏，两套操作。
+  const needsConfirm = onConfirm && !['已确认', '寄存中', '已取消'].includes(order.status)
+
   return (
-    <button onClick={onClick}
-      className="w-full bg-white rounded-xl p-4 text-left shadow-sm hover:shadow-md transition-shadow active:opacity-70">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${color}`}>
-              📦 {order.status}
-            </span>
-            <span className="text-gray-300 text-xs hidden sm:inline font-mono">{order.orderNo || order.id}</span>
-          </div>
-          <p className="text-gray-900 font-bold text-base truncate">{order.customerName}</p>
-          <p className="text-gray-400 text-sm mt-0.5">入库：{order.moveInDate}</p>
-          <p className="text-gray-400 text-xs mt-1">
-            纸箱 {order.boxes}件{order.furniture > 0 ? `  家具 ${order.furniture}件` : ''}
-          </p>
+    <div className="w-full bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden flex">
+      <button onClick={onClick} className="flex-1 min-w-0 p-4 text-left active:opacity-70">
+        <div className="flex items-center gap-2 mb-1.5">
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${color}`}>
+            📦 {order.status}
+          </span>
+          <span className="text-gray-300 text-xs hidden sm:inline font-mono">{order.orderNo || order.id}</span>
         </div>
-        <ChevronRight size={20} className="text-gray-300 flex-shrink-0 mt-1" />
-      </div>
-    </button>
+        <p className="text-gray-900 font-bold text-base truncate">{order.customerName}</p>
+        <p className="text-gray-400 text-sm mt-0.5">入库：{order.moveInDate}</p>
+        <p className="text-gray-400 text-xs mt-1">
+          纸箱 {order.boxes}件{order.furniture > 0 ? `  家具 ${order.furniture}件` : ''}
+        </p>
+      </button>
+
+      {needsConfirm ? (
+        <button
+          onClick={async () => {
+            try { await onConfirm(order) }
+            catch (err) { alert(err.message || '确认失败，请重试') }
+          }}
+          className="flex-shrink-0 w-16 flex flex-col items-center justify-center gap-1 text-white text-xs font-bold"
+          style={{ background: 'linear-gradient(135deg, #6b1414, #c0392b)' }}>
+          <CheckCircle size={18} />
+          <span>确认</span>
+          <span>收单</span>
+        </button>
+      ) : (
+        <button onClick={onClick} className="flex-shrink-0 flex items-center pr-3 text-gray-300 active:opacity-70">
+          <ChevronRight size={20} />
+        </button>
+      )}
+    </div>
   )
 }
 
