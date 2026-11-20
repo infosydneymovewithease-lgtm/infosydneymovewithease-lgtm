@@ -175,9 +175,21 @@ export default function WorkerStorageDetail() {
   function advanceStep(stepKey) {
     const updates = { workerStatus: stepKey }
     if (stepKey === 'arrived') updates.arrivedAt = new Date().toISOString()
-    if (stepKey === 'confirmed' && ['待确认', '已派单'].includes(order?.status)) {
+    // ⚠️ 2026-11-21 第二版。第一版写的是白名单 ['待确认','已派单']，
+    //    老板实测 QX2611105 还是没进「进行中」，而 confirmedAt 是 null ——
+    //    说明那一刻 order.status 不在白名单里。具体是哪个值已经查不回来了
+    //    （单子早变成「寄存中」）。线上寄存单起始状态至少有三种：
+    //    待确认 / 已收定金 / 已派单 —— 白名单天生就会漏。
+    //
+    //    改成反过来：【只要不是终态就推进】，不去猜起始值是什么。
+    //    而且「到达取货地址」也补一次 —— 万一确认那下没生效，
+    //    下一步会自己纠正回来，不用人去管。
+    const 终态 = ['寄存中', '已取消']
+    if (['confirmed', 'arrived'].includes(stepKey)
+        && !终态.includes(order?.status)
+        && order?.status !== '已确认') {
       updates.status = '已确认'
-      updates.confirmedAt = new Date().toISOString()
+      updates.confirmedAt = order?.confirmedAt || new Date().toISOString()
     }
     updateStorageOrder(id, updates)
     if (stepKey === 'stored') 打标签(true)

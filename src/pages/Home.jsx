@@ -41,7 +41,13 @@ export default function Home() {
 
   // 三个标签页分桶：未确认 / 进行中(待进行+进行中) / 已完成
   const unconfirmedOrders  = myOrders.filter(o => ['待确认', '已派单'].includes(o.status))
-  const unconfirmedStorage = myStorageOrders.filter(o => ['待确认', '已派单'].includes(o.status))
+  // ⚠️ 2026-11-21：寄存单的桶改成「反着判断」。
+  //    原来是白名单 ['待确认','已派单'] —— 可线上寄存单的起始状态至少三种
+  //    （待确认 / 已收定金 / 已派单），「已收定金」那 5 单一旦派给师傅，
+  //    三个页签里【一个都不出现】，师傅根本看不到这单。
+  //    现在：不是终态、也不是已确认的，一律算「未确认」，保证每一单都有归属。
+  const unconfirmedStorage = myStorageOrders.filter(o =>
+    !['寄存中', '已取消'].includes(o.status) && o.status !== '已确认')
   const ongoingOrders      = myOrders.filter(o => ['师傅已确认', '进行中'].includes(o.status))
   const ongoingStorage     = myStorageOrders.filter(o => o.status === '已确认')
   const done               = myOrders.filter(o => o.status === '已完成' && isRecent(o))
