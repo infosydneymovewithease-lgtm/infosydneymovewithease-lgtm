@@ -8,7 +8,7 @@
 // 否则她要为每单跳进订单详情页改一遍 —— 一半订单有问题，一天得跳几十次。
 
 import { useState, useEffect, useMemo, Fragment } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { sydneyToday, addDays, hhmmIn } from '../../utils/date'
 import {
@@ -85,6 +85,7 @@ export default function Reconcile() {
   // 老板定的流程是第二天早上核前一天，落地页必须直接是那一天，
   // 不能让她跳过来还要自己翻日期。
   const [params] = useSearchParams()
+  const navigate = useNavigate()
   const [date, setDate] = useState(() => params.get('date') || sydneyToday())
   const [close, setClose] = useState(null)
   const [logs, setLogs] = useState([])
@@ -262,7 +263,11 @@ export default function Reconcile() {
               <span className="text-xs text-violet-500">入库当天收清，不含运输、不算工资</span>
             </div>
             {dayStorage.map(s => (
-              <div key={s.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-50 last:border-0">
+              /* ⚠️ 2026-11-21 老板：「确实可以看到，但是无法点击看详情」。
+                 点一行 → 那单的寄存详情（物品/照片/结算面板/补打标签都在那儿） */
+              <button key={s.id} onClick={() => navigate(`/admin/storage/${s.id}`)}
+                className="w-full flex items-center gap-3 px-4 py-2.5 border-b border-gray-50 last:border-0
+                           text-left hover:bg-violet-50/60 active:opacity-70 transition-colors">
                 <span className="font-mono text-sm font-semibold text-gray-700 w-24 shrink-0">{s.orderNo}</span>
                 <span className="text-sm text-gray-600 flex-1 min-w-0 truncate">{s.customerName}</span>
                 <span className="text-xs text-gray-400 w-40 shrink-0 text-right">
@@ -274,7 +279,8 @@ export default function Reconcile() {
                 <span className="font-mono text-sm font-semibold text-violet-700 w-24 text-right shrink-0">
                   {money(s.fee)}
                 </span>
-              </div>
+                <ChevronRight size={16} className="text-violet-300 shrink-0" />
+              </button>
             ))}
           </div>
         )}

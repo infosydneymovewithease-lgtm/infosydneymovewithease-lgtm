@@ -2,9 +2,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { PlusCircle, Phone, ChevronRight, AlertTriangle, Clock, CheckCircle } from 'lucide-react'
 import dayjs from 'dayjs'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { getStorageRates } from '../../data/storageRates'
-import { storageStatus, STORAGE_TABS, FIRST_NOTICE_DAYS, SECOND_NOTICE_DAYS } from '../../utils/storage'
+import { storageStatus, STORAGE_TABS, FIRST_NOTICE_DAYS, SECOND_NOTICE_DAYS, storageFeeOf } from '../../utils/storage'
 import { settleStorage } from '../../utils/storageBilling'
 import { sydneyToday } from '../../utils/date'
 
@@ -54,6 +54,34 @@ export default function StorageList() {
       : enriched.filter(o => o._status.key === t.value).length,
   }), {})
 
+  // ⚠️ 2026-11-21 老板：「也想现在这个搬运板块一样，有个共计，有个平均每周」。
+  //    这一页原来只有四个【数量】卡，一分钱都没有 ——
+  //    有几单看得见，值多少钱看不见。
+  //    放在这里而不是每日对账里：对账是按天翻的，
+  //    而寄存是「一次收钱、躺几个月」的生意，「平均周数」这种跨周期的数
+  //    放在按天翻的页面里，翻一天重算一次，语义是乱的。
+  const money$ = useMemo(() => {
+    const 在库 = enriched.filter(o => ['active', 'expiring', 'overdue'].includes(o._status.key))
+    const 入库过 = enriched.filter(o => o.workerStatus === 'done' && o._status.key !== 'cancelled')
+    const 本月前缀 = sydneyToday().slice(0, 7)
+    const 本月 = 入库过.filter(o => (o.date || '').startsWith(本月前缀))
+    const 逾期 = enriched.filter(o => o._status.key === 'overdue')
+    // 逾期欠款走已上线的结算规则（宽限 30 天、超一月按短期档），不另写一套
+    const 欠款 = 逾期.reduce((a, o) => {
+      const r = settleStorage(o, sydneyToday())
+      return a + (r?.要补 || 0)
+    }, 0)
+    const 周数合计 = 入库过.reduce((a, o) => a + Math.max(1, Number(o.weeks) || 1), 0)
+    return {
+      在库额: 在库.reduce((a, o) => a + storageFeeOf(o), 0),
+      在库数: 在库.length,
+      本月额: 本月.reduce((a, o) => a + storageFeeOf(o), 0),
+      本月数: 本月.length,
+      平均周: 入库过.length ? 周数合计 / 入库过.length : 0,
+      欠款, 逾期数: 逾期.length,
+    }
+  }, [enriched])
+
   const weeklyRevenue = enriched
     .filter(o => !o.actualMoveOutDate)
     .reduce((s, o) => {
@@ -90,6 +118,18 @@ export default function StorageList() {
         <StatCard label="寄存中"   value={counts.active}   color="blue"  onClick={() => setTab('active')} />
         <StatCard label="即将到期" value={counts.expiring} color={counts.expiring > 0 ? 'amber' : 'gray'} onClick={() => setTab('expiring')} />
         <StatCard label="待出库"   value={counts.overdue}  color={counts.overdue > 0 ? 'red' : 'gray'}    onClick={() => setTab('overdue')} />
+      </div>
+
+      {/* 第二排：钱。和上面那排「有几单」配成「有几单 + 值多少钱」 */}
+      <div className="grid grid-cols-4 gap-3 mb-5">
+        <MoneyCard label="在库总额"   value={fmt(money$.在库额)} sub={`${money$.在库数} 单在仓库`}
+          color="violet" onClick={() => setTab('active')} />
+        <MoneyCard label="本月寄存收入" value={fmt(money$.本月额)} sub={`${money$.本月数} 单入库`}
+          color="violet" />
+        <MoneyCard label="平均寄存周数" value={`${money$.平均周.toFixed(1)} 周`} sub="已入库单平均"
+          color="gray" />
+        <MoneyCard label="逾期欠款"   value={fmt(money$.欠款)} sub={`${money$.逾期数} 单逾期`}
+          color={money$.欠款 > 0 ? 'red' : 'gray'} onClick={() => setTab('overdue')} />
       </div>
 
       {/* Overdue / expiring alerts */}
@@ -236,6 +276,20 @@ function StorageCard({ order: o, onClick, onCancel }) {
         </div>
         <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />
       </div>
+    </div>
+  )
+}
+
+const fmt = n => `$${(Number(n) || 0).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+function MoneyCard({ label, value, sub, color, onClick }) {
+  const colors = { violet: 'text-violet-700', red: 'text-red-500', gray: 'text-gray-500' }
+  return (
+    <div onClick={onClick}
+      className={`bg-white rounded-xl p-3 shadow-sm text-center${onClick ? ' cursor-pointer hover:shadow-md transition-shadow' : ''}`}>
+      <p className={`text-lg font-bold ${colors[color] || 'text-gray-800'}`}>{value}</p>
+      <p className="text-gray-400 text-xs mt-0.5">{label}</p>
+      {sub && <p className="text-gray-300 text-[11px] mt-0.5">{sub}</p>}
     </div>
   )
 }

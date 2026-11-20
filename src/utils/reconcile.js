@@ -12,7 +12,7 @@ import { hourlyRateFor } from './wageRates'
 import { billedHours as calcBilled, overtimeDetail } from './pricing'
 import { VEHICLES, STAIRS_FEE, VAN_PROMO_DISCOUNT } from '../data/vehicles'
 import { RETURN_PAY_FROM } from '../config/features'
-import { getStorageRates } from '../data/storageRates'
+import { storageFeeOf } from './storage'
 
 /** 这些字段为空不算异常 —— 低频，不是漏记 */
 export const LOW_FREQUENCY_FEES = ['parkingFee', 'highwayFee', 'fuelFee', 'suppliesFee']
@@ -149,21 +149,14 @@ export function impactOf(order, changes, staffRates) {
 //    和按价目表算出来的对不上（Chen 那单把家具按纸箱单价算了）。
 //    唯一真相是「件数 × 周数 × 价目表」。
 
-/** 单张寄存单的仓储费（不含运输） */
-export function storageFeeOf(order) {
-  const weeks = Math.max(1, Number(order?.weeks) || 1)
-  const { boxRate, furRate } = getStorageRates(weeks)
-  const v = ((Number(order?.boxes) || 0) * boxRate
-           + (Number(order?.furniture) || 0) * furRate) * weeks
-  return Math.round(v * 100) / 100   // r2 是别处函数里的局部变量，这里用不到
-}
-
 /**
  * 某一天该计入营收的寄存费。
  * 口径：按【入库日】计 —— 老板定的规矩是钱先收，师傅到现场确认时长当场收齐，
  *       所以东西进仓那天这笔钱就已经到手了。
  * 范围：师傅交过单（workerStatus=done）且没取消。
  */
+export { storageFeeOf }
+
 export function dayStorageFees(storageOrders, date) {
   return (storageOrders || [])
     .filter(o => o.date === date && o.workerStatus === 'done' && o.status !== '已取消')

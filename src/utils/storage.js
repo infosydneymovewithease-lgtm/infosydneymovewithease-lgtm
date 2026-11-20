@@ -15,6 +15,7 @@
 //    按日期算就错了，按交单算不会错。arrivedAt 也是那时候写的。
 
 import dayjs from 'dayjs'
+import { getStorageRates } from '../data/storageRates'
 
 // ── 催费节奏（老板 2026-11-16 定）─────────────────────────
 //   出库日 −15 天  第一封：问续费还是取货
@@ -93,3 +94,17 @@ export function storageStepUpdates(order, stepKey) {
   }
   return updates
 }
+
+/**
+ * 单张寄存单的仓储费（不含运输）—— 全系统唯一一份。
+ * ⚠️ 不读 totalFee / weeklyFee：规则文档第十节说明那两列是脏字段，
+ *    和按价目表算出来的对不上。唯一真相是「件数 × 周数 × 价目表」。
+ */
+export function storageFeeOf(order) {
+  const weeks = Math.max(1, Number(order?.weeks) || 1)
+  const { boxRate, furRate } = getStorageRates(weeks)
+  const v = ((Number(order?.boxes) || 0) * boxRate
+           + (Number(order?.furniture) || 0) * furRate) * weeks
+  return Math.round(v * 100) / 100   // r2 是别处函数里的局部变量，这里用不到
+}
+
