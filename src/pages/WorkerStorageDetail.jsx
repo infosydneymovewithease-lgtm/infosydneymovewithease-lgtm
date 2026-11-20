@@ -4,7 +4,7 @@ import { ArrowLeft, Phone, Camera, Video, CheckCircle } from 'lucide-react'
 import dayjs from 'dayjs'
 import { useState, useRef, useEffect } from 'react'
 import { saveVideo, getVideo, deleteVideo } from '../utils/mediaDB'
-import { VEHICLES } from '../data/vehicles'
+import { VEHICLES, VAN_PROMO_DISCOUNT } from '../data/vehicles'
 import { roundToHalfHour } from '../utils/pricing'
 import { isDepositPaid } from '../utils/orderHelpers'
 import { getStorageRates, FREE_SUPPLIES_LABEL, SUPPLIES_NOTICE } from '../data/storageRates'
@@ -18,6 +18,13 @@ const STEPS = [
   { key: 'stored',    label: '到达仓库入库', desc: '物品已搬入仓库，准备拍摄凭证' },
 ]
 const STEP_ORDER = STEPS.map(s => s.key)
+
+// ⚠️ 2026-11-21 老板：「照片我觉得 2-3 张都可以」。
+//    原来硬卡 3 张，现场光线不好、东西少的时候凑第三张纯属浪费时间。
+//    下限降到 2，上限仍是 3（想多传一张照样可以）。
+//    数字原来散在 6 个地方，抽成常量，免得下次又改漏一处。
+const 照片下限 = 2
+const 照片上限 = 3
 
 export default function WorkerStorageDetail() {
   const { id } = useParams()
@@ -53,7 +60,22 @@ export default function WorkerStorageDetail() {
 
   // 账单字段（默认从订单回填，没回填用计算值）
   const [billed,         setBilled]         = useState(() => String(order?.billedHours ?? autoBilledHours ?? 0))
-  const [returnFee,      setReturnFee]      = useState(() => String(order?.returnFee ?? v.returnFee ?? 0))
+  // ⚠️ 2026-11-21 老板：「后面的搬运费用核算我很不满意，尤其是没有返程费用这一块」。
+  //    原来写的是 order?.returnFee ?? v.returnFee ?? 0。
+  //    `??` 只在 null/undefined 时才往后找 —— 而 storage_orders."returnFee"
+  //    的数据库默认值就是 **0**，不是 null。所以永远停在 0，
+  //    车型自带的返程费（面包车 $60 / 小卡 $110）一次都没生效过。
+  //    师傅打开看见 0，不会多想，就这么漏收了。
+  //    实际漏收：QX2611076 和 QX2611012 两单返程费都是 $0。
+  //
+  //    判断改成「这单交过没有」：
+  //      交过单 → 显示当时存的，哪怕是 0（师傅当时就是这么填的，不能替他改）
+  //      没交过 → 0 视为「还没填」，用车型默认值兜底
+  const [returnFee, setReturnFee] = useState(() => {
+    const 存的 = Number(order?.returnFee) || 0
+    if (order?.workerStatus === 'done') return String(存的)
+    return String(存的 > 0 ? 存的 : (v.returnFee || 0))
+  })
   const [stairFee,       setStairFee]       = useState(() => String(order?.stairFee ?? 0))
   const [overtimeFee,    setOvertimeFee]    = useState(() => String(order?.overtimeFee ?? 0))
   const [heavyFee,       setHeavyFee]       = useState(() => String(order?.heavyFee ?? 0))
@@ -116,7 +138,7 @@ export default function WorkerStorageDetail() {
   const workerStatus = order.workerStatus || null
   const currentStepIdx = workerStatus ? STEP_ORDER.indexOf(workerStatus) : -1
   const isDone = order.status === '寄存中'
-  const canSubmit = photos.length >= 3 && (videoUrl || order.hasVideo)
+  const canSubmit = photos.length >= 照片下限 && (videoUrl || order.hasVideo)
 
   // 打印状态：null / 'sending' / 提示文字
   const [printMsg, setPrintMsg] = useState(null)
@@ -139,9 +161,24 @@ export default function WorkerStorageDetail() {
     setTimeout(() => setPrintMsg(null), 8000)
   }
 
+  // ⚠️ 2026-11-21 老板：「点击确认订单，但订单不会像搬运订单那样
+  //    从未确认进入到进行中」。
+  //
+  //    原因：这里只写 workerStatus，【从来不碰 status】。
+  //    而师傅端首页是按 status 分桶的（Home.jsx）：
+  //      未确认 = 待确认 / 已派单     进行中 = 已确认     已完成 = 寄存中
+  //    「已确认」全项目只有【客服后台】那个按钮会设，师傅点一百次也不动。
+  //    结果寄存单从「未确认」直接跳到「已完成」，中间那一格永远是空的。
+  //
+  //    ⚠️ 只在「待确认 / 已派单」时才推进。别的状态一律不碰 ——
+  //    已经「寄存中」的单如果被退回这一步，不能把它打回「已确认」。
   function advanceStep(stepKey) {
     const updates = { workerStatus: stepKey }
     if (stepKey === 'arrived') updates.arrivedAt = new Date().toISOString()
+    if (stepKey === 'confirmed' && ['待确认', '已派单'].includes(order?.status)) {
+      updates.status = '已确认'
+      updates.confirmedAt = new Date().toISOString()
+    }
     updateStorageOrder(id, updates)
     if (stepKey === 'stored') 打标签(true)
   }
@@ -177,7 +214,7 @@ export default function WorkerStorageDetail() {
   }
 
   async function handleAddPhoto(e) {
-    const files = Array.from(e.target.files).slice(0, 3 - photos.length)
+    const files = Array.from(e.target.files).slice(0, 照片上限 - photos.length)
     e.target.value = ''
     if (!files.length) return
     setPhotoBusy(true); setPhotoErr('')
@@ -232,12 +269,18 @@ export default function WorkerStorageDetail() {
   // 实时账单计算
   const num = s => Number(s) || 0
   const billedNum = num(billed)
-  const hourlyRate = v.hourlyRate
+  // ⚠️ 2026-11-21：协议价。原来写死 v.hourlyRate，企业客户的协议时薪在寄存单上【完全无效】。
+  //    搬家单（FormPage）用的是 order.hourlyRate != null ? … : 车型价，这里对齐。
+  const hourlyRate = order?.hourlyRate != null ? Number(order.hourlyRate) : v.hourlyRate
   const timeFee = Math.round(billedNum * hourlyRate * 100) / 100
+  // ⚠️ 2026-11-21：面包车优惠。搬家单走 pricing.js 会减这 $10（老板说的「出车费 $50」
+  //    就是 $60 − $10），寄存单从头到尾没引用过 VAN_PROMO_DISCOUNT，等于多收客人 $10。
+  //    只在真收了返程费时才减 —— 返程费是 0 就没有优惠可言。
+  const vanDiscount = (order?.vehicle === '面包车' && num(returnFee) > 0) ? VAN_PROMO_DISCOUNT : 0
   const transportSubtotal = Math.round((timeFee
     + num(returnFee) + num(stairFee) + num(overtimeFee) + num(heavyFee)
     + num(highwayFee) + num(parkingFee) + num(suppliesFee) + num(fuelFee)
-    - num(discountAmount)) * 100) / 100
+    - vanDiscount - num(discountAmount)) * 100) / 100
   const subtotalAll = transportSubtotal + storageFee
   const gstAmount = paymentMethod === 'transfer'
     ? Math.round(subtotalAll * 0.1 * 100) / 100
@@ -341,6 +384,30 @@ export default function WorkerStorageDetail() {
                 onChange={n => updateStorageOrder(id, { furniture: n })}
               />
               <p className="text-xs text-gray-400 mt-1">客户现场加件时直接改数字，寄存费会自动重算</p>
+            </div>
+
+            {/* ⚠️ 2026-11-21 老板：「在最上面有了物品数量和时间就应该有个核算价格的，
+                 因为装完车后我会和客人把全部费用结算清楚，包括寄存费用，
+                 这时候上面有自动核算出的寄存费用会帮到我一点」。
+                 以前这个数只在最底下的「费用结算」里，而那一块要点了【到达仓库】才出现 ——
+                 等它出现，人已经在仓库，客人早走了。
+                 这里只负责【显示】，件数在上面改、周数在下面改，这儿跟着变。 */}
+            <div className="border-t border-gray-100 pt-2 mt-1">
+              <div className="rounded-lg bg-violet-50 border border-violet-200 px-3 py-2.5">
+                <div className="flex items-baseline justify-between mb-1.5">
+                  <span className="text-xs font-semibold text-violet-700">📦 寄存费（自动算）</span>
+                  <span className="text-xl font-bold text-violet-700">${storageFee.toFixed(2)}</span>
+                </div>
+                <div className="text-xs text-violet-600/80 leading-relaxed">
+                  {(order.boxes || 0) > 0 && <div>纸箱 {order.boxes} 件 × ${boxRate}/周</div>}
+                  {(order.furniture || 0) > 0 && <div>家具 {order.furniture} 件 × ${furRate}/周</div>}
+                  <div>
+                    {weeks} 周 · {shortTerm ? '短期价' : '长期价'}
+                    {weeksOverridden && <span className="text-amber-600 ml-1">（按实付周数，非日期推算）</span>}
+                  </div>
+                </div>
+                <p className="text-[11px] text-violet-500/70 mt-1.5">周数在下面「费用结算」里改</p>
+              </div>
             </div>
 
             {order.items && <Row label="物品描述">{order.items}</Row>}
@@ -459,9 +526,8 @@ export default function WorkerStorageDetail() {
               )
             })}
 
-            {/* Upload section — unlocks after step 4 (stored) */}
+            {/* 入库凭证 —— 照片和视频是【到了仓库】才拍的，保持在 stored 这一步 */}
             {currentStepIdx >= 2 && (
-              <>
                 <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                   <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100">
         {/* ⚠️ 打印条：自动打完也留一个补打按钮 ——
@@ -494,8 +560,11 @@ export default function WorkerStorageDetail() {
                     {/* Photos */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs text-gray-500 font-medium">照片 {photos.length}/3</p>
-                        {photos.length < 3 && (
+                        <p className="text-xs text-gray-500 font-medium">
+                          照片 {photos.length}/{照片上限}
+                          <span className="text-gray-400 ml-1">（至少 {照片下限} 张）</span>
+                        </p>
+                        {photos.length < 照片上限 && (
                           <button onClick={() => photoInputRef.current?.click()}
                             className="text-xs text-red-600 font-semibold flex items-center gap-1">
                             <Camera size={12} /> 拍照 / 选图
@@ -529,7 +598,7 @@ export default function WorkerStorageDetail() {
                               </button>
                             </div>
                           ))}
-                          {photos.length < 3 && (
+                          {photos.length < 照片上限 && (
                             <button onClick={() => photoInputRef.current?.click()}
                               className="w-24 h-24 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-1 text-gray-300 flex-shrink-0">
                               <Camera size={20} />
@@ -570,10 +639,22 @@ export default function WorkerStorageDetail() {
                     </div>
                   </div>
                 </div>
+            )}
 
-                {/* Fee + submit */}
+            {/* ⚠️ 2026-11-21 老板：「装完车后我会和客人把全部费用结算清楚，包括寄存费用」。
+                 原来这一整块和照片一起锁在 currentStepIdx >= 2（到达仓库）后面 ——
+                 可他结算的时候人还在客户家，是第 1 步（到达取货地址）。
+                 等费用区出现，他已经在仓库，客人早走了，只能心算。
+                 现在提前到第 1 步就显示：能算、能改、能和客人对数；
+                 【提交】仍然要等拍完入库照片和视频，那个闸门没动。 */}
+            {currentStepIdx >= 1 && (
                 <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
                   <h3 className="font-semibold text-gray-800">费用结算</h3>
+                  {currentStepIdx < 2 && (
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      现在就能和客人对数、收钱。<b>提交要等到了仓库拍完照片和视频。</b>
+                    </p>
+                  )}
 
                   {/* 运输部分 */}
                   <div className="space-y-2 pb-3 border-b border-gray-100">
@@ -672,6 +753,13 @@ export default function WorkerStorageDetail() {
 
                   {/* 汇总 */}
                   <div className="bg-amber-50 rounded-xl p-3 space-y-1 text-sm border border-amber-100">
+                    {/* 面包车优惠单独列一行 —— 混在「运输小计」里，
+                        客人问「怎么算的」就说不清，和搬家单的收据也对不上 */}
+                    {vanDiscount > 0 && (
+                      <div className="flex justify-between text-green-700">
+                        <span>面包车优惠</span><span>-${vanDiscount.toFixed(2)}</span>
+                      </div>
+                    )}
                     <Row label="运输小计">${transportSubtotal.toFixed(2)}</Row>
                     <Row label="寄存费">${storageFee}</Row>
                     {gstAmount > 0 && <Row label="GST (转账)">${gstAmount.toFixed(2)}</Row>}
@@ -701,10 +789,9 @@ export default function WorkerStorageDetail() {
                       ? '提交中…'
                       : canSubmit
                         ? '✅ 提交账单'
-                        : `还需上传 ${3 - photos.length > 0 ? `${3 - photos.length}张照片` : ''}${(!videoUrl && !order.hasVideo) ? (photos.length < 3 ? ' + 视频' : '视频') : ''}`}
+                        : `还需 ${照片下限 - photos.length > 0 ? `${照片下限 - photos.length} 张照片` : ''}${(!videoUrl && !order.hasVideo) ? (photos.length < 照片下限 ? ' + 视频' : '视频') : ''}`}
                   </button>
                 </div>
-              </>
             )}
           </>
         )}
