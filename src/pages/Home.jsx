@@ -259,7 +259,10 @@ function StorageCard({ order, onClick, onConfirm }) {
             catch (err) { alert(err.message || '确认失败，请重试') }
           }}
           className="flex-shrink-0 w-16 flex flex-col items-center justify-center gap-1 text-white text-xs font-bold"
-          style={{ background: 'linear-gradient(135deg, #6b1414, #c0392b)' }}>
+          /* ⚠️ 紫色，和搬家单的红色区分开（老板 11-21）。
+             寄存板块本来就是紫色系：已派单徽章 purple、寄存费面板 violet。
+             师傅一屏上同时有两种单，颜色一样很容易点错那一个。 */
+          style={{ background: 'linear-gradient(135deg, #5b21b6, #7c3aed)' }}>
           <CheckCircle size={18} />
           <span>确认</span>
           <span>收单</span>
