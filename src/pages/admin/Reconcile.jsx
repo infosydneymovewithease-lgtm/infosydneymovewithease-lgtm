@@ -13,6 +13,7 @@ import { useApp } from '../../context/AppContext'
 import { sydneyToday, addDays, hhmmIn } from '../../utils/date'
 import {
   vehicleMedians, detectIssues, impactOf, daySummary, participants, RECONCILE_FIELDS,
+  dayStorageFees,
   deriveDraft, DERIVED_FIELDS, unitPriceOf, feeToQty, breakdown, STANDARD_DEPOSIT,
 } from '../../utils/reconcile'
 import {
@@ -78,7 +79,7 @@ function composeDT(order, key, hhmm, draft) {
 }
 
 export default function Reconcile() {
-  const { user, orders, staffRates, staff, reconcileOrder, undoReconcile, closeDay, reopenDay,
+  const { user, orders, storageOrders, staffRates, staff, reconcileOrder, undoReconcile, closeDay, reopenDay,
           getReconcile, markReconciled, unmarkReconciled, markAllReconciled, b2bCustomers } = useApp()
   // 从「团队今日」的「去对账」跳过来时带着 ?date= ——
   // 老板定的流程是第二天早上核前一天，落地页必须直接是那一天，
@@ -111,7 +112,12 @@ export default function Reconcile() {
     () => orders.filter(o => o.date === date).sort((a, b) => (a.orderNo || '').localeCompare(b.orderNo || '')),
     [orders, date])
   const done = dayOrders.filter(o => o.status === '已完成')
-  const sum = useMemo(() => daySummary(dayOrders, staffRates, b2bCustomers), [dayOrders, staffRates, b2bCustomers])
+  // ⚠️ 2026-11-21 老板：「寄存费用这个在核算啊什么的却是没有一个出口」。
+  //    11/20 这天对账 4 单全是搬家单 $1468.01，寄存单 QX2611060 的 $312 一分没进来。
+  //    只取【仓储那部分】—— 运输已经由并行的搬家单记过了，拿 finalAmount 会算两遍。
+  const dayStorage = useMemo(() => dayStorageFees(storageOrders, date), [storageOrders, date])
+  const sum = useMemo(() => daySummary(dayOrders, staffRates, b2bCustomers, dayStorage),
+    [dayOrders, staffRates, b2bCustomers, dayStorage])
 
   const issuesBy = useMemo(() => Object.fromEntries(
     done.map(o => [o.id, detectIssues(o, { medians, staffRates })])), [done, medians, staffRates])
@@ -231,7 +237,7 @@ export default function Reconcile() {
         </div>
       )}
       <div className="space-y-2">
-        {dayOrders.length === 0 && (
+        {dayOrders.length === 0 && dayStorage.length === 0 && (
           <p className="text-center text-gray-400 text-sm py-10">这一天没有订单</p>
         )}
         {dayOrders.map(o => (
@@ -245,10 +251,37 @@ export default function Reconcile() {
             onCheck={v => run(() => v ? markReconciled(o.id, date) : unmarkReconciled(o.id))}
             onDirty={n => setDirty(d => (d[o.id] || 0) === n ? d : { ...d, [o.id]: n })} />
         ))}
+
+        {/* 寄存费 —— 单独一块，不和搬家单混在一行。
+            老板 11-19 看到「一单拆两行」的草图第一反应是「你是把寄存单分成 2 部分了吗」，
+            所以这里不装成订单行，明确标成另一种钱：运费 vs 仓储费。 */}
+        {dayStorage.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden ring-1 ring-violet-100">
+            <div className="px-4 py-2 bg-violet-50 border-b border-violet-100 flex items-center justify-between">
+              <span className="text-xs font-bold text-violet-700">📦 寄存费 · 仓储部分</span>
+              <span className="text-xs text-violet-500">入库当天收清，不含运输、不算工资</span>
+            </div>
+            {dayStorage.map(s => (
+              <div key={s.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-50 last:border-0">
+                <span className="font-mono text-sm font-semibold text-gray-700 w-24 shrink-0">{s.orderNo}</span>
+                <span className="text-sm text-gray-600 flex-1 min-w-0 truncate">{s.customerName}</span>
+                <span className="text-xs text-gray-400 w-40 shrink-0 text-right">
+                  纸箱 {s.boxes} 件{s.furniture > 0 ? ` · 家具 ${s.furniture} 件` : ''} × {s.weeks} 周
+                </span>
+                <span className="text-xs w-16 shrink-0 text-center text-gray-400">
+                  {s.paymentMethod === 'transfer' ? '转账' : '现金'}
+                </span>
+                <span className="font-mono text-sm font-semibold text-violet-700 w-24 text-right shrink-0">
+                  {money(s.fee)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* 确认 */}
-      {done.length > 0 && (
+      {/* 确认 —— 只有寄存单没有搬家单的日子也要能确认，否则那天卡住没法收尾 */}
+      {(done.length > 0 || dayStorage.length > 0) && (
         <div className="mt-5 bg-white rounded-2xl p-4 shadow-sm">
           {confirmed ? (
             <div className="flex items-center justify-between gap-3 flex-wrap">

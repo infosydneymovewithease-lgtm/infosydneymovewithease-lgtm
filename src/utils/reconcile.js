@@ -12,6 +12,7 @@ import { hourlyRateFor } from './wageRates'
 import { billedHours as calcBilled, overtimeDetail } from './pricing'
 import { VEHICLES, STAIRS_FEE, VAN_PROMO_DISCOUNT } from '../data/vehicles'
 import { RETURN_PAY_FROM } from '../config/features'
+import { getStorageRates } from '../data/storageRates'
 
 /** 这些字段为空不算异常 —— 低频，不是漏记 */
 export const LOW_FREQUENCY_FEES = ['parkingFee', 'highwayFee', 'fuelFee', 'suppliesFee']
@@ -130,7 +131,56 @@ export function impactOf(order, changes, staffRates) {
 
 /** 当日汇总。随补录实时变。
  *  工资按人拆开 —— Annie要拿这个和每个师傅核工资，只给总数等于没给。 */
-export function daySummary(orders, staffRates, b2bCustomers) {
+
+// ═══════════════════════════════════════════════════════════
+// 寄存费进对账（2026-11-21）
+// ═══════════════════════════════════════════════════════════
+// 老板看着 11/20 的对账说：「寄存费用这个在核算啊什么的却是没有一个出口」。
+// 那天 4 单全是搬家单 $1468.01，寄存单 QX2611060 的 $312 一分钱没进来。
+// 寄存费从来没进过对账、周月汇总、工资页 —— 三个文件 grep storage 全是 0。
+//
+// ⚠️ 只取【仓储那部分】，绝不能用 finalAmount。
+//    QX2611060 的 finalAmount $402 = 寄存费 312 + 运输 120 − 定金 30，
+//    而那趟运输【已经由并行的搬家单 QX2611080 记进对账了】
+//    （老板现在的做法是让客服同时拍一单寄存、一单搬家）。
+//    拿 finalAmount 进来就是把运输算两遍。
+//
+// ⚠️ 也不能读 totalFee / weeklyFee —— 规则文档第十节：那两列是脏字段，
+//    和按价目表算出来的对不上（Chen 那单把家具按纸箱单价算了）。
+//    唯一真相是「件数 × 周数 × 价目表」。
+
+/** 单张寄存单的仓储费（不含运输） */
+export function storageFeeOf(order) {
+  const weeks = Math.max(1, Number(order?.weeks) || 1)
+  const { boxRate, furRate } = getStorageRates(weeks)
+  const v = ((Number(order?.boxes) || 0) * boxRate
+           + (Number(order?.furniture) || 0) * furRate) * weeks
+  return Math.round(v * 100) / 100   // r2 是别处函数里的局部变量，这里用不到
+}
+
+/**
+ * 某一天该计入营收的寄存费。
+ * 口径：按【入库日】计 —— 老板定的规矩是钱先收，师傅到现场确认时长当场收齐，
+ *       所以东西进仓那天这笔钱就已经到手了。
+ * 范围：师傅交过单（workerStatus=done）且没取消。
+ */
+export function dayStorageFees(storageOrders, date) {
+  return (storageOrders || [])
+    .filter(o => o.date === date && o.workerStatus === 'done' && o.status !== '已取消')
+    .map(o => ({
+      id: o.id,
+      orderNo: o.orderNo || o.id.slice(-6),
+      customerName: o.customerName,
+      boxes: Number(o.boxes) || 0,
+      furniture: Number(o.furniture) || 0,
+      weeks: Math.max(1, Number(o.weeks) || 1),
+      paymentMethod: o.paymentMethod,
+      paymentStatus: o.paymentStatus,
+      fee: storageFeeOf(o),
+    }))
+}
+
+export function daySummary(orders, staffRates, b2bCustomers, storageFees = []) {
   let due = 0, paid = 0, cash = 0, transfer = 0
   const byStaff = new Map()
   for (const o of orders) {
@@ -153,9 +203,21 @@ export function daySummary(orders, staffRates, b2bCustomers) {
       byStaff.set(id, { ...cur, amount: cur.amount + (w?.total || 0), orders: cur.orders + 1 })
     }
   }
+  // 寄存费：进应收/已收，【不进工资】—— 仓储费里没有人工
+  let storageDue = 0
+  for (const s of storageFees) {
+    const amt = Number(s.fee) || 0
+    storageDue += amt
+    due += amt
+    // 「寄存中」就代表师傅现场已经收齐（老板 11-17 定的规矩），所以一律计已收
+    paid += amt
+    if (s.paymentMethod === 'transfer') transfer += amt
+    else cash += amt
+  }
+
   const wageList = [...byStaff.values()].sort((a, b) => b.amount - a.amount)
   return {
-    due, paid, unpaid: due - paid, cash, transfer,
+    due, paid, unpaid: due - paid, cash, transfer, storageDue,
     wages: wageList.reduce((a, w) => a + w.amount, 0),
     wageList,
   }
