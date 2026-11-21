@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
-import { ArrowLeft, Phone, Camera, Video, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Phone, Camera, Video, CheckCircle, MapPin } from 'lucide-react'
 import dayjs from 'dayjs'
 import { useState, useRef, useEffect } from 'react'
 import { saveVideo, getVideo, deleteVideo } from '../utils/mediaDB'
@@ -24,6 +24,29 @@ const STEP_ORDER = STEPS.map(s => s.key)
 //    原来硬卡 3 张，现场光线不好、东西少的时候凑第三张纯属浪费时间。
 //    下限降到 2，上限仍是 3（想多传一张照样可以）。
 //    数字原来散在 6 个地方，抽成常量，免得下次又改漏一处。
+// 地图链接 —— 和搬家单（OrderDetail.jsx）同一套：iOS 开苹果地图，其余开 Google
+function mapUrl(address) {
+  const e = encodeURIComponent(address)
+  return /iphone|ipad|ipod/i.test(navigator.userAgent)
+    ? `maps://maps.apple.com/?q=${e}` : `https://maps.google.com/?q=${e}`
+}
+
+function AddrRow({ label, address, color }) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <MapPin size={15} className={`flex-shrink-0 mt-0.5 ${color}`} />
+      <div className="flex-1 min-w-0">
+        <p className={`text-xs font-bold mb-0.5 ${color}`}>{label}</p>
+        <p className="text-gray-800 text-sm leading-snug">{address}</p>
+      </div>
+      <a href={mapUrl(address)}
+        className="flex-shrink-0 text-blue-600 text-xs font-semibold bg-blue-50 px-3 py-1.5 rounded-lg">
+        地图
+      </a>
+    </div>
+  )
+}
+
 const 照片下限 = 2
 const 照片上限 = 3
 
@@ -357,12 +380,26 @@ export default function WorkerStorageDetail() {
           </div>
           <div className="border-t border-gray-100 pt-2 space-y-1">
             <Row label="入库日期">{order.moveInDate}</Row>
+            {/* ⚠️ 2026-11-21 老板实测：「我改了时间的话，它还是按照那 11 周的来，
+                 改成一周了结果算还是 800 多」。
+                 原来这个 onChange【只改日期不改周数】—— 而寄存费读的是 order.weeks
+                 （11-10 定的：客人付了几周才是事实，日期只是预计）。
+                 结果日期改了钱纹丝不动，得再去下面「费用结算」里单独改周数。
+                 现在改日期就按新日期重算周数；想让两者不一致（客人只付 9 周但放 12 周），
+                 改完日期再去下面改周数 —— 那边仍然是最终说了算的。 */}
             <div className="flex items-center justify-between py-0.5">
               <span className="text-gray-500 text-sm">预计取件</span>
               <input
                 type="date"
                 value={order.moveOutDate || ''}
-                onChange={e => updateStorageOrder(id, { moveOutDate: e.target.value })}
+                onChange={e => {
+                  const 新日 = e.target.value
+                  const 天 = dayjs(新日).diff(dayjs(order.moveInDate), 'day')
+                  const 新周 = Math.max(1, Math.ceil(天 / 7))
+                  updateStorageOrder(id, Number.isFinite(新周)
+                    ? { moveOutDate: 新日, weeks: 新周 }
+                    : { moveOutDate: 新日 })
+                }}
                 className="text-sm font-medium text-gray-800 text-right bg-transparent border-b border-gray-200 focus:border-red-300 focus:outline-none"
               />
             </div>
@@ -406,6 +443,17 @@ export default function WorkerStorageDetail() {
                 <p className="text-[11px] text-violet-500/70 mt-1.5">周数在下面「费用结算」里改</p>
               </div>
             </div>
+
+            {/* ⚠️ 2026-11-21 老板：「寄存订单和搬运订单区别没有地址，早上司机不知道去哪里」。
+                 fromAddress 库里本来就有值（QX2611093 = 104 Seven Hills Rd…），
+                 只是这一页从来没显示过。搬家单（OrderDetail）早就有这一块。 */}
+            {order.fromAddress && (
+              <div className="border-t border-gray-100 pt-2 mt-1 space-y-2">
+                <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">地址</p>
+                <AddrRow label="取货" address={order.fromAddress} color="text-red-500" />
+                <AddrRow label="送达" address={order.deliveryAddress || '仓库'} color="text-green-600" />
+              </div>
+            )}
 
             {order.items && <Row label="物品描述">{order.items}</Row>}
             {order.location && <Row label="仓位">{order.location}</Row>}
@@ -464,7 +512,20 @@ export default function WorkerStorageDetail() {
               {order.timeFee != null && <Row label="工时费">${Number(order.timeFee).toFixed(2)}</Row>}
               <Row label="运输小计">${Number(order.movingFee || 0).toFixed(2)}</Row>
               <Row label="寄存费">${storageFee}</Row>
-              {Number(order.gst) > 0 && <Row label="GST">${Number(order.gst).toFixed(2)}</Row>}
+              {/* ⚠️ 2026-11-21 老板：「这个结算看着还不错，就是看不到减去定金的部分，
+                   和如果客人转账的情况下」。
+                   QX2611093：运输 140 + 寄存 95 = 235，应付 205 —— 中间那 30 定金
+                   以前一个字都没有，客人问「怎么少了 30」只能靠师傅自己记。 */}
+              {Number(order.deposit) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500 text-sm">减定金</span>
+                  <span className="text-orange-600 text-sm">-${Number(order.deposit).toFixed(2)}</span>
+                </div>
+              )}
+              {order.paymentMethod === 'transfer' && (
+                <Row label="GST（转账 10%）">${Number(order.gst || 0).toFixed(2)}</Row>
+              )}
+              <Row label="收款方式">{order.paymentMethod === 'transfer' ? '转账' : '现金'}</Row>
               <div className="border-t border-green-200 pt-1 flex justify-between">
                 <span className="text-green-700 font-semibold">客户应付</span>
                 <span className="text-green-700 font-bold">${Number(order.finalAmount ?? (Number(order.movingFee || 0) + storageFee)).toFixed(2)}</span>
